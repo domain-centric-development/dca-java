@@ -1,0 +1,59 @@
+name: Release
+
+# Tag-driven, one artifact per tag:
+#   building-blocks/v1.2.0  -> publishes :dca-building-blocks 1.2.0
+#   archunit/v3.4.1         -> publishes :dca-archunit 3.4.1
+on:
+  push:
+    tags:
+      - 'building-blocks/v*'
+      - 'archunit/v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Resolve artifact and version from tag
+        id: tag
+        run: |
+          TAG="${GITHUB_REF_NAME}"                 # e.g. archunit/v1.2.3
+          PREFIX="${TAG%%/*}"                     # archunit
+          VERSION="${TAG##*/v}"                   # 1.2.3
+          case "$PREFIX" in
+            building-blocks) PROJECT=dca-building-blocks; PROP=buildingBlocksVersion ;;
+            archunit)        PROJECT=dca-archunit;        PROP=archunitVersion ;;
+            *) echo "unknown tag prefix $PREFIX"; exit 1 ;;
+          esac
+          echo "project=$PROJECT" >> "$GITHUB_OUTPUT"
+          echo "prop=$PROP"       >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build and test
+        run: ./gradlew :${{ steps.tag.outputs.project }}:build -P${{ steps.tag.outputs.prop }}=${{ steps.tag.outputs.version }} --no-daemon
+
+      # Publishing to Maven Central (Sonatype Central Portal) — wired up in WP-09:
+      # requires CENTRAL_USERNAME / CENTRAL_PASSWORD / GPG_PRIVATE_KEY / GPG_PASSPHRASE org secrets
+      # and the central-portal publishing plugin in build.gradle.kts.
+      - name: Publish
+        run: ./gradlew :${{ steps.tag.outputs.project }}:publish -P${{ steps.tag.outputs.prop }}=${{ steps.tag.outputs.version }} --no-daemon
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.tag.outputs.project }} ${{ steps.tag.outputs.version }}
+          body: See ${{ steps.tag.outputs.project }}/CHANGELOG.md
+          files: ${{ steps.tag.outputs.project }}/build/libs/*.jar
