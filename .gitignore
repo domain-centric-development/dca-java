@@ -3,4 +3,4 @@ build/
 .idea/
 *.iml
 .DS_Store
-out/
+/out/
