@@ -9,6 +9,7 @@ import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
+import dev.domaincentric.dca.archunit.DcaRuleViolation;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.DomainEvent;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.DomainService;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.Factory;
@@ -438,7 +439,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
 
   private static void failIfAny(List<String> violations, String header) {
     if (!violations.isEmpty()) {
-      throw new AssertionError(header + "\n" + String.join("\n", violations));
+      throw new DcaRuleViolation(header, violations);
     }
   }
 }

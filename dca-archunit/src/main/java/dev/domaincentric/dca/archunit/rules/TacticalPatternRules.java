@@ -13,6 +13,7 @@ import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
+import dev.domaincentric.dca.archunit.DcaRuleViolation;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.AggregateRoot;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.Entity;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.Factory;
@@ -638,14 +639,11 @@ public final class TacticalPatternRules implements DcaRuleSet {
               }
             }
           }
-          if (!violations.isEmpty()) {
-            throw new AssertionError(
-                "Store interfaces use record/count/exists semantics, not findById/save.\n"
-                    + "Violations:\n"
-                    + String.join("\n", violations)
-                    + "\n\nFix: rename to *Repository if the stored object is an Aggregate Root,"
-                    + " otherwise rename the methods to record(...), count(...), exists(...).");
-          }
+          fail(
+              "Store interfaces use record/count/exists semantics, not findById/save."
+                  + " Fix: rename to *Repository if the stored object is an Aggregate Root,"
+                  + " otherwise rename the methods to record(...), count(...), exists(...).",
+              violations);
         });
   }
 
@@ -790,7 +788,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
 
   private static void fail(String message, List<String> violations) {
     if (!violations.isEmpty()) {
-      throw new AssertionError(message + "\nViolations found:\n" + String.join("\n", violations));
+      throw new DcaRuleViolation(message, violations);
     }
   }
 }

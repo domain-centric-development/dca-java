@@ -2,6 +2,7 @@ package dev.domaincentric.dca.archunit;
 
 import com.tngtech.archunit.lang.ArchRule;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -30,20 +31,27 @@ public interface DcaRule {
   /** Runs the rule; throws {@link AssertionError} on violation. */
   void check(DcaArchitecture architecture);
 
+  /**
+   * The single ArchUnit rule behind this check, when there is one.
+   *
+   * <p>Rules built with {@link #of} expose theirs, which is what makes freezing a baseline and
+   * filtering individual violations possible. Rules built with {@link #check} run several checks
+   * internally (once per bounded context, say) and return {@link Optional#empty()}.
+   */
+  default Optional<ArchRule> archRule(DcaArchitecture architecture) {
+    return Optional.empty();
+  }
+
   /** A rule built from a single ArchUnit rule derived from the architecture. */
   static DcaRule of(
       String id, String title, String rationale, Function<DcaArchitecture, ArchRule> rule) {
     Objects.requireNonNull(rule);
-    return new SimpleRule(
-        id,
-        title,
-        rationale,
-        arch -> rule.apply(arch).as(title).because(rationale).check(arch.classes()));
+    return new SimpleRule(id, title, rationale, null, rule);
   }
 
   /** A rule with custom check logic (loops over contexts, reflective checks, …). */
   static DcaRule check(String id, String title, String rationale, Consumer<DcaArchitecture> check) {
-    return new SimpleRule(id, title, rationale, check);
+    return new SimpleRule(id, title, rationale, Objects.requireNonNull(check), null);
   }
 
   /** Default implementation used by the factories. */
@@ -52,12 +60,19 @@ public interface DcaRule {
     private final String title;
     private final String rationale;
     private final Consumer<DcaArchitecture> check;
+    private final Function<DcaArchitecture, ArchRule> archRule;
 
-    SimpleRule(String id, String title, String rationale, Consumer<DcaArchitecture> check) {
+    SimpleRule(
+        String id,
+        String title,
+        String rationale,
+        Consumer<DcaArchitecture> check,
+        Function<DcaArchitecture, ArchRule> archRule) {
       this.id = Objects.requireNonNull(id);
       this.title = Objects.requireNonNull(title);
       this.rationale = Objects.requireNonNull(rationale);
-      this.check = Objects.requireNonNull(check);
+      this.check = check;
+      this.archRule = archRule;
     }
 
     @Override
@@ -77,7 +92,20 @@ public interface DcaRule {
 
     @Override
     public void check(DcaArchitecture architecture) {
-      check.accept(architecture);
+      if (check != null) {
+        check.accept(architecture);
+      } else {
+        described(architecture).check(architecture.classes());
+      }
+    }
+
+    @Override
+    public Optional<ArchRule> archRule(DcaArchitecture architecture) {
+      return archRule == null ? Optional.empty() : Optional.of(described(architecture));
+    }
+
+    private ArchRule described(DcaArchitecture architecture) {
+      return archRule.apply(architecture).as(title).because(rationale);
     }
 
     @Override

@@ -8,6 +8,7 @@ import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
+import dev.domaincentric.dca.archunit.DcaRuleViolation;
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.BoundedContext;
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.relationships.ExternalUpstream;
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.relationships.Partnership;
@@ -679,7 +680,7 @@ public final class ContextMapRules implements DcaRuleSet {
 
   private static void require(boolean condition, String message) {
     if (!condition) {
-      throw new AssertionError(message);
+      throw new DcaRuleViolation("", List.of(message));
     }
   }
 

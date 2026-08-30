@@ -75,7 +75,8 @@ class ArchitectureTest extends DcaArchitectureTest {
 }
 ```
 
-That is the whole test. Every rule runs as its own dynamic test, named `[DCA-TAC-001] Aggregate roots must …`.
+That is the whole test. Rules run as dynamic tests grouped by rule set, each named
+`[DCA-TAC-001] Aggregate roots must …`.
 
 ### 3. Adapt to your layout
 
@@ -88,18 +89,58 @@ DcaLayout.forBasePackage("com.acme.shop")
     .withFrameworkAnnotations(FrameworkAnnotations.spring());   // or your own FQNs
 ```
 
-Switch rules off by id, or pick rule sets:
+### 4. Choose which rules run, and how strictly
+
+The catalog is opinionated, and no team adopts all of it on day one. A rule you disagree with, or
+cannot satisfy yet, is a decision to record — not a reason to drop the library. `DcaRuleSelection`
+expresses four things:
 
 ```java
-@Override protected Set<String> excludedRuleIds() { return Set.of("DCA-NAM-004"); }
-@Override protected List<DcaRule> rules() { return DcaRules.only(layout(), "tactical", "hexagonal"); }
+@Override
+protected DcaRuleSelection additionalSelection() {
+  return DcaRuleSelection.all()
+      .onlySets("cycles", "layered", "hexagonal")            // scope: adopt in stages
+      .excluding("DCA-NAM-002", "no DI framework here")      // off, with the reason
+      .warning("DCA-TAC-009", "made final step by step")     // reported, does not fail the build
+      .ignoringViolationsMatching("DCA-STR-003", ".*legacy.*")   // a documented exception
+      .frozen("DCA-ONI-002")                                 // baseline: only new violations fail
+      .withFreezeStore(Path.of("arch/frozen"));
+}
 ```
+
+A rule that is switched off or lowered to a warning **stays in the report**, aborted with the reason
+you recorded — so the decision remains visible instead of vanishing from the run.
+
+The same configuration can live in `dca-archunit.properties` on the test class path, which the base
+class reads and `additionalSelection()` is then applied on top of. No Java needed to tune it:
+
+```properties
+dca.rules.sets              = cycles,layered,hexagonal
+dca.rules.off               = DCA-NAM-002
+dca.rule.DCA-NAM-002.reason = no DI framework in this project
+dca.rules.warn              = DCA-TAC-009
+dca.rules.warn.sets         = naming
+dca.rule.DCA-STR-003.ignore = .*legacy.*
+dca.rules.freeze            = DCA-ONI-002
+dca.rules.freeze.store      = arch/frozen
+```
+
+An unknown rule id or set name fails the run immediately — a typo must never leave a rule silently
+enforced.
+
+Both sources combine: the file is the base, `additionalSelection()` is merged on top, and the later
+entry wins per rule id. Override `additionalSelection()`, not `selection()` — the latter *replaces*
+the file, so a `dca-archunit.properties` added later would be ignored without a word.
+
+**One limitation.** Freezing needs a single ArchUnit rule to build the baseline from. The rules that
+run several checks internally — the context-map set and those iterating over bounded contexts —
+cannot be frozen; freezing one fails with a message naming it. Lower those to `warning(...)` instead.
 
 Without JUnit's base class:
 
 ```java
 DcaArchitecture arch = DcaArchitecture.load(DcaLayout.forBasePackage("com.acme.shop"));
-DcaRules.checkAll(arch);                       // or iterate DcaRules.all(arch.layout())
+DcaRules.checkAll(arch);                       // or checkAll(arch, selection) with a selection
 ```
 
 ## Rule catalog
