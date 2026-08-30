@@ -89,6 +89,7 @@ Source: `UseCasePatternsArchUnitTest.groovy` → `UseCaseRules` (DCA-USE-001…0
 - USE-006 uses `dev.domaincentric.dca.buildingblocks.ddd.tactical.Value` for the "domain Value Objects named *Result are allowed" exemption.
 - USE-009 (publish after save) matches `Repository`/`DomainEventPublisher` from the building blocks; logic unchanged.
 - USE-010 (no DTOs in domain) had no `allowEmptyShould(true)` in Groovy; added for symmetry with USE-011 and so the rule set works on code bases with an as yet empty domain layer.
+- **USE-012 (added 2026-08-30, not from the Groovy source):** use cases that call the `DomainEventPublisher` must carry `@Transactional` (class or method, meta-annotations included). Spring skips `@TransactionalEventListener`/`@ApplicationModuleListener` silently when no transaction is active and Modulith registers publications in the publishing transaction — a non-transactional publishing use case succeeds while the other contexts never hear of it. Annotation name from `FrameworkAnnotations.transactional()`. Negative fixture: the Bad `PlaceOrderUseCase`; the Good one gained `@Transactional`.
 - Every rule has a negative fixture (`NO_NEGATIVE_FIXTURE` is empty for both sets).
 - No files created outside the assigned set; the Spring annotation shims under `src/test/java/org/springframework/**` already existed (Hexagonal agent) and were reused.
 

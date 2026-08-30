@@ -6,6 +6,7 @@ import dev.domaincentric.dca.archunit.fixtures.usecase.bad.order.domain.model.Or
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.DomainEventPublisher;
 import org.springframework.stereotype.Service;
 
+// DCA-USE-012: publishes domain events without @Transactional
 @Service
 public final class PlaceOrderUseCase implements PlaceOrderInputPort {
   private final OrderRepository orders;

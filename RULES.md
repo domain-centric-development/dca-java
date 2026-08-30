@@ -1,6 +1,6 @@
 # DCA rule catalog
 
-Generated from `dca-archunit` — do not edit. 107 rules in 10 sets.
+Generated from `dca-archunit` — do not edit. 108 rules in 10 sets.
 
 ## `layered`
 
@@ -133,6 +133,7 @@ Generated from `dca-archunit` — do not edit. 107 rules in 10 sets.
 | `DCA-USE-009` | Use cases that save an aggregate must publish its domain events | A saved aggregate must not keep its events: unpublished, they are lost, and stored on the instance they may later be published out of context. Publishing belongs after the save, in the use case that owns the unit of work - even when the action raised no event |
 | `DCA-USE-010` | DTOs must not be used in the Domain Layer | Domain layer should not depend on DTOs (presentation concerns) - Dependency Inversion Principle |
 | `DCA-USE-011` | DTOs must not be used in the Application Layer | Application layer should use Command/Query/Response models, not presentation DTOs (Clean Architecture) |
+| `DCA-USE-012` | Use cases that publish domain events must be transactional | Integration events are relayed after commit (@TransactionalEventListener, @ApplicationModuleListener) and their publication is registered in the publishing transaction. Without an active transaction the after-commit listeners are skipped silently and nothing is registered: the use case succeeds, the other contexts never hear of it. The use case that publishes owns the transaction - on the class or on the executing method |
 
 ## `naming`
 

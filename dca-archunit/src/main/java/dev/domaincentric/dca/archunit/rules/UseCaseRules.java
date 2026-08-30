@@ -18,7 +18,8 @@ import java.util.List;
 
 /**
  * Use case and mapping patterns: the generic input-port contract, Command/Query/Result models, HTTP
- * response models, domain-event publication after saving, and DTO-free inner layers.
+ * response models, domain-event publication after saving (inside a transaction), and DTO-free inner
+ * layers.
  */
 public final class UseCaseRules implements DcaRuleSet {
 
@@ -37,7 +38,8 @@ public final class UseCaseRules implements DcaRuleSet {
             responsesResideInIncomingAdapters(layout),
             useCasesPublishDomainEventsAfterSaving(layout),
             noDtosInDomain(layout),
-            noDtosInApplication(layout));
+            noDtosInApplication(layout),
+            publishingUseCasesAreTransactional(layout));
   }
 
   @Override
@@ -226,6 +228,55 @@ public final class UseCaseRules implements DcaRuleSet {
         .should()
         .haveModifier(JavaModifier.FINAL)
         .allowEmptyShould(true);
+  }
+
+  public static DcaRule publishingUseCasesAreTransactional(DcaLayout layout) {
+    return DcaRule.of(
+        "DCA-USE-012",
+        "Use cases that publish domain events must be transactional",
+        "Integration events are relayed after commit (@TransactionalEventListener,"
+            + " @ApplicationModuleListener) and their publication is registered in the publishing"
+            + " transaction. Without an active transaction the after-commit listeners are skipped"
+            + " silently and nothing is registered: the use case succeeds, the other contexts never"
+            + " hear of it. The use case that publishes owns the transaction - on the class or on the"
+            + " executing method",
+        arch ->
+            classes()
+                .that()
+                .resideInAPackage(layout.applicationPattern())
+                .and()
+                .haveSimpleNameEndingWith(layout.useCaseSuffix())
+                .and()
+                .areNotInterfaces()
+                .should(beTransactionalWhenPublishing(layout.frameworkAnnotations().transactional()))
+                .allowEmptyShould(true));
+  }
+
+  private static ArchCondition<JavaClass> beTransactionalWhenPublishing(String transactional) {
+    return new ArchCondition<>("be transactional when publishing domain events") {
+      @Override
+      public void check(JavaClass item, ConditionEvents events) {
+        boolean publishes =
+            item.getMethodCallsFromSelf().stream()
+                .anyMatch(call -> call.getTargetOwner().isAssignableTo(DomainEventPublisher.class));
+        if (!publishes) {
+          return;
+        }
+        boolean inTransaction =
+            item.isMetaAnnotatedWith(transactional)
+                || item.getMethods().stream().anyMatch(m -> m.isMetaAnnotatedWith(transactional));
+        events.add(
+            inTransaction
+                ? SimpleConditionEvent.satisfied(
+                    item, item.getSimpleName() + " publishes inside a transaction")
+                : SimpleConditionEvent.violated(
+                    item,
+                    item.getSimpleName()
+                        + " publishes domain events without @"
+                        + transactional.substring(transactional.lastIndexOf('.') + 1)
+                        + " - after-commit listeners are skipped"));
+      }
+    };
   }
 
   private static ArchCondition<JavaClass> publishAfterSaving() {
