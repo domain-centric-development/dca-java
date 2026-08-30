@@ -1,6 +1,6 @@
 # DCA rule catalog
 
-Generated from `dca-archunit` — do not edit. 109 rules in 10 sets.
+Generated from `dca-archunit` — do not edit. 110 rules in 10 sets.
 
 ## `layered`
 
@@ -34,6 +34,7 @@ Generated from `dca-archunit` — do not edit. 109 rules in 10 sets.
 | `DCA-HEX-008` | Classes named *Repository must reside in the outgoing adapter package | Repository implementations are secondary adapters (outgoing ports) |
 | `DCA-HEX-009` | Output Ports in application.shared must extend OutputPort | Top-level interfaces in application.shared are output ports and must extend OutputPort to be part of the port hierarchy. Nested interfaces (e.g. IdentityProvider.Identity) are part of their enclosing port's contract, not ports themselves |
 | `DCA-HEX-010` | Output ports must not reside in the domain layer | output ports (Repository, Store, OutputPort) are an application-layer concern and must live in application/shared/, not domain/ |
+| `DCA-HEX-011` | Incoming Adapters must depend on input port interfaces, not on use case classes | A driving adapter drives the application through its port. Injecting the concrete implementation instead couples the adapter to one realisation of the use case, defeats the Dependency Inversion Principle the port exists for, and makes the adapter untestable without the real use case and everything it depends on |
 
 ## `tactical`
 

@@ -3,10 +3,13 @@ package dev.domaincentric.dca.archunit.rules;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaClass;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.BoundedContext;
+import dev.domaincentric.dca.buildingblocks.hexagonal.port.in.InputPort;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.OutputPort;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.Repository;
 import java.util.List;
@@ -14,8 +17,9 @@ import java.util.Map;
 
 /**
  * Hexagonal Architecture (Ports and Adapters) rules: separation between ports and adapters,
- * incoming adapters drive the application, outgoing adapters implement outbound ports, adapters
- * never talk to each other directly, incoming adapters stay inside their own bounded context.
+ * incoming adapters drive the application through its input ports, outgoing adapters implement
+ * outbound ports, adapters never talk to each other directly, incoming adapters stay inside their
+ * own bounded context.
  */
 public final class HexagonalRules implements DcaRuleSet {
 
@@ -35,7 +39,8 @@ public final class HexagonalRules implements DcaRuleSet {
             incomingAdaptersStayInOwnContext(),
             repositoryClassesResideInOutgoingAdapter(),
             sharedOutputPortsExtendOutputPort(),
-            outputPortsMustNotResideInDomain());
+            outputPortsMustNotResideInDomain(),
+            incomingAdaptersMustDependOnInputPortsNotUseCaseClasses());
   }
 
   @Override
@@ -214,6 +219,33 @@ public final class HexagonalRules implements DcaRuleSet {
                 .should()
                 .beAssignableTo(OutputPort.class)
                 .allowEmptyShould(true));
+  }
+
+  public DcaRule incomingAdaptersMustDependOnInputPortsNotUseCaseClasses() {
+    return DcaRule.of(
+        "DCA-HEX-011",
+        "Incoming Adapters must depend on input port interfaces, not on use case classes",
+        "A driving adapter drives the application through its port. Injecting the concrete"
+            + " implementation instead couples the adapter to one realisation of the use case,"
+            + " defeats the Dependency Inversion Principle the port exists for, and makes the"
+            + " adapter untestable without the real use case and everything it depends on",
+        arch ->
+            noClasses()
+                .that()
+                .resideInAPackage(layout.incomingAdapterPattern())
+                .should()
+                .dependOnClassesThat(useCaseImplementations())
+                .allowEmptyShould(true));
+  }
+
+  /** A use case implementation: a class (never an interface) behind an {@link InputPort}. */
+  private static DescribedPredicate<JavaClass> useCaseImplementations() {
+    return new DescribedPredicate<>("are use case implementations rather than input ports") {
+      @Override
+      public boolean test(JavaClass javaClass) {
+        return !javaClass.isInterface() && javaClass.isAssignableTo(InputPort.class);
+      }
+    };
   }
 
   public DcaRule outputPortsMustNotResideInDomain() {
