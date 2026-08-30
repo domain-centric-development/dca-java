@@ -27,7 +27,9 @@ import java.lang.annotation.Target;
  * <p><b>Architectural rules</b> (enforced by {@code ContextMapArchUnitTest}):
  *
  * <ul>
- *   <li>Only packages annotated with {@link dev.domaincentric.dca.buildingblocks.ddd.strategic.BoundedContext BoundedContext} may declare {@code @Partnership}
+ *   <li>Only packages annotated with {@link
+ *       dev.domaincentric.dca.buildingblocks.ddd.strategic.BoundedContext BoundedContext} may
+ *       declare {@code @Partnership}
  *   <li>The target context must exist and must not be the declaring context itself
  *   <li>The declaration must be mirrored by the target context (symmetry)
  * </ul>

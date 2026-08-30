@@ -5,7 +5,7 @@ Hexagonal Architecture and Clean Architecture.
 
 | Artifact | What it is | Dependencies |
 |----------|------------|--------------|
-| `dev.domaincentric:dca-building-blocks` | The building blocks your code implements: DDD tactical markers (`AggregateRoot`, `Entity`, `Value`, `DomainEvent`, …), strategic annotations (`@BoundedContext`, `@SharedKernel`, `@Upstream`, `@Partnership`, …) and hexagonal port interfaces (`UseCase`, `Repository`, `Store`, …) | none |
+| `dev.domaincentric:dca-building-blocks` | The building blocks your code implements: DDD tactical markers (`AggregateRoot`, `Entity`, `Value`, `DomainEvent`, …), strategic annotations (`@BoundedContext`, `@SharedKernel`, `@Upstream`, `@Partnership`, …) and hexagonal port interfaces (`UseCase`, `Repository`, `Store`, `UnitOfWork`, …) | none |
 | `dev.domaincentric:dca-archunit` | The governance rules: ~100 ArchUnit rules pinned to those building blocks, plus an executable context map | `dca-building-blocks`, ArchUnit |
 
 Both target Java 17+. Versions are independent; see [Versioning](#versioning).
@@ -48,7 +48,7 @@ dev.domaincentric.dca.buildingblocks
 ├── ddd.strategic                @BoundedContext
 ├── ddd.strategic.relationships  @SharedKernel, @OpenHostService, @Upstream, @ExternalUpstream, @Partnership
 └── hexagonal.port.in / .out     InputPort, UseCase  |  OutputPort, Repository, Store,
-                                 DomainEventPublisher, IntegrationEventPublisher
+                                 DomainEventPublisher, IntegrationEventPublisher, UnitOfWork
 ```
 
 ### 2. Rules in an architecture test

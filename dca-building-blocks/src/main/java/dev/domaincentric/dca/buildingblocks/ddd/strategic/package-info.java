@@ -6,8 +6,10 @@
  *
  * <ul>
  *   <li>{@link BoundedContext} - Explicit boundary for a domain model
- *   <li>{@link dev.domaincentric.dca.buildingblocks.ddd.strategic.relationships.SharedKernel SharedKernel} - Curated subset shared between contexts
- *   <li>{@link dev.domaincentric.dca.buildingblocks.ddd.strategic.relationships.OpenHostService OpenHostService} - Public API exposed to other contexts
+ *   <li>{@link dev.domaincentric.dca.buildingblocks.ddd.strategic.relationships.SharedKernel
+ *       SharedKernel} - Curated subset shared between contexts
+ *   <li>{@link dev.domaincentric.dca.buildingblocks.ddd.strategic.relationships.OpenHostService
+ *       OpenHostService} - Public API exposed to other contexts
  * </ul>
  *
  * <p><b>Usage:</b> These annotations are typically applied to {@code package-info.java} files to

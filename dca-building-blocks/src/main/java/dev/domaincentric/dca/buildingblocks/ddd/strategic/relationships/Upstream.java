@@ -38,7 +38,9 @@ import java.lang.annotation.Target;
  * <p><b>Architectural rules</b> (enforced by {@code ContextMapArchUnitTest}):
  *
  * <ul>
- *   <li>Only packages annotated with {@link dev.domaincentric.dca.buildingblocks.ddd.strategic.BoundedContext BoundedContext} may declare {@code @Upstream}
+ *   <li>Only packages annotated with {@link
+ *       dev.domaincentric.dca.buildingblocks.ddd.strategic.BoundedContext BoundedContext} may
+ *       declare {@code @Upstream}
  *   <li>The target context must exist and must not be the declaring context itself
  *   <li>{@code (context, via)} must be unique across all declarations of one context
  *   <li>Every declaration must match a {@code "{context} :: api"} or {@code "{context} :: events"}
