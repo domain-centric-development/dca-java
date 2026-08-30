@@ -16,6 +16,13 @@ jobs:
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew build --no-daemon
+      - name: Rule catalog is up to date
+        run: |
+          ./gradlew :dca-archunit:rulesCatalog --no-daemon
+          git diff --exit-code -- rules.json RULES.md
+      - name: Minimal consumer sample
+        working-directory: samples/minimal-consumer
+        run: ./gradlew test --no-daemon
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
