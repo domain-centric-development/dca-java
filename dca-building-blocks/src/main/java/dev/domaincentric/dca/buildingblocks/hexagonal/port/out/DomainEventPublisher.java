@@ -32,8 +32,17 @@ import dev.domaincentric.dca.buildingblocks.ddd.tactical.DomainEvent;
  *   <li>Easy to swap implementations or mock for testing
  * </ul>
  *
- * <p><b>Implementation Note:</b> Concrete implementations should ensure events are published only
- * after successful persistence to maintain data consistency.
+ * <p><b>Order of operations — save, dispatch, then clear.</b> The use case calls {@code
+ * publishAndClearEvents} after {@code save}, inside the same transaction, so an event is never
+ * dispatched for state that was not persisted. The implementation dispatches the collected events
+ * first and clears the aggregate <em>afterwards</em>: clearing is the acknowledgement that every
+ * listener has seen the event. A listener that throws therefore fails the use case and leaves the
+ * events on the aggregate — nothing is silently lost. Clearing before dispatch would drop events on
+ * the first failing listener.
+ *
+ * <p>Integration events derived from these domain events (by an outgoing event adapter listening
+ * in-process) are recorded in a transactional outbox inside the same transaction and delivered
+ * after commit, at least once; their consumers are idempotent.
  */
 public interface DomainEventPublisher extends OutputPort {
 
@@ -51,8 +60,10 @@ public interface DomainEventPublisher extends OutputPort {
   /**
    * Publishes all domain events from an aggregate and clears them.
    *
-   * <p>This method should be called after successfully persisting an aggregate. It publishes all
-   * collected events and then clears them to prevent duplicate publishing.
+   * <p>Call after successfully persisting the aggregate, inside the transaction. Dispatches all
+   * collected events to their listeners and, once every listener returned, clears them from the
+   * aggregate — the clear is the acknowledgement. If a listener throws, the exception propagates,
+   * the events stay on the aggregate and the surrounding transaction rolls back.
    *
    * @param aggregate the aggregate containing domain events
    * @throws IllegalArgumentException if aggregate is null

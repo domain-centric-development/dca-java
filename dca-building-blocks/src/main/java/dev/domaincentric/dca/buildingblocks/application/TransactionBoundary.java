@@ -37,6 +37,13 @@ import java.util.function.Supplier;
  * <p>Domain events published inside {@link #inTransaction(Supplier)} see the same transaction as
  * the save; after-commit listeners fire when it commits.
  *
+ * <p><b>Nesting.</b> A call inside a running transaction joins it (Spring's {@code REQUIRED}
+ * propagation) — there is one commit, at the outermost boundary. A failure in an inner block marks
+ * the shared transaction rollback-only even when the outer block catches the exception: the
+ * outermost {@code inTransaction} then rolls back and throws instead of committing half of the
+ * work. Implementations must preserve this; an in-memory implementation emulates it with a
+ * rollback-only flag.
+ *
  * <p><b>Rules of thumb:</b>
  *
  * <ol>
