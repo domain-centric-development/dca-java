@@ -4,34 +4,35 @@ import dev.domaincentric.dca.archunit.fixtures.usecase.good.order.application.sh
 import dev.domaincentric.dca.archunit.fixtures.usecase.good.order.application.shared.OrderRepository;
 import dev.domaincentric.dca.archunit.fixtures.usecase.good.order.domain.model.Order;
 import dev.domaincentric.dca.archunit.fixtures.usecase.good.order.domain.model.OrderId;
+import dev.domaincentric.dca.buildingblocks.application.TransactionBoundary;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.DomainEventPublisher;
-import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.UnitOfWork;
 import org.springframework.stereotype.Service;
 
-// DCA-USE-012/013: remote call first, then an explicit UnitOfWork boundary around save + publish
+// DCA-USE-012/013: remote call first, then an explicit TransactionBoundary boundary around save +
+// publish
 @Service
 public final class ShipOrderUseCase implements ShipOrderInputPort {
   private final OrderRepository orders;
   private final CarrierPort carrier;
   private final DomainEventPublisher events;
-  private final UnitOfWork unitOfWork;
+  private final TransactionBoundary transactionBoundary;
 
   public ShipOrderUseCase(
       OrderRepository orders,
       CarrierPort carrier,
       DomainEventPublisher events,
-      UnitOfWork unitOfWork) {
+      TransactionBoundary transactionBoundary) {
     this.orders = orders;
     this.carrier = carrier;
     this.events = events;
-    this.unitOfWork = unitOfWork;
+    this.transactionBoundary = transactionBoundary;
   }
 
   @Override
   public ShipOrderResult execute(ShipOrderCommand command) {
     OrderId id = new OrderId(command.orderId());
     String quote = carrier.quote(id);
-    return unitOfWork.run(
+    return transactionBoundary.inTransaction(
         () -> {
           Order order = orders.findById(id).orElseThrow();
           orders.save(order);

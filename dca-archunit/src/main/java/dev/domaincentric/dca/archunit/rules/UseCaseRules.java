@@ -11,13 +11,13 @@ import com.tngtech.archunit.lang.SimpleConditionEvent;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
+import dev.domaincentric.dca.buildingblocks.application.TransactionBoundary;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.Value;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.DomainEventPublisher;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.IntegrationEventPublisher;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.OutputPort;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.Repository;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.Store;
-import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.UnitOfWork;
 import java.util.List;
 
 /**
@@ -238,14 +238,14 @@ public final class UseCaseRules implements DcaRuleSet {
   public static DcaRule publishingUseCasesAreTransactional(DcaLayout layout) {
     return DcaRule.of(
         "DCA-USE-012",
-        "Use cases that publish domain events must run inside a transaction boundary",
+        "Use cases that publish domain events must have a transaction boundary",
         "Integration events are relayed after commit (@TransactionalEventListener,"
             + " @ApplicationModuleListener) and their publication is registered in the publishing"
             + " transaction. Without an active transaction the after-commit listeners are skipped"
             + " silently and nothing is registered: the use case succeeds, the other contexts never"
-            + " hear of it. The use case that publishes owns the boundary - @Transactional on the"
-            + " class or the executing method, or an explicit UnitOfWork.run(...) around save and"
-            + " publish",
+            + " hear of it. The use case that publishes owns the boundary - either declarative"
+            + " transaction metadata (@Transactional on the class or the executing method) or an"
+            + " explicit TransactionBoundary.inTransaction(...) around save and publish",
         arch ->
             classes()
                 .that()
@@ -262,15 +262,15 @@ public final class UseCaseRules implements DcaRuleSet {
   public static DcaRule transactionalUseCasesDoNotCallRemotePorts(DcaLayout layout) {
     return DcaRule.of(
         "DCA-USE-013",
-        "Transactional use cases must not call remote-capable output ports",
+        "Declaratively transactional use cases must not call remote-capable output ports",
         "A @Transactional use case holds a database connection for its whole run. Calling an"
             + " output port that may leave the process (another context's API, a payment provider,"
             + " a mail gateway) inside it blocks that connection for the remote round trip; under"
             + " load the pool runs dry, and a rollback cannot undo the remote effect. Only"
             + " transactional resources belong inside the boundary: Repository, Store,"
             + " DomainEventPublisher, IntegrationEventPublisher. Everything else is called before"
-            + " the transaction - draw the boundary by hand with UnitOfWork.run(...) - or after it,"
-            + " as a reaction to an integration event",
+            + " the transaction - draw the boundary by hand with TransactionBoundary.inTransaction(...)"
+            + " - or after it, as a reaction to an integration event",
         arch ->
             classes()
                 .that()
@@ -290,9 +290,9 @@ public final class UseCaseRules implements DcaRuleSet {
         || item.getMethods().stream().anyMatch(m -> m.isMetaAnnotatedWith(transactional));
   }
 
-  private static boolean usesUnitOfWork(JavaClass item) {
+  private static boolean usesTransactionBoundary(JavaClass item) {
     return item.getMethodCallsFromSelf().stream()
-        .anyMatch(call -> call.getTargetOwner().isAssignableTo(UnitOfWork.class));
+        .anyMatch(call -> call.getTargetOwner().isAssignableTo(TransactionBoundary.class));
   }
 
   /**
@@ -302,8 +302,7 @@ public final class UseCaseRules implements DcaRuleSet {
     return owner.isAssignableTo(Repository.class)
         || owner.isAssignableTo(Store.class)
         || owner.isAssignableTo(DomainEventPublisher.class)
-        || owner.isAssignableTo(IntegrationEventPublisher.class)
-        || owner.isAssignableTo(UnitOfWork.class);
+        || owner.isAssignableTo(IntegrationEventPublisher.class);
   }
 
   private static ArchCondition<JavaClass> notCallRemotePortsWhenTransactional(
@@ -333,7 +332,7 @@ public final class UseCaseRules implements DcaRuleSet {
                       + " and calls "
                       + String.join(", ", remotePorts)
                       + " inside the transaction - call it before, or draw the boundary with"
-                      + " UnitOfWork.run(...)"));
+                      + " TransactionBoundary.inTransaction(...)"));
         }
       }
     };
@@ -349,7 +348,8 @@ public final class UseCaseRules implements DcaRuleSet {
         if (!publishes) {
           return;
         }
-        boolean inTransaction = isTransactional(item, transactional) || usesUnitOfWork(item);
+        boolean inTransaction =
+            isTransactional(item, transactional) || usesTransactionBoundary(item);
         events.add(
             inTransaction
                 ? SimpleConditionEvent.satisfied(
@@ -359,7 +359,7 @@ public final class UseCaseRules implements DcaRuleSet {
                     item.getSimpleName()
                         + " publishes domain events without @"
                         + transactional.substring(transactional.lastIndexOf('.') + 1)
-                        + " and without UnitOfWork.run(...) - after-commit listeners are skipped"));
+                        + " and without TransactionBoundary.inTransaction(...) - after-commit listeners are skipped"));
       }
     };
   }
