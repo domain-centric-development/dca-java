@@ -1,8 +1,12 @@
 name: Release
 
 # Tag-driven, one artifact per tag:
-#   building-blocks/v1.2.0  -> publishes :dca-building-blocks 1.2.0
-#   archunit/v3.4.1         -> publishes :dca-archunit 3.4.1
+#   building-blocks/v1.2.0  -> :dca-building-blocks 1.2.0
+#   archunit/v3.4.1         -> :dca-archunit 3.4.1
+#
+# Publishing to Maven Central happens on the maintainer's machine (./scripts/release.sh) so the GPG
+# signing key never reaches CI. This workflow verifies the tagged version and publishes the GitHub
+# release; the tag is pushed after the artifact is on Central.
 on:
   push:
     tags:
@@ -10,7 +14,7 @@ on:
       - 'archunit/v*'
 
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -33,6 +37,11 @@ jobs:
             archunit)        PROJECT=dca-archunit;        PROP=archunitVersion ;;
             *) echo "unknown tag prefix $PREFIX"; exit 1 ;;
           esac
+          case "$VERSION" in
+            *-SNAPSHOT) echo "a release tag must not carry a snapshot version: $VERSION"; exit 1 ;;
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "not a semantic version: $VERSION"; exit 1 ;;
+          esac
           echo "project=$PROJECT" >> "$GITHUB_OUTPUT"
           echo "prop=$PROP"       >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -40,16 +49,17 @@ jobs:
       - name: Build and test
         run: ./gradlew :${{ steps.tag.outputs.project }}:build -P${{ steps.tag.outputs.prop }}=${{ steps.tag.outputs.version }} --no-daemon
 
-      # Publishing to Maven Central (Sonatype Central Portal) — wired up in WP-09:
-      # requires CENTRAL_USERNAME / CENTRAL_PASSWORD / GPG_PRIVATE_KEY / GPG_PASSPHRASE org secrets
-      # and the central-portal publishing plugin in build.gradle.kts.
-      - name: Publish
-        run: ./gradlew :${{ steps.tag.outputs.project }}:publish -P${{ steps.tag.outputs.prop }}=${{ steps.tag.outputs.version }} --no-daemon
-        env:
-          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
-          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      - name: Changelog names this version
+        run: grep -q "^## \[${{ steps.tag.outputs.version }}\]" ${{ steps.tag.outputs.project }}/CHANGELOG.md
+
+      - name: Artifact is on Maven Central
+        run: |
+          URL="https://repo1.maven.org/maven2/dev/domaincentric/${{ steps.tag.outputs.project }}/${{ steps.tag.outputs.version }}/${{ steps.tag.outputs.project }}-${{ steps.tag.outputs.version }}.pom"
+          for i in $(seq 1 30); do
+            if curl -fsSL -o /dev/null "$URL"; then echo "published: $URL"; exit 0; fi
+            echo "not on Central yet, retrying in 60s ($i/30)"; sleep 60
+          done
+          echo "still not on Central after 30 minutes: $URL"; exit 1
 
       - name: GitHub release
         uses: softprops/action-gh-release@v2

@@ -20,6 +20,8 @@ jobs:
         run: |
           ./gradlew :dca-archunit:rulesCatalog --no-daemon
           git diff --exit-code -- rules.json RULES.md
+      - name: Publishing config is valid
+        run: ./gradlew publishToMavenLocal --no-daemon
       - name: Minimal consumer sample
         working-directory: samples/minimal-consumer
         run: ./gradlew test --no-daemon

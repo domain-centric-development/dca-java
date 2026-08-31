@@ -189,7 +189,9 @@ Semantic versioning, independent per artifact:
 - `dca-archunit` — a new rule is a minor bump (it can fail your build — pin versions), a tightened
   rule is a major bump, a relaxed rule or fixed false positive a patch.
 
-Tags: `building-blocks/vX.Y.Z`, `archunit/vX.Y.Z`. Changelogs: [dca-building-blocks/CHANGELOG.md](dca-building-blocks/CHANGELOG.md), [dca-archunit/CHANGELOG.md](dca-archunit/CHANGELOG.md).
+Tags: `building-blocks/vX.Y.Z`, `archunit/vX.Y.Z` — one tag per released artifact; see
+[RELEASING.md](RELEASING.md). `dca-archunit` depends on the `dca-building-blocks` version named in
+`gradle.properties`, so that property tracks the latest released marker version. Changelogs: [dca-building-blocks/CHANGELOG.md](dca-building-blocks/CHANGELOG.md), [dca-archunit/CHANGELOG.md](dca-archunit/CHANGELOG.md).
 
 ## Build
 
@@ -198,6 +200,9 @@ Tags: `building-blocks/vX.Y.Z`, `archunit/vX.Y.Z`. Changelogs: [dca-building-blo
 ./gradlew :dca-archunit:test         # rule self-tests against good/bad fixtures
 ./gradlew publishToMavenLocal        # try a snapshot in another project
 ```
+
+Releases are published from a maintainer machine (`./scripts/release.sh <artifact> <version>`),
+then tagged; the signing key never enters CI — [RELEASING.md](RELEASING.md).
 
 ## License
 
