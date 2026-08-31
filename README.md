@@ -3,6 +3,9 @@
 Java libraries for **Domain-Centric Architecture (DCA)** — a synthesis of Domain-Driven Design,
 Hexagonal Architecture and Clean Architecture.
 
+*Written with AI assistance — drafted mainly by Claude, reviewed and directed by the author since
+2025. The architecture rules in this repository's build are part of how that work is verified.*
+
 | Artifact | What it is | Dependencies |
 |----------|------------|--------------|
 | `dev.domaincentric:dca-building-blocks` | The building blocks your code implements: DDD tactical markers (`AggregateRoot`, `Entity`, `Value`, `DomainEvent`, …), strategic annotations (`@BoundedContext`, `@SharedKernel`, `@Upstream`, `@Partnership`, …) and hexagonal port interfaces (`UseCase`, `Repository`, `Store`, …) and the application-layer `TransactionBoundary` | none |
