@@ -17,7 +17,7 @@ Both target Java 17+. Versions are independent; see [Versioning](#versioning).
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("dev.domaincentric:dca-building-blocks:<version>")
+    implementation("dev.domaincentric:dca-building-blocks:0.1.0")
 }
 ```
 
@@ -56,7 +56,7 @@ dev.domaincentric.dca.buildingblocks
 
 ```kotlin
 dependencies {
-    testImplementation("dev.domaincentric:dca-archunit:<version>")
+    testImplementation("dev.domaincentric:dca-archunit:0.1.0")
     testImplementation("org.junit.jupiter:junit-jupiter")
 }
 ```

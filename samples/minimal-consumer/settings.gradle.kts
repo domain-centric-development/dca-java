@@ -1,8 +1,10 @@
 rootProject.name = "minimal-consumer"
 
-// Local development: substitute the published coordinates with the sibling build.
-// Drop this line once the artifacts are on Maven Central.
-includeBuild("../..")
+// Resolves dev.domaincentric:* from Maven Central, exactly as a real consumer does. To test
+// unreleased changes of the surrounding build instead, run with -PwithDcaJava.
+if (providers.gradleProperty("withDcaJava").isPresent) {
+    includeBuild("../..")
+}
 
 dependencyResolutionManagement {
     repositories { mavenCentral() }
