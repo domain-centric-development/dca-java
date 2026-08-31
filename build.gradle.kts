@@ -48,7 +48,9 @@ subprojects {
 
     extensions.configure<MavenPublishBaseExtension> {
         // Sources jar, javadoc jar, checksums and the Central Portal upload come from the plugin.
-        publishToMavenCentral(automaticRelease = true)
+        // The deployment is uploaded and validated but not released: it waits for "Publish" on
+        // https://central.sonatype.com/publishing/deployments, so a bad release can still be dropped.
+        publishToMavenCentral()
 
         // Signing only when a key is configured, so publishToMavenLocal and the composite build
         // of the sample work without GPG.

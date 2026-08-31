@@ -94,8 +94,8 @@ SIGNATURES="$(ls "$HOME/.m2/repository/dev/domaincentric/$PROJECT/$VERSION/"*.as
 echo "$SIGNATURES signatures written"
 
 echo
-echo "About to upload $PROJECT $VERSION to Maven Central and release the deployment."
-echo "This is irreversible — a released version can never be replaced or removed."
+echo "About to upload $PROJECT $VERSION to the Central Portal."
+echo "The deployment is validated but NOT released — publishing it is a click in the Portal."
 read -r -p "type the version to confirm: " CONFIRM
 [ "$CONFIRM" = "$VERSION" ] || die "aborted"
 
@@ -104,11 +104,14 @@ read -r -p "type the version to confirm: " CONFIRM
 # --- afterwards ------------------------------------------------------------------------------------
 
 echo
-echo "uploaded and released. Maven Central serves it in 10–30 minutes:"
-echo "  https://repo1.maven.org/maven2/dev/domaincentric/$PROJECT/$VERSION/"
+echo "uploaded and validated. The deployment is waiting for release:"
+echo "  https://central.sonatype.com/publishing/deployments"
 echo
 echo "next:"
-echo "  git tag $ARTIFACT/v$VERSION && git push origin $ARTIFACT/v$VERSION"
+echo "  1. check the deployment there, then Publish (or Drop, if something is wrong)"
+echo "  2. wait until Maven Central serves it (10–30 minutes):"
+echo "     https://repo1.maven.org/maven2/dev/domaincentric/$PROJECT/$VERSION/"
+echo "  3. git tag $ARTIFACT/v$VERSION && git push origin $ARTIFACT/v$VERSION"
 if [ "$ARTIFACT" = "building-blocks" ]; then
-  echo "  set buildingBlocksVersion=$VERSION in gradle.properties and commit"
+  echo "  4. set buildingBlocksVersion=$VERSION in gradle.properties and commit"
 fi

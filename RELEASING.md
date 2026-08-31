@@ -87,23 +87,30 @@ signs, checks the signatures locally, asks for a typed confirmation and uploads:
    `gpg` on stdin, never as an argument)
 4. `build` of that subproject only
 5. `publishToMavenLocal` and a count of at least four `.asc` files in `~/.m2`
-6. `publishToMavenCentral` — uploads, releases the deployment (`automaticRelease = true`) and polls
-   until Central reports `VALIDATED`
+6. `publishToMavenCentral` — uploads and polls until Central reports `VALIDATED`. The deployment is
+   **not** released: it waits for "Publish" on the
+   [Portal](https://central.sonatype.com/publishing/deployments), so a bad build can still be dropped
 
 Afterwards, as the script prints:
 
-```bash
-git tag building-blocks/v0.1.0
-git push origin building-blocks/v0.1.0
-```
+1. Check the deployment on the [Portal](https://central.sonatype.com/publishing/deployments) and click
+   **Publish** — or **Drop**, which throws the deployment away and frees the version number again.
+2. Wait until `https://repo1.maven.org/maven2/dev/domaincentric/<artifact>/<version>/` answers.
+3. Tag it:
 
-The tag comes **after** the upload, so the release workflow finds the artifact on Central instead of
-waiting for a publish that has not happened. After a `dca-building-blocks` release, set
-`buildingBlocksVersion` in `gradle.properties` to that version and commit.
+   ```bash
+   git tag building-blocks/v0.1.0
+   git push origin building-blocks/v0.1.0
+   ```
 
-To inspect a deployment before it goes out, change `publishToMavenCentral(automaticRelease = true)` in
-[build.gradle.kts](build.gradle.kts) to `publishToMavenCentral()` — the deployment then waits for
-"Publish" on the [Portal](https://central.sonatype.com/publishing/deployments).
+The tag comes **after** the release, so the workflow finds the artifact on Central instead of waiting for
+a publish that has not happened. After a `dca-building-blocks` release, set `buildingBlocksVersion` in
+`gradle.properties` to that version and commit.
+
+To release without the manual click, change `publishToMavenCentral()` in
+[build.gradle.kts](build.gradle.kts) to `publishToMavenCentral(automaticRelease = true)`. Worth doing
+once the first release has proven the setup; until then the click is the only chance to inspect what
+Central validated.
 
 ## Manual equivalent
 
@@ -131,6 +138,8 @@ A snapshot goes to the Central snapshot repository, not to Central, and can be r
 ./scripts/publish-snapshot.sh dca-archunit     # one of them
 ```
 
+Snapshots must be enabled for the namespace first (Portal → the namespace's dropdown → *Enable
+SNAPSHOTs*), otherwise the upload fails with `403 Forbidden` despite a verified namespace.
 It resolves the token exactly like `release.sh` (environment, keychain, prompt — see
 [scripts/lib/central-token.sh](scripts/lib/central-token.sh)) and needs no GPG key: snapshots are not
 signed. A bare `./gradlew :dca-building-blocks:publishToMavenCentral` fails with missing credentials,
