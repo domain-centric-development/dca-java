@@ -54,28 +54,8 @@ gpg --list-secret-keys "$SIGNING_KEY" >/dev/null 2>&1 || die "no secret key $SIG
 
 # --- Central Portal user token ---------------------------------------------------------------------
 
-KEYCHAIN_ITEM="dca-maven-central"
-
-if [ -n "${ORG_GRADLE_PROJECT_mavenCentralUsername:-}" ] && [ -n "${ORG_GRADLE_PROJECT_mavenCentralPassword:-}" ]; then
-  echo "using the Central token from the environment"
-elif TOKEN="$(security find-generic-password -s "$KEYCHAIN_ITEM" -w 2>/dev/null)"; then
-  # Stored as "username:password" — the token halves contain no colon.
-  export ORG_GRADLE_PROJECT_mavenCentralUsername="${TOKEN%%:*}"
-  export ORG_GRADLE_PROJECT_mavenCentralPassword="${TOKEN#*:}"
-  unset TOKEN
-  echo "using the Central token from the keychain item $KEYCHAIN_ITEM"
-else
-  echo "no Central token in the environment or keychain item $KEYCHAIN_ITEM"
-  read -r -p "Central Portal token username: " CENTRAL_USERNAME
-  read -r -s -p "Central Portal token password: " CENTRAL_PASSWORD
-  echo
-  export ORG_GRADLE_PROJECT_mavenCentralUsername="$CENTRAL_USERNAME"
-  export ORG_GRADLE_PROJECT_mavenCentralPassword="$CENTRAL_PASSWORD"
-  unset CENTRAL_USERNAME CENTRAL_PASSWORD
-fi
-
-[ -n "$ORG_GRADLE_PROJECT_mavenCentralUsername" ] || die "no Central token username"
-[ -n "$ORG_GRADLE_PROJECT_mavenCentralPassword" ] || die "no Central token password"
+# shellcheck source=lib/central-token.sh
+. scripts/lib/central-token.sh
 
 # --- sign and publish ------------------------------------------------------------------------------
 

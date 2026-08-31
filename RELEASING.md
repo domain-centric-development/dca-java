@@ -82,7 +82,8 @@ signs, checks the signatures locally, asks for a typed confirmation and uploads:
    signing key in the keyring
 2. for `dca-archunit`: `buildingBlocksVersion` in [gradle.properties](gradle.properties) names a
    released version — it becomes the dependency version in the published POM
-3. Central token from environment, keychain or prompt; GPG passphrase prompt (the passphrase reaches
+3. Central token from environment, keychain or prompt ([scripts/lib/central-token.sh](scripts/lib/central-token.sh),
+   shared with `publish-snapshot.sh`); GPG passphrase prompt (the passphrase reaches
    `gpg` on stdin, never as an argument)
 4. `build` of that subproject only
 5. `publishToMavenLocal` and a count of at least four `.asc` files in `~/.m2`
@@ -126,9 +127,14 @@ carried over by hand.
 A snapshot goes to the Central snapshot repository, not to Central, and can be repeated at will:
 
 ```bash
-export ORG_GRADLE_PROJECT_mavenCentralUsername=… ORG_GRADLE_PROJECT_mavenCentralPassword=…
-./gradlew :dca-building-blocks:publishToMavenCentral      # version stays 0.1.0-SNAPSHOT
+./scripts/publish-snapshot.sh                  # both artifacts, version from gradle.properties
+./scripts/publish-snapshot.sh dca-archunit     # one of them
 ```
+
+It resolves the token exactly like `release.sh` (environment, keychain, prompt — see
+[scripts/lib/central-token.sh](scripts/lib/central-token.sh)) and needs no GPG key: snapshots are not
+signed. A bare `./gradlew :dca-building-blocks:publishToMavenCentral` fails with missing credentials,
+because Gradle reads neither the keychain nor `settings.xml`.
 
 `401` means the username is wrong (Portal login instead of token); a namespace complaint means the DNS
 verification of `dev.domaincentric` is still missing.
