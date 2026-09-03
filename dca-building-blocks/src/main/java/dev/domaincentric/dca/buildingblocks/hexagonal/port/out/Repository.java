@@ -15,7 +15,6 @@ import java.util.Optional;
  *
  * <ul>
  *   <li>One Repository per Aggregate Root (not per Entity)
- *   <li>Repository interfaces belong in the domain layer
  *   <li>Repository implementations belong in secondary adapters (infrastructure layer)
  *   <li>Use domain language in method names (not generic CRUD)
  *   <li>Return domain objects, never infrastructure objects
@@ -44,7 +43,7 @@ import java.util.Optional;
  * <p><b>Example:</b>
  *
  * <pre>
- * // Domain layer interface
+ * // Output port in the application layer
  * public interface ProductRepository extends Repository&lt;Product, ProductId&gt; {
  *   Optional&lt;Product&gt; findBySku(SKU sku);
  *   List&lt;Product&gt; findByCategory(Category category);

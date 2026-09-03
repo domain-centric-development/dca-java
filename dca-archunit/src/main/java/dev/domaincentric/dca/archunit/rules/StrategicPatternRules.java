@@ -1,21 +1,29 @@
 package dev.domaincentric.dca.archunit.rules;
 
+import static com.tngtech.archunit.base.DescribedPredicate.not;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import com.tngtech.archunit.lang.ArchRule;
+import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.BoundedContext;
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.relationships.OpenHostService;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.IntegrationEvent;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 /**
  * DDD strategic pattern rules: shared-kernel independence, bounded-context isolation, Open Host
- * Services, Integration Events and Anti-Corruption Layers. Bounded contexts and the shared kernel
- * are discovered via {@code @BoundedContext} / {@code @SharedKernel} on {@code package-info}.
+ * Services, Integration Events and Anti-Corruption Layers. The isolation rules ({@code
+ * DCA-STR-003}, {@code -004}, {@code -006}) select structurally over every module that owns a DCA
+ * layer ({@link DcaArchitecture#isolatedModuleRoots()}), so a module governs and is protected
+ * whether or not it declares {@code @BoundedContext}; the declaration decides context-map
+ * membership. The shared kernel is discovered via {@code @SharedKernel} on {@code package-info}.
  */
 public final class StrategicPatternRules implements DcaRuleSet {
 
@@ -30,7 +38,7 @@ public final class StrategicPatternRules implements DcaRuleSet {
             sharedKernelMustNotDependOnBoundedContexts(),
             applicationLayerIsolation(),
             domainLayerIsolation(),
-            openHostServicesResideInApiOrOpenHostPackages(),
+            openHostServicesResideInApiOrIncomingAdapter(),
             outgoingAdaptersOnlyUseOpenHostServices(),
             integrationEventsResideInEventsPackages(),
             integrationEventsAreRecords(),
@@ -99,36 +107,44 @@ public final class StrategicPatternRules implements DcaRuleSet {
                     }));
   }
 
-  /** DCA-STR-003. */
+  /**
+   * DCA-STR-003. Selects over every module that owns a DCA layer ({@link
+   * DcaArchitecture#isolatedModuleRoots()}), declared as a bounded context or not — on the source
+   * side and on the target side. A module must not be able to escape isolation, or to have its
+   * internals reached into, by staying off the context map.
+   */
   public DcaRule applicationLayerIsolation() {
     return DcaRule.check(
         "DCA-STR-003",
-        "Bounded contexts must not directly access each other in application layer (except allowed"
-            + " dependencies)",
-        "Application layers talk to other contexts through output ports and adapters, never"
-            + " directly",
+        "Modules must not access each other in the application layer",
+        "An application layer talks to other modules through its own output ports, implemented by"
+            + " adapters - never directly. Selects structurally over every module that owns a DCA"
+            + " layer, declared as a bounded context or not: an undeclared module must not be able"
+            + " to escape isolation by staying off the context map",
         arch -> {
-          for (Map.Entry<String, BoundedContext> source : arch.boundedContexts().entrySet()) {
-            String[] forbidden = arch.boundedContextPatternsExcluding(source.getKey());
+          List<ArchRule> perModule = new ArrayList<>();
+          for (String source : arch.isolatedModuleRoots()) {
+            String[] forbidden = arch.moduleRootPatternsExcluding(source);
             if (forbidden.length == 0) {
               continue;
             }
             // dependOnClassesThat, not accessClassesThat: "access" is a method call or field
             // access, so a field, parameter or record component of a foreign type slips past it.
-            noClasses()
-                .that()
-                .resideInAPackage(layout.applicationPattern(source.getKey()))
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage(forbidden)
-                .allowEmptyShould(true)
-                .because(
-                    "Application layer of bounded context '"
-                        + source.getValue().name()
-                        + "' must not access other contexts directly - define output ports and"
-                        + " use adapters instead")
-                .check(arch.classes());
+            perModule.add(
+                noClasses()
+                    .that()
+                    .resideInAPackage(layout.applicationPattern(source))
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage(forbidden)
+                    .allowEmptyShould(true)
+                    .because(
+                        "The application layer of module '"
+                            + arch.contextName(source)
+                            + "' must not access other modules directly - define output ports and"
+                            + " use adapters instead"));
           }
+          CollectedViolations.check(perModule, arch.classes());
         });
   }
 
@@ -136,96 +152,100 @@ public final class StrategicPatternRules implements DcaRuleSet {
   public DcaRule domainLayerIsolation() {
     return DcaRule.check(
         "DCA-STR-004",
-        "Bounded contexts must not access each other in the domain layer",
-        "A domain layer talks to its own context and the shared kernel, nothing else — not even"
-            + " another context's api/",
+        "Modules must not access each other in the domain layer",
+        "A domain layer talks to its own module and the shared kernel, nothing else - not even"
+            + " another module's api/. Selects structurally over every module that owns a DCA layer,"
+            + " declared as a bounded context or not",
         arch -> {
-          for (Map.Entry<String, BoundedContext> source : arch.boundedContexts().entrySet()) {
-            String[] forbidden = arch.boundedContextPatternsExcluding(source.getKey());
+          List<ArchRule> perModule = new ArrayList<>();
+          for (String source : arch.isolatedModuleRoots()) {
+            String[] forbidden = arch.moduleRootPatternsExcluding(source);
             if (forbidden.length == 0) {
               continue;
             }
-            noClasses()
-                .that()
-                .resideInAPackage(layout.domainPattern(source.getKey()))
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage(forbidden)
-                .allowEmptyShould(true)
-                .because(
-                    "The domain layer of bounded context '"
-                        + source.getValue().name()
-                        + "' must depend on nothing outside its own context and the shared kernel")
-                .check(arch.classes());
+            perModule.add(
+                noClasses()
+                    .that()
+                    .resideInAPackage(layout.domainPattern(source))
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage(forbidden)
+                    .allowEmptyShould(true)
+                    .because(
+                        "The domain layer of module '"
+                            + arch.contextName(source)
+                            + "' must depend on nothing outside its own module and the shared"
+                            + " kernel"));
           }
+          CollectedViolations.check(perModule, arch.classes());
         });
   }
 
-  /** DCA-STR-005. */
-  public DcaRule openHostServicesResideInApiOrOpenHostPackages() {
+  /**
+   * DCA-STR-005. An Open Host Service is a relationship pattern, not a transport: the published
+   * protocol one context offers to many consumers. In-process it is the {@code api} package; over
+   * the network it is an incoming adapter (REST, gRPC, MCP, ...). Which sub-package of the incoming
+   * adapter it sits in is the project's business.
+   */
+  public DcaRule openHostServicesResideInApiOrIncomingAdapter() {
     return DcaRule.of(
         "DCA-STR-005",
-        "Open Host Services must reside in api or adapter.incoming.openhost packages",
-        "Open Host Services expose context capabilities via api/ packages (published named"
-            + " interface) or adapter.incoming.openhost/ packages",
+        "Open Host Services must be published: in the api package or as an incoming adapter",
+        "An Open Host Service is the protocol a context publishes for other contexts - in-process"
+            + " as its api/ package, over the network as an incoming adapter (REST, gRPC, MCP). It"
+            + " belongs at the context boundary, never in the domain or application layer; the"
+            + " adapter's sub-package is irrelevant",
         arch ->
             classes()
                 .that()
                 .areAnnotatedWith(OpenHostService.class)
                 .should()
-                .resideInAnyPackage("..api..", openHostAdapterPattern())
+                .resideInAnyPackage(
+                    ".." + layout.apiSubpackage() + "..",
+                    ".." + layout.adapterSubpackage() + "." + layout.incomingSubpackage() + "..")
                 .allowEmptyShould(true));
   }
 
-  private String openHostAdapterPattern() {
-    return ".." + layout.adapterSubpackage() + "." + layout.incomingSubpackage() + ".openhost..";
-  }
-
   /** DCA-STR-006. */
+  /**
+   * DCA-STR-006. The allow-list is the package convention {@code api} / {@code events} of the
+   * target module — DCA's in-process contract, a convention of the architecture and not of any
+   * framework. Everything else in a foreign module (its domain, application, adapters,
+   * infrastructure) is internal.
+   */
   public DcaRule outgoingAdaptersOnlyUseOpenHostServices() {
     return DcaRule.check(
         "DCA-STR-006",
-        "Outgoing adapters accessing other contexts must only use OpenHostService classes (except"
-            + " allowed ACL patterns)",
-        "Cross-context communication goes through the published api/ and events/ packages, never"
-            + " through another context's domain or application layer",
+        "Outgoing adapters accessing other modules must only use their published api/ and events/"
+            + " packages",
+        "Cross-module communication goes through the target's published api/ (synchronous) and"
+            + " events/ (asynchronous) packages - DCA's in-process contract convention, package"
+            + " names rather than framework annotations - never through its domain, application,"
+            + " adapter or infrastructure packages. Selects structurally over every module that owns"
+            + " a DCA layer, declared as a bounded context or not",
         arch -> {
-          Map<String, BoundedContext> contexts = arch.boundedContexts();
-          for (Map.Entry<String, BoundedContext> source : contexts.entrySet()) {
-            for (Map.Entry<String, BoundedContext> target : contexts.entrySet()) {
-              if (target.getKey().equals(source.getKey())) {
-                continue;
-              }
-              noClasses()
-                  .that()
-                  .resideInAPackage(layout.outgoingAdapterPattern(source.getKey()))
-                  .should()
-                  .dependOnClassesThat()
-                  .resideInAPackage(layout.domainPattern(target.getKey()))
-                  .allowEmptyShould(true)
-                  .because(
-                      "Outgoing adapters in '"
-                          + source.getValue().name()
-                          + "' must not access domain layer of '"
-                          + target.getValue().name()
-                          + "' - use api/ or events/ packages instead")
-                  .check(arch.classes());
-              noClasses()
-                  .that()
-                  .resideInAPackage(layout.outgoingAdapterPattern(source.getKey()))
-                  .should()
-                  .dependOnClassesThat()
-                  .resideInAPackage(layout.applicationPattern(target.getKey()))
-                  .allowEmptyShould(true)
-                  .because(
-                      "Outgoing adapters in '"
-                          + source.getValue().name()
-                          + "' must not access application layer of '"
-                          + target.getValue().name()
-                          + "' - use api/ or events/ packages instead")
-                  .check(arch.classes());
+          List<ArchRule> perModule = new ArrayList<>();
+          for (String source : arch.isolatedModuleRoots()) {
+            String[] foreign = arch.moduleRootPatternsExcluding(source);
+            if (foreign.length == 0) {
+              continue;
             }
+            String[] published = arch.publishedPackagePatternsExcluding(source);
+            perModule.add(
+                noClasses()
+                    .that()
+                    .resideInAPackage(layout.outgoingAdapterPattern(source))
+                    .should()
+                    .dependOnClassesThat(
+                        resideInAnyPackage(foreign).and(not(resideInAnyPackage(published))))
+                    .allowEmptyShould(true)
+                    .because(
+                        "Outgoing adapters in module '"
+                            + arch.contextName(source)
+                            + "' must not access another module's internals - use its api/ or"
+                            + " events/ packages instead"));
           }
+          CollectedViolations.check(perModule, arch.classes());
         });
   }
 
@@ -241,7 +261,8 @@ public final class StrategicPatternRules implements DcaRuleSet {
                 .that()
                 .implement(IntegrationEvent.class)
                 .should()
-                .resideInAnyPackage("..events..", outgoingEventAdapterPattern())
+                .resideInAnyPackage(
+                    ".." + layout.eventsSubpackage() + "..", outgoingEventAdapterPattern())
                 .allowEmptyShould(true));
   }
 

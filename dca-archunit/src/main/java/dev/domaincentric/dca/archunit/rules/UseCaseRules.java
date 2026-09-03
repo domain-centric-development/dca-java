@@ -8,6 +8,7 @@ import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
@@ -86,7 +87,7 @@ public final class UseCaseRules implements DcaRuleSet {
                 .and()
                 .resideInAnyPackage(layout.basePackage() + "..")
                 .should()
-                .resideInAnyPackage(layout.applicationPattern())
+                .resideInAnyPackage(arch.allApplicationPatterns())
                 .allowEmptyShould(true));
   }
 
@@ -102,7 +103,7 @@ public final class UseCaseRules implements DcaRuleSet {
                 .and()
                 .resideInAnyPackage(layout.basePackage() + "..")
                 .should()
-                .resideInAnyPackage(layout.applicationPattern())
+                .resideInAnyPackage(arch.allApplicationPatterns())
                 .allowEmptyShould(true));
   }
 
@@ -111,7 +112,7 @@ public final class UseCaseRules implements DcaRuleSet {
         "DCA-USE-004",
         "Use Case Commands should be immutable (final or records)",
         "Use case commands should be immutable (value objects)",
-        arch -> immutableApplicationModels(layout, "Command"));
+        arch -> immutableApplicationModels(arch, "Command"));
   }
 
   public static DcaRule queriesAreImmutable(DcaLayout layout) {
@@ -119,7 +120,7 @@ public final class UseCaseRules implements DcaRuleSet {
         "DCA-USE-005",
         "Use Case Queries should be immutable (final or records)",
         "Use case queries should be immutable (value objects)",
-        arch -> immutableApplicationModels(layout, "Query"));
+        arch -> immutableApplicationModels(arch, "Query"));
   }
 
   public static DcaRule resultsResideInApplication(DcaLayout layout) {
@@ -137,7 +138,7 @@ public final class UseCaseRules implements DcaRuleSet {
                 .and()
                 .doNotImplement(Value.class)
                 .should()
-                .resideInAnyPackage(layout.applicationPattern())
+                .resideInAnyPackage(arch.allApplicationPatterns())
                 .allowEmptyShould(true));
   }
 
@@ -146,7 +147,7 @@ public final class UseCaseRules implements DcaRuleSet {
         "DCA-USE-007",
         "Use Case Result Models should be immutable (final or records)",
         "Use case result models should be immutable (value objects)",
-        arch -> immutableApplicationModels(layout, "Result"));
+        arch -> immutableApplicationModels(arch, "Result"));
   }
 
   public static DcaRule responsesResideInIncomingAdapters(DcaLayout layout) {
@@ -163,7 +164,7 @@ public final class UseCaseRules implements DcaRuleSet {
                 .and()
                 .resideInAnyPackage(layout.basePackage() + "..")
                 .should()
-                .resideInAPackage(layout.incomingAdapterPattern())
+                .resideInAnyPackage(arch.allIncomingAdapterPatterns())
                 .allowEmptyShould(true));
   }
 
@@ -178,7 +179,7 @@ public final class UseCaseRules implements DcaRuleSet {
         arch ->
             classes()
                 .that()
-                .resideInAPackage(layout.applicationPattern())
+                .resideInAnyPackage(arch.allApplicationPatterns())
                 .and()
                 .haveSimpleNameEndingWith(layout.useCaseSuffix())
                 .and()
@@ -196,7 +197,7 @@ public final class UseCaseRules implements DcaRuleSet {
         arch ->
             noClasses()
                 .that()
-                .resideInAnyPackage(layout.domainPattern())
+                .resideInAnyPackage(arch.allDomainPatterns())
                 .should()
                 .dependOnClassesThat()
                 .haveSimpleNameEndingWith("Dto")
@@ -212,7 +213,7 @@ public final class UseCaseRules implements DcaRuleSet {
         arch ->
             noClasses()
                 .that()
-                .resideInAnyPackage(layout.applicationPattern())
+                .resideInAnyPackage(arch.allApplicationPatterns())
                 .should()
                 .dependOnClassesThat()
                 .haveSimpleNameEndingWith("Dto")
@@ -220,12 +221,12 @@ public final class UseCaseRules implements DcaRuleSet {
   }
 
   private static com.tngtech.archunit.lang.ArchRule immutableApplicationModels(
-      DcaLayout layout, String suffix) {
+      DcaArchitecture arch, String suffix) {
     return classes()
         .that()
         .haveSimpleNameEndingWith(suffix)
         .and()
-        .resideInAnyPackage(layout.applicationPattern())
+        .resideInAnyPackage(arch.allApplicationPatterns())
         .and()
         .areNotInterfaces()
         .and()
@@ -249,7 +250,7 @@ public final class UseCaseRules implements DcaRuleSet {
         arch ->
             classes()
                 .that()
-                .resideInAPackage(layout.applicationPattern())
+                .resideInAnyPackage(arch.allApplicationPatterns())
                 .and()
                 .haveSimpleNameEndingWith(layout.useCaseSuffix())
                 .and()
@@ -274,7 +275,7 @@ public final class UseCaseRules implements DcaRuleSet {
         arch ->
             classes()
                 .that()
-                .resideInAPackage(layout.applicationPattern())
+                .resideInAnyPackage(arch.allApplicationPatterns())
                 .and()
                 .haveSimpleNameEndingWith(layout.useCaseSuffix())
                 .and()

@@ -47,10 +47,11 @@ public final class OnionRules implements DcaRuleSet {
         arch ->
             noClasses()
                 .that()
-                .resideInAnyPackage(layout.domainPattern())
+                .resideInAnyPackage(arch.allDomainPatterns())
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage(layout.applicationPattern()));
+                .resideInAnyPackage(arch.allApplicationPatterns())
+                .allowEmptyShould(true));
   }
 
   public DcaRule domainMustBeFrameworkIndependent() {
@@ -60,13 +61,13 @@ public final class OnionRules implements DcaRuleSet {
             + " when possible",
         "Domain should be framework-independent (Dependency Inversion Principle)",
         arch -> {
-          // Matched by pattern, never by context name: domainPattern() is base.*.domain.., which
-          // also covers the shared kernel's own domain package.
-          String[] domainPackages = {
-            layout.domainPattern(),
-            DcaLayout.BUILDING_BLOCKS_TACTICAL_PACKAGE,
-            DcaLayout.BUILDING_BLOCKS_PORT_OUT_PACKAGE
-          };
+          // Every discovered context's domain plus the shared kernel's own domain package — the
+          // inclusion is explicit here, where the former base.*.domain.. wildcard covered the
+          // shared kernel only as a side effect of matching one segment.
+          List<String> domainPackageList = new ArrayList<>(List.of(arch.allDomainPatterns()));
+          domainPackageList.add(DcaLayout.BUILDING_BLOCKS_TACTICAL_PACKAGE);
+          domainPackageList.add(DcaLayout.BUILDING_BLOCKS_PORT_OUT_PACKAGE);
+          String[] domainPackages = domainPackageList.toArray(String[]::new);
           List<String> allowed = new ArrayList<>(layout.thirdPartyPackagesAllowedInDomain());
           allowed.addAll(List.of(domainPackages));
           return classes()
@@ -74,7 +75,8 @@ public final class OnionRules implements DcaRuleSet {
               .resideInAnyPackage(domainPackages)
               .should()
               .onlyDependOnClassesThat()
-              .resideInAnyPackage(allowed.toArray(String[]::new));
+              .resideInAnyPackage(allowed.toArray(String[]::new))
+              .allowEmptyShould(true);
         });
   }
 
@@ -86,7 +88,7 @@ public final class OnionRules implements DcaRuleSet {
         arch ->
             noClasses()
                 .that()
-                .resideInAnyPackage(layout.domainModelPattern(), layout.sharedKernelDomainPattern())
+                .resideInAnyPackage(arch.allDomainModelPatterns())
                 .should()
                 .beAnnotatedWith(layout.frameworkAnnotations().component())
                 .orShould()
@@ -94,6 +96,7 @@ public final class OnionRules implements DcaRuleSet {
                 .orShould()
                 .beAnnotatedWith("jakarta.persistence.Entity")
                 .orShould()
-                .beAnnotatedWith("jakarta.persistence.Table"));
+                .beAnnotatedWith("jakarta.persistence.Table")
+                .allowEmptyShould(true));
   }
 }

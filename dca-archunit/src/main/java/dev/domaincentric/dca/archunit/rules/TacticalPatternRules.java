@@ -103,7 +103,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
         arch ->
             classes()
                 .that()
-                .resideInAnyPackage(layout.domainModelPattern(), layout.sharedKernelDomainPattern())
+                .resideInAnyPackage(arch.allDomainModelPatterns())
                 .and()
                 .haveSimpleNameEndingWith("AggregateRoot")
                 .and()
@@ -338,7 +338,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
         arch ->
             classes()
                 .that()
-                .resideInAnyPackage(layout.domainModelPattern(), layout.sharedKernelDomainPattern())
+                .resideInAnyPackage(arch.allDomainModelPatterns())
                 .and()
                 .implement(Value.class)
                 .and()
@@ -434,7 +434,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
         arch ->
             classes()
                 .that()
-                .resideInAPackage(layout.applicationPattern())
+                .resideInAnyPackage(arch.allApplicationPatterns())
                 .and()
                 .areInterfaces()
                 .and()
@@ -461,7 +461,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 .and()
                 .doNotHaveSimpleName(REPOSITORY_SUFFIX)
                 .should()
-                .resideInAPackage(layout.sharedOutputPortPattern())
+                .resideInAnyPackage(arch.allSharedOutputPortPatterns())
                 .allowEmptyShould(true));
   }
 
@@ -477,7 +477,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 .and()
                 .areAssignableTo(Repository.class)
                 .should()
-                .resideInAPackage(layout.outgoingAdapterPattern())
+                .resideInAnyPackage(arch.allOutgoingAdapterPatterns())
                 .allowEmptyShould(true));
   }
 
@@ -600,7 +600,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 .and()
                 .doNotHaveSimpleName(STORE_SUFFIX)
                 .should()
-                .resideInAPackage(layout.sharedOutputPortPattern())
+                .resideInAnyPackage(arch.allSharedOutputPortPatterns())
                 .allowEmptyShould(true));
   }
 
@@ -616,7 +616,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 .and()
                 .areAssignableTo(Store.class)
                 .should()
-                .resideInAPackage(layout.outgoingAdapterPattern())
+                .resideInAnyPackage(arch.allOutgoingAdapterPatterns())
                 .allowEmptyShould(true));
   }
 
@@ -662,7 +662,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 .that()
                 .haveSimpleNameStartingWith("Enriched")
                 .and()
-                .resideInAPackage(layout.domainModelPattern())
+                .resideInAnyPackage(arch.allDomainModelPatterns())
                 .and()
                 .doNotImplement(Factory.class)
                 .should()

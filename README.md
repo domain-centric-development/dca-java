@@ -87,6 +87,7 @@ That is the whole test. Rules run as dynamic tests grouped by rule set, each nam
 DcaLayout.forBasePackage("com.acme.shop")
     .withIncomingSubpackage("in")            // adapter/in instead of adapter/incoming
     .withOutgoingSubpackage("out")
+    .withApiSubpackage("contract")            // published sync contract (default: api); events: withEventsSubpackage
     .withUseCaseSuffix("ApplicationService")
     .allowingInDomain("org.jmolecules..")     // extra third-party packages allowed in the domain
     .withFrameworkAnnotations(FrameworkAnnotations.spring());   // or your own FQNs

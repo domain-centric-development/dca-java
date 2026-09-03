@@ -2,10 +2,15 @@ package dev.domaincentric.dca.archunit.rules;
 
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
+import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.library.dependencies.SliceAssignment;
+import com.tngtech.archunit.library.dependencies.SliceIdentifier;
+import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 /**
  * Package cycle detection: no circular dependencies between the per-context slices of one layer
@@ -44,9 +49,12 @@ public final class CycleRules implements DcaRuleSet {
             + " Principle)",
         arch ->
             slices()
-                .matching(layout.basePackage() + ".(*)." + layout.domainSubpackage() + ".model..")
+                .assignedFrom(
+                    moduleLayerSlices(
+                        arch, root -> root + "." + layout.domainSubpackage() + ".model"))
                 .should()
-                .beFreeOfCycles());
+                .beFreeOfCycles()
+                .allowEmptyShould(true));
   }
 
   public static DcaRule applicationLayerFreeOfCycles(DcaLayout layout) {
@@ -56,9 +64,11 @@ public final class CycleRules implements DcaRuleSet {
         "Application services should have clear boundaries and no cycles",
         arch ->
             slices()
-                .matching(layout.basePackage() + ".(*)." + layout.applicationSubpackage() + "..")
+                .assignedFrom(
+                    moduleLayerSlices(arch, root -> root + "." + layout.applicationSubpackage()))
                 .should()
-                .beFreeOfCycles());
+                .beFreeOfCycles()
+                .allowEmptyShould(true));
   }
 
   public static DcaRule outgoingAdaptersFreeOfCycles(DcaLayout layout) {
@@ -68,15 +78,18 @@ public final class CycleRules implements DcaRuleSet {
         "Outgoing adapters should have clear boundaries and no cycles",
         arch ->
             slices()
-                .matching(
-                    layout.basePackage()
-                        + ".(*)."
-                        + layout.adapterSubpackage()
-                        + "."
-                        + layout.outgoingSubpackage()
-                        + "..")
+                .assignedFrom(
+                    moduleLayerSlices(
+                        arch,
+                        root ->
+                            root
+                                + "."
+                                + layout.adapterSubpackage()
+                                + "."
+                                + layout.outgoingSubpackage()))
                 .should()
-                .beFreeOfCycles());
+                .beFreeOfCycles()
+                .allowEmptyShould(true));
   }
 
   public static DcaRule incomingAdaptersFreeOfCycles(DcaLayout layout) {
@@ -86,14 +99,50 @@ public final class CycleRules implements DcaRuleSet {
         "Incoming adapters should have clear boundaries and no cycles",
         arch ->
             slices()
-                .matching(
-                    layout.basePackage()
-                        + ".(*)."
-                        + layout.adapterSubpackage()
-                        + "."
-                        + layout.incomingSubpackage()
-                        + "..")
+                .assignedFrom(
+                    moduleLayerSlices(
+                        arch,
+                        root ->
+                            root
+                                + "."
+                                + layout.adapterSubpackage()
+                                + "."
+                                + layout.incomingSubpackage()))
                 .should()
-                .beFreeOfCycles());
+                .beFreeOfCycles()
+                .allowEmptyShould(true));
+  }
+
+  /**
+   * One slice per module, holding that module's classes in the layer {@code layerOf} names.
+   *
+   * <p>Replaces {@code slices().matching(base + ".(*)." + layer + "..")}. A slice pattern needs a
+   * capture group to derive the slice identity, and {@code (*)} is exactly one segment — so the
+   * matching form only ever sliced modules that were direct children of the base package, and a
+   * grouped or nested one was silently excluded from the cycle check. Assigning slices explicitly
+   * uses {@link DcaArchitecture#moduleRootOf(String)} and therefore holds at any depth.
+   */
+  private static SliceAssignment moduleLayerSlices(
+      DcaArchitecture arch, UnaryOperator<String> layerOf) {
+    return new SliceAssignment() {
+
+      @Override
+      public SliceIdentifier getIdentifierOf(JavaClass javaClass) {
+        String root = arch.moduleRootOf(javaClass.getPackageName());
+        if (root == null) {
+          return SliceIdentifier.ignore();
+        }
+        String layer = layerOf.apply(root);
+        String pkg = javaClass.getPackageName();
+        return pkg.equals(layer) || pkg.startsWith(layer + ".")
+            ? SliceIdentifier.of(root)
+            : SliceIdentifier.ignore();
+      }
+
+      @Override
+      public String getDescription() {
+        return "modules";
+      }
+    };
   }
 }

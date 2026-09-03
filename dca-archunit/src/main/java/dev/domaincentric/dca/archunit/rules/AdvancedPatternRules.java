@@ -102,7 +102,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                 .that()
                 .implement(DomainEvent.class)
                 .should()
-                .resideInAnyPackage(layout.domainPattern())
+                .resideInAnyPackage(arch.allDomainPatterns())
                 .allowEmptyShould(true));
   }
 
@@ -114,7 +114,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
         arch ->
             classes()
                 .that()
-                .resideInAnyPackage(layout.domainPattern())
+                .resideInAnyPackage(arch.allDomainPatterns())
                 .and()
                 .implement(DomainEvent.class)
                 .and()
@@ -136,7 +136,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
         arch ->
             noClasses()
                 .that()
-                .resideInAnyPackage(layout.domainPattern())
+                .resideInAnyPackage(arch.allDomainPatterns())
                 .and()
                 .implement(DomainEvent.class)
                 .should()
@@ -264,7 +264,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                 .that()
                 .implement(DomainService.class)
                 .should()
-                .resideInAnyPackage(layout.domainPattern())
+                .resideInAnyPackage(arch.allDomainPatterns())
                 .allowEmptyShould(true));
   }
 
@@ -294,7 +294,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                 .that()
                 .implement(DomainService.class)
                 .and()
-                .resideInAnyPackage(layout.domainPattern())
+                .resideInAnyPackage(arch.allDomainPatterns())
                 .should()
                 .haveOnlyFinalFields()
                 .allowEmptyShould(true));
@@ -328,7 +328,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                 .that()
                 .implement(Factory.class)
                 .should()
-                .resideInAnyPackage(layout.domainPattern())
+                .resideInAnyPackage(arch.allDomainPatterns())
                 .allowEmptyShould(true));
   }
 
@@ -342,7 +342,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                 .that()
                 .implement(Factory.class)
                 .and()
-                .resideInAnyPackage(layout.domainPattern())
+                .resideInAnyPackage(arch.allDomainPatterns())
                 .should()
                 .beAnnotatedWith(layout.frameworkAnnotations().component())
                 .orShould()
@@ -360,7 +360,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                 .that()
                 .implement(Factory.class)
                 .and()
-                .resideInAnyPackage(layout.domainPattern())
+                .resideInAnyPackage(arch.allDomainPatterns())
                 .should()
                 .haveOnlyFinalFields()
                 .allowEmptyShould(true));
@@ -384,7 +384,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                 .and()
                 .doNotHaveSimpleName("Specification")
                 .should()
-                .resideInAnyPackage(layout.domainPattern())
+                .resideInAnyPackage(arch.allDomainPatterns())
                 .allowEmptyShould(true));
   }
 
@@ -398,7 +398,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                 .that()
                 .haveSimpleNameEndingWith("Specification")
                 .and()
-                .resideInAnyPackage(layout.domainPattern())
+                .resideInAnyPackage(arch.allDomainPatterns())
                 .should()
                 .beAnnotatedWith(layout.frameworkAnnotations().component())
                 .orShould()

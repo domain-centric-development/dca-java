@@ -55,7 +55,7 @@ public final class NamingRules implements DcaRuleSet {
         arch ->
             classes()
                 .that()
-                .resideInAPackage(layout.applicationPattern())
+                .resideInAnyPackage(arch.allApplicationPatterns())
                 .and()
                 .areNotInterfaces()
                 .and()
@@ -75,7 +75,7 @@ public final class NamingRules implements DcaRuleSet {
         arch ->
             classes()
                 .that()
-                .resideInAPackage(layout.applicationPattern())
+                .resideInAnyPackage(arch.allApplicationPatterns())
                 .and()
                 .haveSimpleNameEndingWith(layout.useCaseSuffix())
                 .and()
@@ -95,7 +95,7 @@ public final class NamingRules implements DcaRuleSet {
         arch ->
             classes()
                 .that()
-                .resideInAPackage(layout.applicationPattern())
+                .resideInAnyPackage(arch.allApplicationPatterns())
                 .and()
                 .areInterfaces()
                 .and()
@@ -117,7 +117,7 @@ public final class NamingRules implements DcaRuleSet {
         arch ->
             classes()
                 .that()
-                .resideInAPackage(layout.applicationPattern())
+                .resideInAnyPackage(arch.allApplicationPatterns())
                 .and()
                 .areInterfaces()
                 .and()
@@ -137,7 +137,7 @@ public final class NamingRules implements DcaRuleSet {
         arch ->
             classes()
                 .that()
-                .resideInAPackage(layout.incomingAdapterPattern())
+                .resideInAnyPackage(arch.allIncomingAdapterPatterns())
                 .and()
                 .areAnnotatedWith(layout.frameworkAnnotations().controller())
                 .should()
@@ -157,7 +157,7 @@ public final class NamingRules implements DcaRuleSet {
         arch ->
             classes()
                 .that()
-                .resideInAPackage(layout.incomingAdapterPattern())
+                .resideInAnyPackage(arch.allIncomingAdapterPatterns())
                 .and()
                 .areAnnotatedWith(layout.frameworkAnnotations().restController())
                 .should()
@@ -177,7 +177,7 @@ public final class NamingRules implements DcaRuleSet {
                 .and()
                 .resideInAnyPackage(layout.basePackage() + "..")
                 .should()
-                .resideInAPackage(layout.adapterPattern())
+                .resideInAnyPackage(arch.allAdapterPatterns())
                 .allowEmptyShould(true));
   }
 
@@ -193,7 +193,7 @@ public final class NamingRules implements DcaRuleSet {
                 .and()
                 .resideInAnyPackage(layout.basePackage() + "..")
                 .should()
-                .resideInAPackage(layout.adapterPattern())
+                .resideInAnyPackage(arch.allAdapterPatterns())
                 .allowEmptyShould(true));
   }
 
@@ -227,7 +227,7 @@ public final class NamingRules implements DcaRuleSet {
         arch ->
             noClasses()
                 .that()
-                .resideInAPackage(layout.domainPattern())
+                .resideInAnyPackage(arch.allDomainPatterns())
                 .should()
                 .haveSimpleNameEndingWith("Manager")
                 .orShould()

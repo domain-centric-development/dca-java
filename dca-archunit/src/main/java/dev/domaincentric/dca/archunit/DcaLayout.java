@@ -13,11 +13,29 @@ import java.util.Objects;
  * <pre>{@code
  * DcaLayout layout = DcaLayout.forBasePackage("com.acme.shop")
  *     .withIncomingSubpackage("in")
- *     .withOutgoingSubpackage("out");
+ *     .withOutgoingSubpackage("out")
+ *     .withApiSubpackage("contract");
  * }</pre>
  *
  * <p>All package patterns returned by this class use ArchUnit's package-matching syntax ({@code ..}
  * for any number of sub-packages, {@code *} for exactly one segment).
+ *
+ * <p><b>Wildcard patterns versus discovered contexts.</b> The no-argument accessors ({@link
+ * #domainPattern()} and its siblings) build {@code base.*.domain..}, where {@code *} is exactly one
+ * segment — they therefore only ever match a bounded context that is a direct child of the base
+ * package. They are kept for projects that have not declared their contexts yet, and for tooling
+ * that needs a pattern without an imported class graph. <b>The rules do not use them.</b> Every
+ * rule selects through {@code DcaArchitecture}'s discovery accessors ({@code
+ * contextDomainPatterns()}, {@code allDomainPatternsWithSharedKernel()}, …), which are built from
+ * the packages that actually carry {@code @BoundedContext} and so work at any depth: {@code
+ * base.sales.order} and a single-context application that annotates its base package are both
+ * governed.
+ *
+ * <p>The wildcard is deliberately not loosened to {@code base..domain..}: that would also match any
+ * package merely *named* {@code domain} further down, such as an outgoing adapter mapping to a
+ * foreign model. A module is instead found structurally by {@code DcaArchitecture.moduleRoots()} —
+ * the shortest prefix that owns a layer — which needs no annotation and is not fooled by such a
+ * package.
  */
 public final class DcaLayout {
 
@@ -51,6 +69,8 @@ public final class DcaLayout {
   private final String incomingSubpackage;
   private final String outgoingSubpackage;
   private final String infrastructureSubpackage;
+  private final String apiSubpackage;
+  private final String eventsSubpackage;
   private final String useCaseSuffix;
   private final String restControllerSuffix;
   private final List<String> thirdPartyPackagesAllowedInDomain;
@@ -65,6 +85,8 @@ public final class DcaLayout {
       String incomingSubpackage,
       String outgoingSubpackage,
       String infrastructureSubpackage,
+      String apiSubpackage,
+      String eventsSubpackage,
       String useCaseSuffix,
       String restControllerSuffix,
       List<String> thirdPartyPackagesAllowedInDomain,
@@ -78,6 +100,12 @@ public final class DcaLayout {
     this.outgoingSubpackage = requireSegment(outgoingSubpackage, "outgoingSubpackage");
     this.infrastructureSubpackage =
         requireSegment(infrastructureSubpackage, "infrastructureSubpackage");
+    this.apiSubpackage = requireSegment(apiSubpackage, "apiSubpackage");
+    this.eventsSubpackage = requireSegment(eventsSubpackage, "eventsSubpackage");
+    if (apiSubpackage.equals(eventsSubpackage)) {
+      throw new IllegalArgumentException(
+          "apiSubpackage and eventsSubpackage must differ, both are '" + apiSubpackage + "'");
+    }
     this.useCaseSuffix = requireSegment(useCaseSuffix, "useCaseSuffix");
     this.restControllerSuffix = requireSegment(restControllerSuffix, "restControllerSuffix");
     this.thirdPartyPackagesAllowedInDomain = List.copyOf(thirdPartyPackagesAllowedInDomain);
@@ -95,6 +123,8 @@ public final class DcaLayout {
         "incoming",
         "outgoing",
         "infrastructure",
+        "api",
+        "events",
         "UseCase",
         "Resource",
         DEFAULT_THIRD_PARTY_ALLOWED_IN_DOMAIN,
@@ -121,6 +151,8 @@ public final class DcaLayout {
         incomingSubpackage,
         outgoingSubpackage,
         infrastructureSubpackage,
+        apiSubpackage,
+        eventsSubpackage,
         useCaseSuffix,
         restControllerSuffix,
         thirdPartyPackagesAllowedInDomain,
@@ -136,6 +168,8 @@ public final class DcaLayout {
         incomingSubpackage,
         outgoingSubpackage,
         infrastructureSubpackage,
+        apiSubpackage,
+        eventsSubpackage,
         useCaseSuffix,
         restControllerSuffix,
         thirdPartyPackagesAllowedInDomain,
@@ -151,6 +185,8 @@ public final class DcaLayout {
         incomingSubpackage,
         outgoingSubpackage,
         infrastructureSubpackage,
+        apiSubpackage,
+        eventsSubpackage,
         useCaseSuffix,
         restControllerSuffix,
         thirdPartyPackagesAllowedInDomain,
@@ -166,6 +202,8 @@ public final class DcaLayout {
         incomingSubpackage,
         outgoingSubpackage,
         infrastructureSubpackage,
+        apiSubpackage,
+        eventsSubpackage,
         useCaseSuffix,
         restControllerSuffix,
         thirdPartyPackagesAllowedInDomain,
@@ -182,6 +220,8 @@ public final class DcaLayout {
         value,
         outgoingSubpackage,
         infrastructureSubpackage,
+        apiSubpackage,
+        eventsSubpackage,
         useCaseSuffix,
         restControllerSuffix,
         thirdPartyPackagesAllowedInDomain,
@@ -200,6 +240,8 @@ public final class DcaLayout {
         incomingSubpackage,
         value,
         infrastructureSubpackage,
+        apiSubpackage,
+        eventsSubpackage,
         useCaseSuffix,
         restControllerSuffix,
         thirdPartyPackagesAllowedInDomain,
@@ -214,6 +256,52 @@ public final class DcaLayout {
         adapterSubpackage,
         incomingSubpackage,
         outgoingSubpackage,
+        value,
+        apiSubpackage,
+        eventsSubpackage,
+        useCaseSuffix,
+        restControllerSuffix,
+        thirdPartyPackagesAllowedInDomain,
+        frameworkAnnotations);
+  }
+
+  /**
+   * Sub-package of a module's <em>synchronous</em> published contract, e.g. {@code "api"} (default)
+   * or {@code "contract"}. Together with {@link #withEventsSubpackage(String)} it is the only part
+   * of a module another module's adapters may depend on; the context-map rules and renderer use the
+   * same name for the channel.
+   */
+  public DcaLayout withApiSubpackage(String value) {
+    return copy(
+        sharedKernelSubpackage,
+        domainSubpackage,
+        applicationSubpackage,
+        adapterSubpackage,
+        incomingSubpackage,
+        outgoingSubpackage,
+        infrastructureSubpackage,
+        value,
+        eventsSubpackage,
+        useCaseSuffix,
+        restControllerSuffix,
+        thirdPartyPackagesAllowedInDomain,
+        frameworkAnnotations);
+  }
+
+  /**
+   * Sub-package of a module's <em>asynchronous</em> published contract — its integration events —
+   * e.g. {@code "events"} (default) or {@code "published"}.
+   */
+  public DcaLayout withEventsSubpackage(String value) {
+    return copy(
+        sharedKernelSubpackage,
+        domainSubpackage,
+        applicationSubpackage,
+        adapterSubpackage,
+        incomingSubpackage,
+        outgoingSubpackage,
+        infrastructureSubpackage,
+        apiSubpackage,
         value,
         useCaseSuffix,
         restControllerSuffix,
@@ -231,6 +319,8 @@ public final class DcaLayout {
         incomingSubpackage,
         outgoingSubpackage,
         infrastructureSubpackage,
+        apiSubpackage,
+        eventsSubpackage,
         value,
         restControllerSuffix,
         thirdPartyPackagesAllowedInDomain,
@@ -247,6 +337,8 @@ public final class DcaLayout {
         incomingSubpackage,
         outgoingSubpackage,
         infrastructureSubpackage,
+        apiSubpackage,
+        eventsSubpackage,
         useCaseSuffix,
         value,
         thirdPartyPackagesAllowedInDomain,
@@ -266,6 +358,8 @@ public final class DcaLayout {
         incomingSubpackage,
         outgoingSubpackage,
         infrastructureSubpackage,
+        apiSubpackage,
+        eventsSubpackage,
         useCaseSuffix,
         restControllerSuffix,
         patterns,
@@ -289,6 +383,8 @@ public final class DcaLayout {
         incomingSubpackage,
         outgoingSubpackage,
         infrastructureSubpackage,
+        apiSubpackage,
+        eventsSubpackage,
         useCaseSuffix,
         restControllerSuffix,
         thirdPartyPackagesAllowedInDomain,
@@ -303,6 +399,8 @@ public final class DcaLayout {
       String incomingSubpackage,
       String outgoingSubpackage,
       String infrastructureSubpackage,
+      String apiSubpackage,
+      String eventsSubpackage,
       String useCaseSuffix,
       String restControllerSuffix,
       List<String> thirdPartyPackagesAllowedInDomain,
@@ -316,6 +414,8 @@ public final class DcaLayout {
         incomingSubpackage,
         outgoingSubpackage,
         infrastructureSubpackage,
+        apiSubpackage,
+        eventsSubpackage,
         useCaseSuffix,
         restControllerSuffix,
         thirdPartyPackagesAllowedInDomain,
@@ -356,6 +456,23 @@ public final class DcaLayout {
 
   public String infrastructureSubpackage() {
     return infrastructureSubpackage;
+  }
+
+  public String apiSubpackage() {
+    return apiSubpackage;
+  }
+
+  public String eventsSubpackage() {
+    return eventsSubpackage;
+  }
+
+  /**
+   * The published sub-packages of a module, {@code api} then {@code events}: DCA's in-process
+   * contract convention — package names, not framework annotations — and the only part of a module
+   * another module's adapters may depend on.
+   */
+  public List<String> publishedSubpackages() {
+    return List.of(apiSubpackage, eventsSubpackage);
   }
 
   public String useCaseSuffix() {
@@ -408,7 +525,12 @@ public final class DcaLayout {
     return infrastructurePackage() + "..";
   }
 
-  /** {@code base.*.domain..} — the domain layer of every direct sub-package (context). */
+  /**
+   * {@code base.*.domain..} — the domain layer of every <em>direct</em> sub-package. Matches a
+   * bounded context only when it is a direct child of the base package; prefer {@code
+   * DcaArchitecture.contextDomainPatterns()}, which is derived from the declared contexts and holds
+   * at any depth.
+   */
   public String domainPattern() {
     return basePackage + ".*." + domainSubpackage + "..";
   }
@@ -455,6 +577,10 @@ public final class DcaLayout {
 
   public String applicationPattern(String contextPackage) {
     return contextPackage + "." + applicationSubpackage + "..";
+  }
+
+  public String sharedOutputPortPattern(String contextPackage) {
+    return contextPackage + "." + applicationSubpackage + ".shared..";
   }
 
   public String adapterPattern(String contextPackage) {

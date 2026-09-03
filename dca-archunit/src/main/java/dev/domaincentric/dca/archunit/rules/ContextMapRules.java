@@ -43,9 +43,6 @@ import java.util.TreeSet;
  */
 public final class ContextMapRules implements DcaRuleSet {
 
-  private static final String API = "api";
-  private static final String EVENTS = "events";
-
   private final DcaLayout layout;
   private final List<DcaRule> rules;
 
@@ -124,7 +121,7 @@ public final class ContextMapRules implements DcaRuleSet {
         arch -> {
           Set<String> moduleNames = moduleNames(arch);
           for (String pkg : arch.boundedContextPackages()) {
-            String source = shortName(pkg);
+            String source = arch.contextName(pkg);
             List<String> edges = new ArrayList<>();
             for (ExternalUpstream e : arch.packageAnnotations(pkg, ExternalUpstream.class)) {
               require(
@@ -191,7 +188,7 @@ public final class ContextMapRules implements DcaRuleSet {
         arch -> {
           Set<String> moduleNames = moduleNames(arch);
           for (String pkg : arch.boundedContextPackages()) {
-            String source = shortName(pkg);
+            String source = arch.contextName(pkg);
             for (Upstream u : arch.packageAnnotations(pkg, Upstream.class)) {
               require(
                   moduleNames.contains(u.context()),
@@ -219,7 +216,7 @@ public final class ContextMapRules implements DcaRuleSet {
             + " channel require separate annotations",
         arch -> {
           for (String pkg : arch.boundedContextPackages()) {
-            String source = shortName(pkg);
+            String source = arch.contextName(pkg);
             List<String> edges = new ArrayList<>();
             for (Upstream u : arch.packageAnnotations(pkg, Upstream.class)) {
               require(
@@ -230,7 +227,7 @@ public final class ContextMapRules implements DcaRuleSet {
                       + u.context()
                       + "\") declares no channel — via must not be empty");
               for (Upstream.Consumes channel : u.via()) {
-                String edge = u.context() + " :: " + channelName(channel);
+                String edge = u.context() + " :: " + channelName(arch, channel);
                 require(
                     !edges.contains(edge),
                     "Context '"
@@ -265,7 +262,7 @@ public final class ContextMapRules implements DcaRuleSet {
           }
           Set<String> moduleNames = moduleNames(arch);
           for (String pkg : arch.boundedContextPackages()) {
-            String source = shortName(pkg);
+            String source = arch.contextName(pkg);
             Set<String> declared = declaredEdges(arch, pkg);
             Set<String> allowed = new LinkedHashSet<>();
             for (String entry : allowedDependencies(arch, pkg, moduleAnnotation.get())) {
@@ -334,14 +331,14 @@ public final class ContextMapRules implements DcaRuleSet {
         arch -> {
           Map<String, String> packagesByName = packagesByName(arch);
           for (String pkg : arch.boundedContextPackages()) {
-            String source = shortName(pkg);
+            String source = arch.contextName(pkg);
             for (Upstream u : arch.packageAnnotations(pkg, Upstream.class)) {
               String targetPkg = packagesByName.get(u.context());
               if (u.status() != Upstream.Status.IMPLEMENTED || targetPkg == null) {
                 continue;
               }
               for (Upstream.Consumes channel : u.via()) {
-                String channelPkg = targetPkg + "." + channelName(channel);
+                String channelPkg = targetPkg + "." + channelName(arch, channel);
                 boolean exists = false;
                 for (JavaClass javaClass : arch.classes()) {
                   if (!inPackageTree(javaClass.getPackageName(), pkg)) {
@@ -364,7 +361,7 @@ public final class ContextMapRules implements DcaRuleSet {
                         + "' declares @Upstream(context = \""
                         + u.context()
                         + "\", via = "
-                        + channelName(channel)
+                        + channelName(arch, channel)
                         + ") as IMPLEMENTED, but no class in '"
                         + pkg
                         + "' depends on '"
@@ -392,7 +389,7 @@ public final class ContextMapRules implements DcaRuleSet {
         arch -> {
           Map<String, String> packagesByName = packagesByName(arch);
           for (String pkg : arch.boundedContextPackages()) {
-            String source = shortName(pkg);
+            String source = arch.contextName(pkg);
             for (Upstream u : arch.packageAnnotations(pkg, Upstream.class)) {
               String targetPkg = packagesByName.get(u.context());
               if (u.translation() != Upstream.Translation.ANTI_CORRUPTION_LAYER
@@ -411,7 +408,7 @@ public final class ContextMapRules implements DcaRuleSet {
                     .resideOutsideOfPackage(allowedAdapter)
                     .should()
                     .dependOnClassesThat()
-                    .resideInAPackage(targetPkg + "." + channelName(channel) + "..")
+                    .resideInAPackage(targetPkg + "." + channelName(arch, channel) + "..")
                     .allowEmptyShould(true)
                     .because(
                         "Context '"
@@ -419,7 +416,7 @@ public final class ContextMapRules implements DcaRuleSet {
                             + "' declares ANTI_CORRUPTION_LAYER towards '"
                             + u.context()
                             + "' ("
-                            + channelName(channel)
+                            + channelName(arch, channel)
                             + ") — upstream contract types must not leave "
                             + allowedAdapter
                             + "; translate them there into the context's own model")
@@ -440,7 +437,7 @@ public final class ContextMapRules implements DcaRuleSet {
         arch -> {
           Map<String, String> packagesByName = packagesByName(arch);
           for (String pkg : arch.boundedContextPackages()) {
-            String source = shortName(pkg);
+            String source = arch.contextName(pkg);
             for (Upstream u : arch.packageAnnotations(pkg, Upstream.class)) {
               String targetPkg = packagesByName.get(u.context());
               if (u.translation() != Upstream.Translation.CONFORMIST || targetPkg == null) {
@@ -452,7 +449,7 @@ public final class ContextMapRules implements DcaRuleSet {
                     .resideInAPackage(layout.domainPattern(pkg))
                     .should()
                     .dependOnClassesThat()
-                    .resideInAPackage(targetPkg + "." + channelName(channel) + "..")
+                    .resideInAPackage(targetPkg + "." + channelName(arch, channel) + "..")
                     .allowEmptyShould(true)
                     .because(
                         "Context '"
@@ -460,7 +457,7 @@ public final class ContextMapRules implements DcaRuleSet {
                             + "' conforms to '"
                             + u.context()
                             + "' ("
-                            + channelName(channel)
+                            + channelName(arch, channel)
                             + "), but conformism does not suspend domain purity — the domain"
                             + " layer stays free of foreign contract types")
                     .check(arch.classes());
@@ -481,7 +478,7 @@ public final class ContextMapRules implements DcaRuleSet {
           // Without contractPackages (wire-level contract, no vendor SDK) there is nothing to
           // check — the declaration then only documents the relationship.
           for (String pkg : arch.boundedContextPackages()) {
-            String source = shortName(pkg);
+            String source = arch.contextName(pkg);
             for (ExternalUpstream e : arch.packageAnnotations(pkg, ExternalUpstream.class)) {
               if (e.contractPackages().length == 0) {
                 continue;
@@ -544,14 +541,14 @@ public final class ContextMapRules implements DcaRuleSet {
         arch -> {
           List<String> contexts = arch.boundedContextPackages();
           for (String srcPkg : contexts) {
-            String source = shortName(srcPkg);
+            String source = arch.contextName(srcPkg);
             Set<String> declared = declaredEdges(arch, srcPkg);
             for (String tgtPkg : contexts) {
               if (tgtPkg.equals(srcPkg)) {
                 continue;
               }
-              String target = shortName(tgtPkg);
-              for (String channel : List.of(API, EVENTS)) {
+              String target = arch.contextName(tgtPkg);
+              for (String channel : arch.layout().publishedSubpackages()) {
                 if (declared.contains(target + " :: " + channel)) {
                   continue;
                 }
@@ -593,7 +590,7 @@ public final class ContextMapRules implements DcaRuleSet {
         arch -> {
           Map<String, String> packagesByName = packagesByName(arch);
           for (String pkg : arch.boundedContextPackages()) {
-            String source = shortName(pkg);
+            String source = arch.contextName(pkg);
             for (Partnership p : arch.packageAnnotations(pkg, Partnership.class)) {
               require(
                   packagesByName.containsKey(p.context()),
@@ -641,7 +638,7 @@ public final class ContextMapRules implements DcaRuleSet {
         arch -> {
           System.out.println("=== Context Map (declared) ===");
           for (String pkg : arch.boundedContextPackages()) {
-            String source = shortName(pkg);
+            String source = arch.contextName(pkg);
             for (Upstream u : arch.packageAnnotations(pkg, Upstream.class)) {
               for (Upstream.Consumes channel : u.via()) {
                 System.out.println(
@@ -650,7 +647,7 @@ public final class ContextMapRules implements DcaRuleSet {
                         + " --["
                         + u.translation()
                         + " / "
-                        + channelName(channel)
+                        + channelName(arch, channel)
                         + "]--> "
                         + u.context());
               }
@@ -697,13 +694,13 @@ public final class ContextMapRules implements DcaRuleSet {
 
   private static Set<String> moduleNames(DcaArchitecture arch) {
     Set<String> names = new LinkedHashSet<>();
-    arch.boundedContextPackages().forEach(p -> names.add(shortName(p)));
+    arch.boundedContextPackages().forEach(p -> names.add(arch.contextName(p)));
     return names;
   }
 
   private static Map<String, String> packagesByName(DcaArchitecture arch) {
     Map<String, String> byName = new LinkedHashMap<>();
-    arch.boundedContextPackages().forEach(p -> byName.put(shortName(p), p));
+    arch.boundedContextPackages().forEach(p -> byName.put(arch.contextName(p), p));
     return byName;
   }
 
@@ -712,14 +709,16 @@ public final class ContextMapRules implements DcaRuleSet {
     Set<String> edges = new LinkedHashSet<>();
     for (Upstream u : arch.packageAnnotations(contextPackage, Upstream.class)) {
       for (Upstream.Consumes channel : u.via()) {
-        edges.add(u.context() + " :: " + channelName(channel));
+        edges.add(u.context() + " :: " + channelName(arch, channel));
       }
     }
     return edges;
   }
 
-  private static String channelName(Upstream.Consumes channel) {
-    return channel == Upstream.Consumes.API ? API : EVENTS;
+  private static String channelName(DcaArchitecture arch, Upstream.Consumes channel) {
+    return channel == Upstream.Consumes.API
+        ? arch.layout().apiSubpackage()
+        : arch.layout().eventsSubpackage();
   }
 
   /** True when packageName is root itself or a sub-package of root (exact segment boundary). */
@@ -730,9 +729,5 @@ public final class ContextMapRules implements DcaRuleSet {
   /** The mermaid node id of an external system in the generated context map. */
   private static String normalizedExternalId(String name) {
     return "ext_" + name.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_");
-  }
-
-  private static String shortName(String packagePath) {
-    return DcaArchitecture.simpleContextName(packagePath);
   }
 }

@@ -11,6 +11,7 @@ import dev.domaincentric.dca.buildingblocks.ddd.strategic.relationships.SharedKe
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,18 @@ public final class DcaArchitecture {
   private final JavaClasses classes;
   private Map<String, BoundedContext> boundedContexts;
   private Optional<String> sharedKernelPackage;
+
+  /**
+   * {@code package-info} lookups are reflective and miss far more often than they hit — context
+   * discovery walks every ancestor package of every class. Cached per architecture instance,
+   * empties included.
+   */
+  private final Map<String, Optional<Class<?>>> packageInfoCache = new HashMap<>();
+
+  /** Memoised {@link #isContextRoot(String)}, for the same reason. */
+  private final Map<String, Boolean> contextRootCache = new HashMap<>();
+
+  private List<String> moduleRoots;
 
   private DcaArchitecture(DcaLayout layout, JavaClasses classes) {
     this.layout = Objects.requireNonNull(layout);
@@ -71,8 +84,9 @@ public final class DcaArchitecture {
   // ---------------------------------------------------------------------------------------------
 
   /**
-   * All packages directly below the base package whose {@code package-info} carries {@link
-   * BoundedContext}, keyed by package name, in encounter order.
+   * All packages whose {@code package-info} carries {@link BoundedContext}, keyed by package name,
+   * in encounter order. Discovery is by annotation, so a context may sit at any depth below the
+   * base package — see {@link #rootContextPackage(String)}.
    */
   public Map<String, BoundedContext> boundedContexts() {
     if (boundedContexts == null) {
@@ -106,7 +120,10 @@ public final class DcaArchitecture {
         .toArray(String[]::new);
   }
 
-  /** The package directly below the base package annotated with {@link SharedKernel}. */
+  /**
+   * The package annotated with {@link SharedKernel}, at whatever depth below the base package it
+   * sits.
+   */
   public Optional<String> sharedKernelPackage() {
     if (sharedKernelPackage == null) {
       Optional<String> found = Optional.empty();
@@ -127,11 +144,60 @@ public final class DcaArchitecture {
   }
 
   /**
-   * The direct sub-package of the base package that a fully qualified package belongs to, e.g.
-   * {@code com.acme.shop.cart.domain.model → com.acme.shop.cart}; {@code null} for packages outside
-   * the base package.
+   * The root package of the bounded context (or shared kernel) that a fully qualified package
+   * belongs to — the nearest ancestor at or below the base package whose {@code package-info}
+   * carries {@link BoundedContext} or {@link SharedKernel}.
+   *
+   * <p>Because the declaration is the annotation and not the position in the tree, a context may
+   * sit at any depth: {@code com.acme.shop.cart.domain.model → com.acme.shop.cart} when {@code
+   * cart} is annotated, and {@code com.acme.shop.sales.order.domain.model →
+   * com.acme.shop.sales.order} when {@code sales.order} is. A single-context application may
+   * annotate the base package itself.
+   *
+   * <p>Falls back to the direct sub-package of the base package when no ancestor is annotated, so
+   * that a project which has not declared its contexts yet still groups classes the way it used to.
+   * Such a package is not a discovered context; whether it owns layers — and is therefore governed
+   * — is decided structurally by {@link #moduleRoots()}, not by this fallback.
+   *
+   * @return the context root package, or {@code null} for packages outside the base package
    */
   public String rootContextPackage(String fullPackageName) {
+    if (fullPackageName == null) {
+      return null;
+    }
+    String base = layout.basePackage();
+    if (!fullPackageName.equals(base) && !fullPackageName.startsWith(base + ".")) {
+      return null;
+    }
+    for (String candidate = fullPackageName;
+        candidate != null;
+        candidate = parentPackage(candidate, base)) {
+      if (isContextRoot(candidate)) {
+        return candidate;
+      }
+    }
+    return firstSegmentBelowBase(fullPackageName);
+  }
+
+  private boolean isContextRoot(String packageName) {
+    return contextRootCache.computeIfAbsent(
+        packageName,
+        p ->
+            packageAnnotation(p, BoundedContext.class).isPresent()
+                || packageAnnotation(p, SharedKernel.class).isPresent());
+  }
+
+  /** The parent of {@code packageName}, down to {@code base} inclusive; {@code null} beyond it. */
+  private static String parentPackage(String packageName, String base) {
+    if (packageName.equals(base)) {
+      return null;
+    }
+    int dot = packageName.lastIndexOf('.');
+    return dot < 0 ? null : packageName.substring(0, dot);
+  }
+
+  /** The pre-discovery fallback: {@code base.cart.domain.model → base.cart}. */
+  private String firstSegmentBelowBase(String fullPackageName) {
     String prefix = layout.basePackage() + ".";
     if (!fullPackageName.startsWith(prefix)) {
       return null;
@@ -144,7 +210,36 @@ public final class DcaArchitecture {
     return remainder.isEmpty() ? null : layout.basePackage() + "." + remainder;
   }
 
-  /** Last segment of a context package: {@code com.acme.shop.cart → cart}. */
+  /**
+   * The identifier of a context package: its name relative to the base package, e.g. {@code
+   * com.acme.shop.cart → cart} and {@code com.acme.shop.sales.order → sales.order}.
+   *
+   * <p>This is the name a context is referenced by in {@code @Upstream(context = ...)}, in the
+   * rendered context map, and in rule messages. It deliberately matches how Spring Modulith derives
+   * an application-module identifier ({@code JavaPackage.getTrailingName}), so the two agree
+   * without a mapping layer. For a context that is a direct child of the base package it is the
+   * last segment, so nothing changes for a flat layout; grouped contexts keep their group in the
+   * name, which is also what makes them unambiguous — two contexts named {@code order} under
+   * different groups would otherwise collide.
+   */
+  public String contextName(String contextPackage) {
+    String base = layout.basePackage();
+    if (contextPackage.equals(base)) {
+      return simpleContextName(base);
+    }
+    return contextPackage.startsWith(base + ".")
+        ? contextPackage.substring(base.length() + 1)
+        : simpleContextName(contextPackage);
+  }
+
+  /**
+   * Last segment of a package: {@code com.acme.shop.cart → cart}.
+   *
+   * @deprecated a context identifier is its name relative to the base package — use {@link
+   *     #contextName(String)}, which is unambiguous for grouped contexts. This method stays for
+   *     callers that really do want the last segment.
+   */
+  @Deprecated(since = "0.2.0")
   public static String simpleContextName(String contextPackage) {
     return contextPackage.substring(contextPackage.lastIndexOf('.') + 1);
   }
@@ -168,6 +263,10 @@ public final class DcaArchitecture {
   }
 
   private Optional<Class<?>> packageInfo(String packageName) {
+    return packageInfoCache.computeIfAbsent(packageName, DcaArchitecture::loadPackageInfo);
+  }
+
+  private static Optional<Class<?>> loadPackageInfo(String packageName) {
     try {
       return Optional.of(
           Class.forName(
@@ -184,7 +283,121 @@ public final class DcaArchitecture {
   }
 
   // ---------------------------------------------------------------------------------------------
-  // Pattern helpers over the discovered contexts
+  // Module discovery — structural, unlike context discovery
+  // ---------------------------------------------------------------------------------------------
+
+  /**
+   * Every package that owns a DCA layer, in encounter order — the roots the layer rules apply to.
+   *
+   * <p><b>Why this is not the same as {@link #boundedContexts()}.</b> Being a bounded context is a
+   * strategic statement: it is declared with {@code @BoundedContext} and it decides isolation, the
+   * context map, upstream relationships. Owning a {@code domain}/{@code application}/{@code
+   * adapter} layer is a structural fact, and the layer rules — the domain knows no infrastructure,
+   * transactions are an application concern, a {@code Command} lives in {@code application} — apply
+   * to it either way. A module that is deliberately <em>not</em> a bounded context (an operational
+   * backoffice reading other contexts' data, say) still follows DCA layering and must still be
+   * governed.
+   *
+   * <p>A root is the <b>shortest</b> package prefix at or below the base package whose remainder
+   * starts with a layer segment. Shortest wins so that an adapter's own {@code domain} package — an
+   * outgoing adapter mapping to a foreign model — stays inside its module instead of becoming a
+   * root of its own: for {@code base.cart.adapter.outgoing.domain.Foo} the root is {@code
+   * base.cart}, not {@code base.cart.adapter.outgoing}.
+   *
+   * <p>Because the test is structural, a module is found at any depth and without any annotation —
+   * which is what keeps a grouped or nested layout governed. The isolation rules select over module
+   * roots as well ({@link #isolatedModuleRoots()}), so a module that declares nothing can neither
+   * reach into a neighbour's internals nor have its own internals reached into. Declaring a module
+   * a bounded context decides its place on the context map, nothing more.
+   */
+  public List<String> moduleRoots() {
+    if (moduleRoots == null) {
+      String base = layout.basePackage();
+      java.util.Set<String> layers = layerSegments();
+      java.util.LinkedHashSet<String> roots = new java.util.LinkedHashSet<>();
+      for (JavaClass javaClass : classes) {
+        String root = moduleRootOf(javaClass.getPackageName(), base, layers);
+        if (root != null) {
+          roots.add(root);
+        }
+      }
+      moduleRoots = List.copyOf(roots);
+    }
+    return moduleRoots;
+  }
+
+  /**
+   * The module roots the isolation rules govern: every module root except the shared kernel. The
+   * shared kernel is a module root too (it may own {@code domain}, {@code application} and {@code
+   * adapter} packages), but everyone may depend on it, and what <em>it</em> may depend on is {@code
+   * DCA-STR-002}'s business.
+   */
+  public List<String> isolatedModuleRoots() {
+    Optional<String> sharedKernel = sharedKernelPackage();
+    return moduleRoots().stream().filter(root -> !sharedKernel.equals(Optional.of(root))).toList();
+  }
+
+  /**
+   * Package patterns of every isolated module root except the given one — {@code root..} each.
+   * Built from {@link #isolatedModuleRoots()}, so an undeclared module is a forbidden target like
+   * any other, not only a governed source.
+   */
+  public String[] moduleRootPatternsExcluding(String moduleRoot) {
+    return isolatedModuleRoots().stream()
+        .filter(root -> !root.equals(moduleRoot))
+        .map(root -> root + "..")
+        .toArray(String[]::new);
+  }
+
+  /**
+   * The published packages of every isolated module root except the given one: {@code root.api..}
+   * (synchronous, in-process) and {@code root.events..} (asynchronous), with the segment names
+   * taken from {@link DcaLayout#publishedSubpackages()}. These are DCA's in-process contract
+   * convention — package names, a convention of the architecture and not of any framework — and the
+   * only part of a foreign module an adapter may depend on.
+   */
+  public String[] publishedPackagePatternsExcluding(String moduleRoot) {
+    return isolatedModuleRoots().stream()
+        .filter(root -> !root.equals(moduleRoot))
+        .flatMap(root -> layout.publishedSubpackages().stream().map(sub -> root + "." + sub + ".."))
+        .toArray(String[]::new);
+  }
+
+  /**
+   * The layer sub-package names of this layout: {@code domain}, {@code application}, {@code
+   * adapter}.
+   */
+  public java.util.Set<String> layerSegments() {
+    return java.util.Set.of(
+        layout.domainSubpackage(), layout.applicationSubpackage(), layout.adapterSubpackage());
+  }
+
+  /**
+   * The module root of a package, or {@code null} when the package carries no layer segment — the
+   * global infrastructure package, for instance, or a plain support package.
+   */
+  public String moduleRootOf(String packageName) {
+    return moduleRootOf(packageName, layout.basePackage(), layerSegments());
+  }
+
+  private static String moduleRootOf(
+      String packageName, String base, java.util.Set<String> layers) {
+    if (packageName == null || !packageName.startsWith(base + ".")) {
+      return null;
+    }
+    String[] segments = packageName.substring(base.length() + 1).split("\\.");
+    StringBuilder root = new StringBuilder(base);
+    for (String segment : segments) {
+      if (layers.contains(segment)) {
+        return root.toString();
+      }
+      root.append('.').append(segment);
+    }
+    return null;
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Pattern helpers: context* over declared bounded contexts, all* over module roots
   // ---------------------------------------------------------------------------------------------
 
   public String[] contextDomainPatterns() {
@@ -207,34 +420,43 @@ public final class DcaArchitecture {
     return boundedContexts().keySet().stream().map(layout::adapterPattern).toArray(String[]::new);
   }
 
-  /** Incoming-adapter patterns of all contexts plus the shared kernel's, if it has one. */
+  /**
+   * Application-layer patterns of every module root — the discovery equivalent of the former {@code
+   * base.*.application..} wildcard, which matched a direct child of the base package and nothing
+   * else. Built from {@link #moduleRoots()}, so it holds at any depth.
+   */
+  public String[] allApplicationPatterns() {
+    return moduleRoots().stream().map(layout::applicationPattern).toArray(String[]::new);
+  }
+
+  /** Adapter patterns of every module root. */
+  public String[] allAdapterPatterns() {
+    return moduleRoots().stream().map(layout::adapterPattern).toArray(String[]::new);
+  }
+
+  /** Shared-output-port patterns ({@code application.shared}) of every module root. */
+  public String[] allSharedOutputPortPatterns() {
+    return moduleRoots().stream().map(layout::sharedOutputPortPattern).toArray(String[]::new);
+  }
+
+  /** Domain-layer patterns of every module root. */
+  public String[] allDomainPatterns() {
+    return moduleRoots().stream().map(layout::domainPattern).toArray(String[]::new);
+  }
+
+  /** Domain-model patterns of every module root. */
+  public String[] allDomainModelPatterns() {
+    return moduleRoots().stream().map(layout::domainModelPattern).toArray(String[]::new);
+  }
+
+  /** Incoming-adapter patterns of every module root. */
   public String[] allIncomingAdapterPatterns() {
-    List<String> patterns = new ArrayList<>();
-    boundedContexts().keySet().forEach(p -> patterns.add(layout.incomingAdapterPattern(p)));
-    sharedKernelPackage().ifPresent(p -> patterns.add(layout.incomingAdapterPattern(p)));
-    return patterns.toArray(String[]::new);
+    return moduleRoots().stream().map(layout::incomingAdapterPattern).toArray(String[]::new);
   }
 
-  /** Outgoing-adapter patterns of all contexts plus the shared kernel's, if it has one. */
+  /** Outgoing-adapter patterns of every module root. */
   public String[] allOutgoingAdapterPatterns() {
-    List<String> patterns = new ArrayList<>();
-    boundedContexts().keySet().forEach(p -> patterns.add(layout.outgoingAdapterPattern(p)));
-    sharedKernelPackage().ifPresent(p -> patterns.add(layout.outgoingAdapterPattern(p)));
-    return patterns.toArray(String[]::new);
-  }
-
-  /** Domain patterns of all contexts plus the shared kernel domain. */
-  public String[] allDomainPatternsWithSharedKernel() {
-    List<String> patterns = new ArrayList<>(List.of(contextDomainPatterns()));
-    patterns.add(layout.sharedKernelDomainPattern());
-    return patterns.toArray(String[]::new);
-  }
-
-  /** Domain-model patterns of all contexts plus the shared kernel domain. */
-  public String[] allDomainModelPatternsWithSharedKernel() {
-    List<String> patterns = new ArrayList<>(List.of(contextDomainModelPatterns()));
-    patterns.add(layout.sharedKernelDomainPattern());
-    return patterns.toArray(String[]::new);
+    return moduleRoots().stream().map(layout::outgoingAdapterPattern).toArray(String[]::new);
   }
 
   /** Classes residing in the global infrastructure implementation packages. */

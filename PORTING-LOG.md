@@ -110,6 +110,9 @@ Source: `DddStrategicPatternsArchUnitTest.groovy` → `StrategicPatternRules` (`
   `DcaLayout` sub-package names; `..api..` and `..events..` stay literal (published-interface
   convention, not a layout setting). Rationale texts drop the "Spring Modulith @NamedInterface"
   mention in favour of "published named interface" — the library is framework-agnostic.
+  *Revised 2026-09-03 (WP-21):* `api`/`events` are layout settings now (`DcaLayout.apiSubpackage()`,
+  `eventsSubpackage()`), and STR-005 accepts `api/` or **any** sub-package of the incoming adapter —
+  an Open Host Service is a relationship pattern, not a folder; `openhost/` is no longer special.
 - **STR-010** ("Event Listeners consuming integration events should use Anti-Corruption Layer")
   was `true`-only in the source and stays a never-failing rule without a `Diagnostic:` prefix
   (title verbatim). No negative fixture (STR-001, STR-010).
@@ -132,3 +135,35 @@ Source: `ContextMapArchUnitTest.groovy` → `ContextMapRules` (`DCA-MAP-001`…`
   `contexts.size() >= 1`). No negative fixture.
 - Fixtures use the shim `org.springframework.modulith.ApplicationModule` created by the
   Hexagonal port (not created here).
+
+## Post-port changes
+
+Changes made after the Groovy → Java port, where the ported behaviour itself was revised. Kept here
+because the port notes above describe the *old* selection mechanism in several places.
+
+### Context discovery and module discovery (2026-09-02, planning WP-18)
+
+The ported rules selected their classes through `DcaLayout`'s wildcard patterns (`base.*.domain..`),
+which is what the Groovy source did. `*` is exactly one segment, so those patterns only ever matched
+a bounded context that was a direct child of the base package — a grouped (`base.sales.order`),
+nested (`base.contexts.todo`) or flat (context = base package) layout matched no layer rule at all
+and passed for lack of subjects.
+
+Two concepts are now separate, and the port notes should be read with that in mind:
+
+- **Bounded context** — declared with `@BoundedContext`, found by walking up from a class's package
+  (`DcaArchitecture.rootContextPackage`), at any depth. Drives the strategic and context-map rules.
+  Identified by its name relative to the base package (`contextName`), matching Spring Modulith's
+  own derivation.
+- **Module root** — structural: the shortest package prefix whose remainder starts with a layer
+  segment (`DcaArchitecture.moduleRoots()`). Drives the layer, hexagonal, onion, naming, tactical and
+  use-case rules, which is why a module that is deliberately not a bounded context stays governed.
+
+The isolation rules (`DCA-STR-003`, `-004`, `-006`, `DCA-HEX-007`) select over module roots as well
+(`isolatedModuleRoots()` — every module root except the shared kernel), on the source and on the
+target side, with the target's `api`/`events` packages as the only allowed dependency for adapters
+(2026-09-03, planning WP-21). So a module needs no declaration of any kind to be governed and
+protected; `@BoundedContext` decides context-map membership only. A rule `DCA-LAY-006` demanding such
+a declaration existed briefly during WP-18 and was dropped before release — the id is free. The four
+rules also collect their per-module violations and throw once, instead of stopping at the first
+module (the Groovy originals, one ArchUnit rule per context, had the same first-failure behaviour).

@@ -37,7 +37,6 @@ public final class ContextMapRenderer {
 
   private static final String NAMED_INTERFACE_ANNOTATION =
       "org.springframework.modulith.NamedInterface";
-  private static final List<String> CHANNELS = List.of("api", "events");
 
   private final DcaArchitecture arch;
   private boolean includeExternalSystems = true;
@@ -94,7 +93,7 @@ public final class ContextMapRenderer {
   public String render() {
     Map<String, BoundedContext> contexts = arch.boundedContexts();
     List<String> packages = new ArrayList<>(contexts.keySet());
-    packages.sort(Comparator.comparing(ContextMapRenderer::shortName));
+    packages.sort(Comparator.comparing(arch::contextName));
 
     StringBuilder md = new StringBuilder();
     md.append("# ").append(title).append("\n\n");
@@ -125,7 +124,7 @@ public final class ContextMapRenderer {
     for (String pkg : packages) {
       List<String> published = publishedInterfaces(pkg);
       md.append("| ")
-          .append(shortName(pkg))
+          .append(arch.contextName(pkg))
           .append(" | ")
           .append(contexts.get(pkg).name())
           .append(" | ")
@@ -143,7 +142,7 @@ public final class ContextMapRenderer {
     md.append("| Downstream | Upstream | Channel | Translation | Status | Rationale |\n");
     md.append("|---|---|---|---|---|---|\n");
     for (String pkg : packages) {
-      String source = shortName(pkg);
+      String source = arch.contextName(pkg);
       for (Upstream u : upstreams(pkg)) {
         for (Upstream.Consumes channel : u.via()) {
           md.append("| ")
@@ -174,7 +173,7 @@ public final class ContextMapRenderer {
                 + " Status | Rationale |\n");
         md.append("|---|---|---|---|---|---|---|---|\n");
         for (String pkg : packages) {
-          String source = shortName(pkg);
+          String source = arch.contextName(pkg);
           for (ExternalUpstream e : externalUpstreams(pkg)) {
             md.append("| ")
                 .append(source)
@@ -224,7 +223,7 @@ public final class ContextMapRenderer {
     md.append("```mermaid\ngraph LR\n");
     for (String pkg : packages) {
       md.append("  ")
-          .append(shortName(pkg))
+          .append(arch.contextName(pkg))
           .append("[\"")
           .append(contexts.get(pkg).name())
           .append(publishedBadge(pkg))
@@ -232,7 +231,7 @@ public final class ContextMapRenderer {
     }
     md.append("\n");
     for (String pkg : packages) {
-      String source = shortName(pkg);
+      String source = arch.contextName(pkg);
       for (Upstream u : upstreams(pkg)) {
         for (Upstream.Consumes channel : u.via()) {
           String label =
@@ -258,7 +257,7 @@ public final class ContextMapRenderer {
         md.append("  ").append(externalId(name)).append("[[\"").append(name).append("\"]]\n");
       }
       for (String pkg : packages) {
-        String source = shortName(pkg);
+        String source = arch.contextName(pkg);
         for (ExternalUpstream e : externalUpstreams(pkg)) {
           // The one-word protocol replaces the generic inbound/outbound in the label — the arrow
           // style already encodes the direction. The full exchanges text lives in the table only.
@@ -318,7 +317,7 @@ public final class ContextMapRenderer {
   private Map<List<String>, List<String>> partnershipPairs(List<String> packages) {
     Map<List<String>, List<String>> pairs = new LinkedHashMap<>();
     for (String pkg : packages) {
-      String source = shortName(pkg);
+      String source = arch.contextName(pkg);
       for (Partnership p : arch.packageAnnotations(pkg, Partnership.class)) {
         List<String> pair = new ArrayList<>(List.of(source, p.context()));
         pair.sort(Comparator.naturalOrder());
@@ -348,7 +347,7 @@ public final class ContextMapRenderer {
    */
   private List<String> publishedInterfaces(String contextPackage) {
     List<String> published = new ArrayList<>();
-    for (String channel : CHANNELS) {
+    for (String channel : arch.layout().publishedSubpackages()) {
       // Exact package-segment boundary — a plain prefix would also match "apiary"/"eventsourcing".
       String root = contextPackage + "." + channel;
       boolean hasClasses = false;
@@ -430,15 +429,13 @@ public final class ContextMapRenderer {
     return status == Upstream.Status.PLANNED ? " / planned" : "";
   }
 
-  private static String channelName(Upstream.Consumes channel) {
-    return channel == Upstream.Consumes.API ? "api" : "events";
+  private String channelName(Upstream.Consumes channel) {
+    return channel == Upstream.Consumes.API
+        ? arch.layout().apiSubpackage()
+        : arch.layout().eventsSubpackage();
   }
 
   private static String orDash(String value) {
     return value.isEmpty() ? "—" : value;
-  }
-
-  private static String shortName(String packageName) {
-    return packageName.substring(packageName.lastIndexOf('.') + 1);
   }
 }

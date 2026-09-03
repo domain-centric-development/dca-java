@@ -5,15 +5,15 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.lang.ArchRule;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
-import dev.domaincentric.dca.buildingblocks.ddd.strategic.BoundedContext;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.in.InputPort;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.OutputPort;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.Repository;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Hexagonal Architecture (Ports and Adapters) rules: separation between ports and adapters,
@@ -66,10 +66,11 @@ public final class HexagonalRules implements DcaRuleSet {
         arch ->
             noClasses()
                 .that()
-                .resideInAPackage(layout.domainModelPattern())
+                .resideInAnyPackage(arch.allDomainModelPatterns())
                 .should()
                 .dependOnClassesThat()
-                .resideInAPackage(layout.adapterPattern()));
+                .resideInAnyPackage(arch.allAdapterPatterns())
+                .allowEmptyShould(true));
   }
 
   public DcaRule applicationMustNotAccessAdapters() {
@@ -80,10 +81,10 @@ public final class HexagonalRules implements DcaRuleSet {
         arch ->
             noClasses()
                 .that()
-                .resideInAPackage(layout.applicationPattern())
+                .resideInAnyPackage(arch.allApplicationPatterns())
                 .should()
                 .dependOnClassesThat()
-                .resideInAPackage(layout.adapterPattern()));
+                .resideInAnyPackage(arch.allAdapterPatterns()));
   }
 
   public DcaRule controllersMustNotAccessRepositories() {
@@ -112,7 +113,7 @@ public final class HexagonalRules implements DcaRuleSet {
         arch ->
             noClasses()
                 .that()
-                .resideInAPackage(layout.incomingAdapterPattern())
+                .resideInAnyPackage(arch.allIncomingAdapterPatterns())
                 .should()
                 .dependOnClassesThat(arch.infrastructureImplementation()));
   }
@@ -126,7 +127,7 @@ public final class HexagonalRules implements DcaRuleSet {
         arch ->
             noClasses()
                 .that()
-                .resideInAPackage(layout.outgoingAdapterPattern())
+                .resideInAnyPackage(arch.allOutgoingAdapterPatterns())
                 .should()
                 .dependOnClassesThat(arch.infrastructureImplementation()));
   }
@@ -141,12 +142,12 @@ public final class HexagonalRules implements DcaRuleSet {
         arch ->
             noClasses()
                 .that()
-                .resideInAPackage(layout.incomingAdapterPattern())
+                .resideInAnyPackage(arch.allIncomingAdapterPatterns())
                 .and()
                 .resideOutsideOfPackage(eventConsumerPattern())
                 .should()
                 .dependOnClassesThat()
-                .resideInAPackage(layout.outgoingAdapterPattern()));
+                .resideInAnyPackage(arch.allOutgoingAdapterPatterns()));
   }
 
   public DcaRule incomingAdaptersStayInOwnContext() {
@@ -157,29 +158,31 @@ public final class HexagonalRules implements DcaRuleSet {
         "Incoming adapters must only orchestrate use cases from their own bounded context - use"
             + " domain events for cross-context integration",
         arch -> {
-          Map<String, BoundedContext> contexts = arch.boundedContexts();
-          for (Map.Entry<String, BoundedContext> entry : contexts.entrySet()) {
-            String contextPackage = entry.getKey();
-            String[] otherContexts = arch.boundedContextPatternsExcluding(contextPackage);
-            if (otherContexts.length == 0) {
+          // Structural, over every module that owns a DCA layer - declared as a bounded context or
+          // not - so an undeclared module can neither reach out nor be reached into.
+          List<ArchRule> perModule = new ArrayList<>();
+          for (String module : arch.isolatedModuleRoots()) {
+            String[] otherModules = arch.moduleRootPatternsExcluding(module);
+            if (otherModules.length == 0) {
               continue;
             }
-            noClasses()
-                .that()
-                .resideInAPackage(layout.incomingAdapterPattern(contextPackage))
-                .and()
-                .resideOutsideOfPackage(eventConsumerPattern())
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage(otherContexts)
-                .allowEmptyShould(true)
-                .because(
-                    "Incoming adapters in '"
-                        + entry.getValue().name()
-                        + "' must only orchestrate use cases from their own bounded context - use"
-                        + " domain events for cross-context integration")
-                .check(arch.classes());
+            perModule.add(
+                noClasses()
+                    .that()
+                    .resideInAPackage(layout.incomingAdapterPattern(module))
+                    .and()
+                    .resideOutsideOfPackage(eventConsumerPattern())
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage(otherModules)
+                    .allowEmptyShould(true)
+                    .because(
+                        "Incoming adapters in module '"
+                            + arch.contextName(module)
+                            + "' must only orchestrate use cases from their own module - use"
+                            + " domain events for cross-context integration"));
           }
+          CollectedViolations.check(perModule, arch.classes());
         });
   }
 
@@ -195,7 +198,7 @@ public final class HexagonalRules implements DcaRuleSet {
                 .and()
                 .areNotInterfaces()
                 .should()
-                .resideInAPackage(layout.outgoingAdapterPattern())
+                .resideInAnyPackage(arch.allOutgoingAdapterPatterns())
                 .allowEmptyShould(true));
   }
 
@@ -209,7 +212,7 @@ public final class HexagonalRules implements DcaRuleSet {
         arch ->
             classes()
                 .that()
-                .resideInAPackage(layout.sharedOutputPortPattern())
+                .resideInAnyPackage(arch.allSharedOutputPortPatterns())
                 .and()
                 .areInterfaces()
                 .and()
@@ -232,7 +235,7 @@ public final class HexagonalRules implements DcaRuleSet {
         arch ->
             noClasses()
                 .that()
-                .resideInAPackage(layout.incomingAdapterPattern())
+                .resideInAnyPackage(arch.allIncomingAdapterPatterns())
                 .should()
                 .dependOnClassesThat(useCaseImplementations())
                 .allowEmptyShould(true));
@@ -261,7 +264,7 @@ public final class HexagonalRules implements DcaRuleSet {
                 .and()
                 .areInterfaces()
                 .should()
-                .resideInAPackage(layout.domainPattern())
+                .resideInAnyPackage(arch.allDomainPatterns())
                 .allowEmptyShould(true));
   }
 }

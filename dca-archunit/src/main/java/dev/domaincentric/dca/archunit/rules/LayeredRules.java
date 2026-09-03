@@ -7,6 +7,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -62,10 +63,13 @@ public final class LayeredRules implements DcaRuleSet {
         arch ->
             noClasses()
                 .that()
-                .resideInAnyPackage(layout.domainPattern())
+                .resideInAnyPackage(arch.allDomainPatterns())
                 .should()
                 .dependOnClassesThat()
-                .resideInAPackage(layout.infrastructurePattern()));
+                .resideInAPackage(layout.infrastructurePattern())
+                // A context may legitimately have no domain layer at all - a supporting or generic
+                // subdomain in transaction-script style. An absent domain is not a violation.
+                .allowEmptyShould(true));
   }
 
   public DcaRule applicationMustNotUseInfrastructureImplementations() {
@@ -77,7 +81,7 @@ public final class LayeredRules implements DcaRuleSet {
         arch ->
             noClasses()
                 .that()
-                .resideInAnyPackage(layout.applicationPattern())
+                .resideInAnyPackage(arch.allApplicationPatterns())
                 .should()
                 .dependOnClassesThat(arch.infrastructureImplementation()));
   }
@@ -92,10 +96,10 @@ public final class LayeredRules implements DcaRuleSet {
         rationale,
         arch -> {
           String transactional = layout.frameworkAnnotations().transactional();
-          String[] allowed = {
-            layout.applicationPattern(),
-            ".." + layout.adapterSubpackage() + "." + layout.outgoingSubpackage() + ".."
-          };
+          List<String> allowedPatterns = new ArrayList<>(List.of(arch.allApplicationPatterns()));
+          allowedPatterns.add(
+              ".." + layout.adapterSubpackage() + "." + layout.outgoingSubpackage() + "..");
+          String[] allowed = allowedPatterns.toArray(String[]::new);
           methods()
               .that()
               .areAnnotatedWith(transactional)
