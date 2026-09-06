@@ -190,3 +190,12 @@ reconstitute domain objects while implementing output ports). Both are marker-ba
 (`AggregateRoot`, `Entity`, `DomainService`) and hold at any module depth. Fixtures:
 `fixtures.usecase.{good,bad}.order.application.{getorder,listorders}` and a `PricingPolicy`
 domain service in `fixtures.hexagonal`. Rule count 112 → 114.
+
+### Empty selections in a greenfield project (2026-09-06, planning WP-06)
+
+Bootstrapping a fresh project through `/dca-bootstrap` (one context, model plus use case, no adapter
+yet) surfaced five rules that still relied on ArchUnit's fail-on-empty default: `DCA-HEX-002/004/005/006`
+and `DCA-LAY-003`. All five now carry `allowEmptyShould(true)`; `GreenfieldTest` keeps the whole
+catalog green against `fixtures.layout.greenfield`. The .NET library passes every empty selection by
+construction (`DcaRule.Of`), so nothing changes there. Rule count unchanged (114).
+

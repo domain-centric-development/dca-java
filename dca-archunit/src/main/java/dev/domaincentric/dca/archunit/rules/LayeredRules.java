@@ -83,7 +83,8 @@ public final class LayeredRules implements DcaRuleSet {
                 .that()
                 .resideInAnyPackage(arch.allApplicationPatterns())
                 .should()
-                .dependOnClassesThat(arch.infrastructureImplementation()));
+                .dependOnClassesThat(arch.infrastructureImplementation())
+                .allowEmptyShould(true));
   }
 
   public DcaRule transactionBoundariesBelongToApplicationLayer() {

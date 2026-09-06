@@ -4,6 +4,14 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Fixed
+
+- **Empty selections no longer fail a greenfield project.** `DCA-HEX-002`, `DCA-HEX-004`,
+  `DCA-HEX-005`, `DCA-HEX-006` and `DCA-LAY-003` now pass when nothing matches their `that()`
+  clause — a context that has a model and a use case but no adapter or infrastructure yet is a
+  legitimate first day, not a violation. `GreenfieldTest` runs the whole catalog against such a
+  context (`fixtures.layout.greenfield`) so no rule regresses into ArchUnit's fail-on-empty default.
+
 ### Added
 
 - **Shaping the result — two rules.** A use-case result carries values, never identities, and the

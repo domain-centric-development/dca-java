@@ -86,7 +86,8 @@ public final class HexagonalRules implements DcaRuleSet {
                 .resideInAnyPackage(arch.allApplicationPatterns())
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage(arch.allAdapterPatterns()));
+                .resideInAnyPackage(arch.allAdapterPatterns())
+                .allowEmptyShould(true));
   }
 
   public DcaRule controllersMustNotAccessRepositories() {
@@ -117,7 +118,8 @@ public final class HexagonalRules implements DcaRuleSet {
                 .that()
                 .resideInAnyPackage(arch.allIncomingAdapterPatterns())
                 .should()
-                .dependOnClassesThat(arch.infrastructureImplementation()));
+                .dependOnClassesThat(arch.infrastructureImplementation())
+                .allowEmptyShould(true));
   }
 
   public DcaRule outgoingAdaptersMustNotUseInfrastructureImplementations() {
@@ -131,7 +133,8 @@ public final class HexagonalRules implements DcaRuleSet {
                 .that()
                 .resideInAnyPackage(arch.allOutgoingAdapterPatterns())
                 .should()
-                .dependOnClassesThat(arch.infrastructureImplementation()));
+                .dependOnClassesThat(arch.infrastructureImplementation())
+                .allowEmptyShould(true));
   }
 
   public DcaRule adaptersMustNotCommunicateDirectly() {
@@ -149,7 +152,8 @@ public final class HexagonalRules implements DcaRuleSet {
                 .resideOutsideOfPackage(eventConsumerPattern())
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage(arch.allOutgoingAdapterPatterns()));
+                .resideInAnyPackage(arch.allOutgoingAdapterPatterns())
+                .allowEmptyShould(true));
   }
 
   public DcaRule incomingAdaptersStayInOwnContext() {
