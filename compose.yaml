@@ -1,0 +1,29 @@
+# docker compose run --rm build      → ./gradlew build (compiles, tests, javadoc)
+# docker compose run --rm catalog    → renders rules.json / RULES.md into the checkout
+# docker compose run --rm gradle <task>  → any Gradle task, dependencies cached in a volume
+# docker compose build               → CI-style check: the image builds only if everything is green
+services:
+  gradle:
+    image: eclipse-temurin:21-jdk
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - gradle-cache:/root/.gradle
+    entrypoint: ["./gradlew", "--no-daemon"]
+    command: ["build"]
+
+  build:
+    extends: gradle
+    command: ["build"]
+
+  catalog:
+    extends: gradle
+    command: [":dca-archunit:rulesCatalog"]
+
+  check:
+    build: .
+    image: dca-java
+    profiles: [ci]
+
+volumes:
+  gradle-cache:

@@ -1,0 +1,9 @@
+.git
+.gradle
+build
+*/build
+*/bin
+samples
+scripts
+.idea
+*.iml
