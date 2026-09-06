@@ -4,6 +4,29 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Added
+
+- **Features within a bounded context — two rules and a compatibility fixture.** A *feature* is an
+  optional, domain-named group of related use cases below a module's application package
+  (`application.<feature>.<usecase>`, e.g. `checkout.application.session.startcheckout`). It is a
+  navigation and cohesion boundary inside one bounded context — not a layer, module, aggregate owner
+  or deployment unit, and nothing in the library infers bounded contexts or aggregate ownership
+  from it. The pre-existing rules already saw such packages (they select with `..`); the fixture
+  `fixtures.features.compat` runs the whole catalog against a grouped context so a later change of a
+  selector into a direct-child assumption fails there first.
+  - `DCA-USE-014` — use case packages within a module must use one consistent depth: flat
+    (`application.<usecase>`) or grouped (`application.<feature>.<usecase>`). Selects the concrete
+    classes ending in the configured `useCaseSuffix`, ignores `application.shared`, abstract classes and
+    nested types, and reports every offending module and package in one violation — a use case directly in
+    the application package, one nested deeper than a feature, or a module that mixes both forms. A
+    module without use cases is valid; a single use case may use either depth. Legibility only.
+  - `DCA-CYC-005` — the immediate child packages of a module's application package (`shared`
+    excepted) must be free of cycles. In a grouped layout those are the features, in a flat layout
+    the use cases; a one-directional dependency between two of them is fine. Slices are assigned from
+    each class's module root (`moduleRootOf`), never from a one-segment base-package wildcard.
+  Catalog: 112 rules.
+
+
 ### Changed — breaking
 
 - **Bounded contexts are discovered by annotation, at any depth.** `DcaArchitecture.rootContextPackage`

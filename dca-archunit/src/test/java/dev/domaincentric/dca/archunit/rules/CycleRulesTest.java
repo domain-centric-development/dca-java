@@ -32,9 +32,10 @@ class CycleRulesTest {
   }
 
   @Test
-  void setHasFourRulesInCatalogOrder() {
+  void setHasFiveRulesInCatalogOrder() {
     List<String> ids = rules(GOOD).stream().map(DcaRule::id).toList();
-    assertEquals(List.of("DCA-CYC-001", "DCA-CYC-002", "DCA-CYC-003", "DCA-CYC-004"), ids);
+    assertEquals(
+        List.of("DCA-CYC-001", "DCA-CYC-002", "DCA-CYC-003", "DCA-CYC-004", "DCA-CYC-005"), ids);
     assertEquals("cycles", new CycleRules(DcaLayout.forBasePackage(GOOD)).name());
   }
 

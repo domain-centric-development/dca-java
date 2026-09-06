@@ -9,7 +9,7 @@ Hexagonal Architecture and Clean Architecture.
 | Artifact | What it is | Dependencies |
 |----------|------------|--------------|
 | `dev.domaincentric:dca-building-blocks` | The building blocks your code implements: DDD tactical markers (`AggregateRoot`, `Entity`, `Value`, `DomainEvent`, …), strategic annotations (`@BoundedContext`, `@SharedKernel`, `@Upstream`, `@Partnership`, …) and hexagonal port interfaces (`UseCase`, `Repository`, `Store`, …) and the application-layer `TransactionBoundary` | none |
-| `dev.domaincentric:dca-archunit` | The governance rules: ~100 ArchUnit rules pinned to those building blocks, plus an executable context map | `dca-building-blocks`, ArchUnit |
+| `dev.domaincentric:dca-archunit` | The governance rules: ~110 ArchUnit rules pinned to those building blocks, plus an executable context map | `dca-building-blocks`, ArchUnit |
 
 Both target Java 17+. Versions are independent; see [Versioning](#versioning).
 
@@ -204,6 +204,11 @@ Tags: `building-blocks/vX.Y.Z`, `archunit/vX.Y.Z` — one tag per released artif
 ./gradlew :dca-archunit:test         # rule self-tests against good/bad fixtures
 ./gradlew publishToMavenLocal        # try a snapshot in another project
 ```
+
+Without a local JDK, the same through Docker (Podman works too): `docker compose run --rm build`
+runs the build with a cached dependency volume, `docker compose run --rm catalog` renders
+`rules.json`/`RULES.md`, and `docker build .` is the CI-style gate — the image only builds when
+everything is green and then carries the jars and the catalog under `/out`.
 
 Releases are published from a maintainer machine (`./scripts/release.sh <artifact> <version>`),
 then tagged; the signing key never enters CI — [RELEASING.md](RELEASING.md).

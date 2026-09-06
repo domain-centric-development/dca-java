@@ -167,3 +167,13 @@ protected; `@BoundedContext` decides context-map membership only. A rule `DCA-LA
 a declaration existed briefly during WP-18 and was dropped before release — the id is free. The four
 rules also collect their per-module violations and throw once, instead of stopping at the first
 module (the Groovy originals, one ArchUnit rule per context, had the same first-failure behaviour).
+
+### Features within a bounded context (2026-09-06, planning WP-23)
+
+Two rules that did not exist in the Groovy source, added to the Java library first and ported to .NET
+with the same ids, titles and rationales: `DCA-USE-014` (one consistent use-case package depth per
+module — `application.<usecase>` or `application.<feature>.<usecase>`) and `DCA-CYC-005` (no cycles
+between the immediate child packages of a module's application package, `shared` excepted). Both
+select through `moduleRootOf(...)`, so they hold at any module depth. The compatibility fixture
+`fixtures.features.compat` runs the whole catalog against a feature-grouped context and is the guard
+that no selector regresses to a direct-child assumption. Rule count 110 → 112.

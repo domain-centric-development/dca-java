@@ -14,7 +14,8 @@ import java.util.function.UnaryOperator;
 
 /**
  * Package cycle detection: no circular dependencies between the per-context slices of one layer
- * (domain model, application, incoming adapters, outgoing adapters).
+ * (domain model, application, incoming adapters, outgoing adapters), and none between the feature
+ * or use-case slices inside one module's application layer.
  *
  * <p>Reference: Clean Architecture, Acyclic Dependencies Principle (ADP).
  */
@@ -28,7 +29,8 @@ public final class CycleRules implements DcaRuleSet {
             domainPackagesFreeOfCycles(layout),
             applicationLayerFreeOfCycles(layout),
             outgoingAdaptersFreeOfCycles(layout),
-            incomingAdaptersFreeOfCycles(layout));
+            incomingAdaptersFreeOfCycles(layout),
+            applicationSlicesFreeOfCycles(layout));
   }
 
   @Override
@@ -111,6 +113,65 @@ public final class CycleRules implements DcaRuleSet {
                 .should()
                 .beFreeOfCycles()
                 .allowEmptyShould(true));
+  }
+
+  /**
+   * The immediate child packages of a module's application package, {@code shared} excepted, must
+   * be free of cycles. In a grouped layout those children are features, in a flat layout they are
+   * the use cases themselves.
+   */
+  public static DcaRule applicationSlicesFreeOfCycles(DcaLayout layout) {
+    return DcaRule.of(
+        "DCA-CYC-005",
+        "Feature and use case packages within a module's application layer must not have cyclic"
+            + " dependencies",
+        "The packages directly below a module's application package are its features"
+            + " (application.<feature>.<usecase>) or, in a flat layout, its use cases"
+            + " (application.<usecase>). A feature is an optional, domain-named group of related"
+            + " use cases; it may depend on another feature in one direction, but a cycle between"
+            + " two of them means the grouping does not carry its weight - the shared concept"
+            + " belongs in application.shared, in the domain, or in one of the two. application.shared"
+            + " is the context-wide port package and is not a slice. The rule does not infer bounded"
+            + " contexts or aggregate ownership from the packages it slices",
+        arch ->
+            slices()
+                .assignedFrom(applicationChildSlices(arch, layout))
+                .should()
+                .beFreeOfCycles()
+                .allowEmptyShould(true));
+  }
+
+  /**
+   * One slice per immediate child package of a module's application package — the module root
+   * comes from {@link DcaArchitecture#moduleRootOf(String)}, so the slicing holds at any depth
+   * and never assumes a module is a direct child of the base package. Classes directly in the
+   * application package and everything below {@code application.shared} are ignored.
+   */
+  private static SliceAssignment applicationChildSlices(DcaArchitecture arch, DcaLayout layout) {
+    return new SliceAssignment() {
+
+      @Override
+      public SliceIdentifier getIdentifierOf(JavaClass javaClass) {
+        String root = arch.moduleRootOf(javaClass.getPackageName());
+        if (root == null) {
+          return SliceIdentifier.ignore();
+        }
+        String application = root + "." + layout.applicationSubpackage();
+        String pkg = javaClass.getPackageName();
+        if (!pkg.startsWith(application + ".")) {
+          return SliceIdentifier.ignore();
+        }
+        String child = pkg.substring(application.length() + 1).split("\\.")[0];
+        return child.equals("shared")
+            ? SliceIdentifier.ignore()
+            : SliceIdentifier.of(application + "." + child);
+      }
+
+      @Override
+      public String getDescription() {
+        return "feature or use case packages";
+      }
+    };
   }
 
   /**

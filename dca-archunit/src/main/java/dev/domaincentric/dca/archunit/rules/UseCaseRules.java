@@ -12,6 +12,7 @@ import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
+import dev.domaincentric.dca.archunit.DcaRuleViolation;
 import dev.domaincentric.dca.buildingblocks.application.TransactionBoundary;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.Value;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.DomainEventPublisher;
@@ -19,12 +20,16 @@ import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.IntegrationEventP
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.OutputPort;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.Repository;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.Store;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 /**
  * Use case and mapping patterns: the generic input-port contract, Command/Query/Result models, HTTP
- * response models, domain-event publication after saving (inside a transaction), and DTO-free inner
- * layers.
+ * response models, domain-event publication after saving (inside a transaction), DTO-free inner
+ * layers, and one consistent use-case package depth per module (flat, or grouped by feature).
  */
 public final class UseCaseRules implements DcaRuleSet {
 
@@ -45,7 +50,8 @@ public final class UseCaseRules implements DcaRuleSet {
             noDtosInDomain(layout),
             noDtosInApplication(layout),
             publishingUseCasesAreTransactional(layout),
-            transactionalUseCasesDoNotCallRemotePorts(layout));
+            transactionalUseCasesDoNotCallRemotePorts(layout),
+            useCasePackagesUseOneDepth(layout));
   }
 
   @Override
@@ -284,6 +290,99 @@ public final class UseCaseRules implements DcaRuleSet {
                     notCallRemotePortsWhenTransactional(
                         layout.frameworkAnnotations().transactional()))
                 .allowEmptyShould(true));
+  }
+
+  /**
+   * Use cases live at one of two depths below a module's application package: {@code
+   * application.<usecase>} (flat) or {@code application.<feature>.<usecase>} (grouped). Selects the
+   * concrete classes ending in the configured use-case suffix, ignores {@code application.shared},
+   * abstract classes (a shared base class is not a use case) and nested types, and reports every offending module and package in one violation: a use case
+   * directly in the application package, one nested deeper than a feature, or a module that mixes
+   * both forms.
+   */
+  public static DcaRule useCasePackagesUseOneDepth(DcaLayout layout) {
+    return DcaRule.check(
+        "DCA-USE-014",
+        "Use case packages within a module must use one consistent depth (flat or grouped by"
+            + " feature)",
+        "A use case package sits either directly below the application package"
+            + " (application.<usecase>) or one level deeper inside a feature"
+            + " (application.<feature>.<usecase>). A feature is an optional, domain-named group of"
+            + " related use cases - a navigation boundary inside one bounded context, not a layer,"
+            + " module or aggregate owner. Mixing both forms in one module makes it unclear whether"
+            + " a package is a feature, a use case or a leftover; nesting deeper than a feature hides"
+            + " the use case. The rule checks legibility only: it does not infer bounded contexts,"
+            + " feature semantics or aggregate ownership. application.shared holds the context-wide"
+            + " output ports and is not a use case package",
+        arch -> checkUseCaseDepth(arch, layout));
+  }
+
+  private static void checkUseCaseDepth(DcaArchitecture arch, DcaLayout layout) {
+    List<String> violations = new ArrayList<>();
+    for (String root : arch.moduleRoots()) {
+      String application = root + "." + layout.applicationSubpackage();
+      String shared = application + ".shared";
+      // depth -> use case packages at that depth, both sorted for a stable message
+      Map<Integer, TreeSet<String>> byDepth = new TreeMap<>();
+      for (JavaClass candidate : arch.classes()) {
+        String pkg = candidate.getPackageName();
+        if (!(pkg.equals(application) || pkg.startsWith(application + "."))
+            || pkg.equals(shared)
+            || pkg.startsWith(shared + ".")
+            || candidate.isInterface()
+            || candidate.getModifiers().contains(JavaModifier.ABSTRACT)
+            || candidate.isNestedClass()
+            || candidate.isAnonymousClass()
+            || !candidate.getSimpleName().endsWith(layout.useCaseSuffix())) {
+          continue;
+        }
+        int depth =
+            pkg.equals(application) ? 0 : pkg.substring(application.length() + 1).split("\\.").length;
+        byDepth.computeIfAbsent(depth, d -> new TreeSet<>()).add(pkg);
+      }
+      if (byDepth.isEmpty()) {
+        continue;
+      }
+      byDepth
+          .getOrDefault(0, new TreeSet<>())
+          .forEach(
+              pkg ->
+                  violations.add(
+                      "Module "
+                          + root
+                          + ": use case directly in the application package "
+                          + pkg
+                          + " - give it a package of its own (application.<usecase>)"));
+      byDepth.forEach(
+          (depth, pkgs) -> {
+            if (depth > 2) {
+              pkgs.forEach(
+                  pkg ->
+                      violations.add(
+                          "Module "
+                              + root
+                              + ": use case package "
+                              + pkg
+                              + " is nested deeper than application.<feature>.<usecase>"));
+            }
+          });
+      if (byDepth.containsKey(1) && byDepth.containsKey(2)) {
+        violations.add(
+            "Module "
+                + root
+                + " mixes flat use case packages "
+                + byDepth.get(1)
+                + " with feature-grouped ones "
+                + byDepth.get(2)
+                + " - finish the migration in one direction");
+      }
+    }
+    if (!violations.isEmpty()) {
+      throw new DcaRuleViolation(
+          "Use case packages within a module must use one consistent depth (flat or grouped by"
+              + " feature)",
+          violations);
+    }
   }
 
   private static boolean isTransactional(JavaClass item, String transactional) {
