@@ -1,6 +1,6 @@
 # DCA rule catalog
 
-Generated from `dca-archunit` — do not edit. 112 rules in 10 sets.
+Generated from `dca-archunit` — do not edit. 114 rules in 10 sets.
 
 ## `layered`
 
@@ -35,6 +35,7 @@ Generated from `dca-archunit` — do not edit. 112 rules in 10 sets.
 | `DCA-HEX-009` | Output Ports in application.shared must extend OutputPort | Top-level interfaces in application.shared are output ports and must extend OutputPort to be part of the port hierarchy. Nested interfaces (e.g. IdentityProvider.Identity) are part of their enclosing port's contract, not ports themselves |
 | `DCA-HEX-010` | Output ports must not reside in the domain layer | output ports (Repository, Store, OutputPort) are an application-layer concern and must live in application/shared/, not domain/ |
 | `DCA-HEX-011` | Incoming Adapters must depend on input port interfaces, not on use case classes | A driving adapter drives the application through its port. Injecting the concrete implementation instead couples the adapter to one realisation of the use case, defeats the Dependency Inversion Principle the port exists for, and makes the adapter untestable without the real use case and everything it depends on |
+| `DCA-HEX-012` | Incoming Adapters must not depend on domain services | An incoming adapter translates external input, calls an input port and formats its result. Injecting or invoking a domain service bypasses the application boundary; the use case owns that collaboration and puts its outcome into the result. Outgoing adapters are outside this rule - repositories and other driven adapters may construct or reconstitute domain objects while implementing output ports |
 
 ## `tactical`
 
@@ -137,6 +138,7 @@ Generated from `dca-archunit` — do not edit. 112 rules in 10 sets.
 | `DCA-USE-012` | Use cases that publish domain events must have a transaction boundary | Integration events are relayed after commit (@TransactionalEventListener, @ApplicationModuleListener) and their publication is registered in the publishing transaction. Without an active transaction the after-commit listeners are skipped silently and nothing is registered: the use case succeeds, the other contexts never hear of it. The use case that publishes owns the boundary - either declarative transaction metadata (@Transactional on the class or the executing method) or an explicit TransactionBoundary.inTransaction(...) around save and publish |
 | `DCA-USE-013` | Declaratively transactional use cases must not call remote-capable output ports | A @Transactional use case holds a database connection for its whole run. Calling an output port that may leave the process (another context's API, a payment provider, a mail gateway) inside it blocks that connection for the remote round trip; under load the pool runs dry, and a rollback cannot undo the remote effect. Only transactional resources belong inside the boundary: Repository, Store, DomainEventPublisher, IntegrationEventPublisher. Everything else is called before the transaction - draw the boundary by hand with TransactionBoundary.inTransaction(...) - or after it, as a reaction to an integration event |
 | `DCA-USE-014` | Use case packages within a module must use one consistent depth (flat or grouped by feature) | A use case package sits either directly below the application package (application.<usecase>) or one level deeper inside a feature (application.<feature>.<usecase>). A feature is an optional, domain-named group of related use cases - a navigation boundary inside one bounded context, not a layer, module or aggregate owner. Mixing both forms in one module makes it unclear whether a package is a feature, a use case or a leftover; nesting deeper than a feature hides the use case. The rule checks legibility only: it does not infer bounded contexts, feature semantics or aggregate ownership. application.shared holds the context-wide output ports and is not a use case package |
+| `DCA-USE-015` | Use Case Result Models must not expose aggregate roots or entities | A result is the use case's answer, not a handle on the model: identity and behaviour stay behind the port; values, enriched models and read models may cross. Checked transitively through nested records, part records anywhere in the application layer (application.shared included) and generic type arguments (List<T>, Optional<T>, Map<K,V>) |
 
 ## `naming`
 

@@ -2,14 +2,17 @@ package dev.domaincentric.dca.archunit.rules;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
+import dev.domaincentric.dca.archunit.DcaRuleViolation;
 import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DynamicTest;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 
 class UseCaseRulesTest {
@@ -63,5 +66,36 @@ class UseCaseRulesTest {
                 }
               }
             }));
+  }
+
+  /** DCA-USE-015 walks generic arguments, nested part records and same-package part records. */
+  @Test
+  void resultRuleNamesEveryPathToAnIdentity() {
+    DcaArchitecture bad = arch(FIXTURES + ".bad");
+    DcaRuleViolation violation =
+        assertThrows(
+            DcaRuleViolation.class,
+            () -> UseCaseRules.resultsMustNotExposeAggregatesOrEntities(bad.layout()).check(bad));
+    assertTrue(
+        violation.violations().contains("ListOrdersResult.orders : Order (AggregateRoot)"),
+        violation.toString());
+    assertTrue(
+        violation
+            .violations()
+            .contains("ListOrdersResult.highlight -> Highlight.order : Order (AggregateRoot)"),
+        violation.toString());
+    assertTrue(
+        violation
+            .violations()
+            .contains("ListOrdersResult.firstLine -> OrderLine.item : OrderLineItem (Entity)"),
+        violation.toString());
+    assertTrue(
+        violation
+            .violations()
+            .contains("ListOrdersResult.parts -> OrderPart.item : OrderLineItem (Entity)"),
+        "a part record shared in application.shared is walked: " + violation);
+    assertTrue(
+        violation.violations().stream().noneMatch(v -> v.startsWith("PlaceOrderResult")),
+        "a result of values is not reported: " + violation);
   }
 }

@@ -6,6 +6,29 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ### Added
 
+- **Shaping the result — two rules.** A use-case result carries values, never identities, and the
+  incoming adapter formats what the result delivers instead of operating the domain itself; the
+  outgoing side is deliberately different, because repositories and persistence mappers must
+  construct and reconstitute domain objects while implementing output ports.
+  - `DCA-USE-015` — use case result models must not expose aggregate roots or entities. Selects the
+    top-level `*Result` classes below an application package and walks their fields transitively:
+    the raw type and every generic type argument of each field (`List<T>`, `Optional<T>`,
+    `Map<K,V>`), records nested in the result, and part records anywhere in the application layer —
+    next to the result or shared in `application.shared` (`OrderLine`, `CartItemSummary` — named by
+    content, without the `Result` suffix). Anything
+    assignable to `AggregateRoot` or `Entity` on such a path is reported with the path
+    (`ListOrdersResult.highlight -> Highlight.order : Order (AggregateRoot)`); value objects, `Value`
+    read models and enriched models may cross. All offending paths of the module land in one
+    violation.
+  - `DCA-HEX-012` — incoming adapters must not depend on domain services. Selects every incoming
+    adapter — event consumers included, they translate and call an input port like any other
+    driving adapter — and forbids a dependency on a class assignable to `DomainService`, injected or
+    accessed statically. The mechanically exact subset of the doctrine; construction of domain
+    objects and calls into domain behaviour from an adapter remain review checks, because a
+    blanket type-dependency rule would also reject passive access to values a result delivers.
+    Outgoing adapters are outside the selection.
+  Catalog: 114 rules.
+
 - **Features within a bounded context — two rules and a compatibility fixture.** A *feature* is an
   optional, domain-named group of related use cases below a module's application package
   (`application.<feature>.<usecase>`, e.g. `checkout.application.session.startcheckout`). It is a

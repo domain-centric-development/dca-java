@@ -14,6 +14,7 @@ public final class OrderPageController {
   }
 
   public PlaceOrderPageViewModel place(UUID orderId) {
-    return new PlaceOrderPageViewModel(placeOrder.execute(new PlaceOrderCommand(orderId)).orderId());
+    return new PlaceOrderPageViewModel(
+        placeOrder.execute(new PlaceOrderCommand(orderId)).orderId());
   }
 }

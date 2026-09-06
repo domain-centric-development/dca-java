@@ -147,7 +147,8 @@ class FeatureLayoutTest {
     void shallowFails() {
       DcaRuleViolation v = fails("shallow");
       assertEquals(1, v.violations().size(), v.getMessage());
-      assertTrue(v.violations().get(0).contains("directly in the application package"), v.getMessage());
+      assertTrue(
+          v.violations().get(0).contains("directly in the application package"), v.getMessage());
     }
 
     @Test

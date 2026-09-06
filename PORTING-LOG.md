@@ -177,3 +177,16 @@ between the immediate child packages of a module's application package, `shared`
 select through `moduleRootOf(...)`, so they hold at any module depth. The compatibility fixture
 `fixtures.features.compat` runs the whole catalog against a feature-grouped context and is the guard
 that no selector regresses to a direct-child assumption. Rule count 110 → 112.
+
+### Shaping the result (2026-09-06, planning WP-24)
+
+Two rules without a Groovy ancestor, added to the Java library first: `DCA-USE-015` (use case
+result models must not expose aggregate roots or entities — a transitive field walk through
+generic type arguments, nested records and part records anywhere in the application layer
+(`application.shared` included), every offending path in
+one violation) and `DCA-HEX-012` (incoming adapters must not depend on domain services — event
+consumers included, outgoing adapters deliberately outside the selection, because repositories
+reconstitute domain objects while implementing output ports). Both are marker-based
+(`AggregateRoot`, `Entity`, `DomainService`) and hold at any module depth. Fixtures:
+`fixtures.usecase.{good,bad}.order.application.{getorder,listorders}` and a `PricingPolicy`
+domain service in `fixtures.hexagonal`. Rule count 112 → 114.

@@ -4,6 +4,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ConditionEvents;
@@ -14,6 +15,8 @@ import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
 import dev.domaincentric.dca.archunit.DcaRuleViolation;
 import dev.domaincentric.dca.buildingblocks.application.TransactionBoundary;
+import dev.domaincentric.dca.buildingblocks.ddd.tactical.AggregateRoot;
+import dev.domaincentric.dca.buildingblocks.ddd.tactical.Entity;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.Value;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.DomainEventPublisher;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.IntegrationEventPublisher;
@@ -21,15 +24,18 @@ import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.OutputPort;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.Repository;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.Store;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
  * Use case and mapping patterns: the generic input-port contract, Command/Query/Result models, HTTP
  * response models, domain-event publication after saving (inside a transaction), DTO-free inner
- * layers, and one consistent use-case package depth per module (flat, or grouped by feature).
+ * layers, one consistent use-case package depth per module (flat, or grouped by feature), and
+ * results that carry values rather than aggregate roots or entities.
  */
 public final class UseCaseRules implements DcaRuleSet {
 
@@ -51,7 +57,8 @@ public final class UseCaseRules implements DcaRuleSet {
             noDtosInApplication(layout),
             publishingUseCasesAreTransactional(layout),
             transactionalUseCasesDoNotCallRemotePorts(layout),
-            useCasePackagesUseOneDepth(layout));
+            useCasePackagesUseOneDepth(layout),
+            resultsMustNotExposeAggregatesOrEntities(layout));
   }
 
   @Override
@@ -296,9 +303,9 @@ public final class UseCaseRules implements DcaRuleSet {
    * Use cases live at one of two depths below a module's application package: {@code
    * application.<usecase>} (flat) or {@code application.<feature>.<usecase>} (grouped). Selects the
    * concrete classes ending in the configured use-case suffix, ignores {@code application.shared},
-   * abstract classes (a shared base class is not a use case) and nested types, and reports every offending module and package in one violation: a use case
-   * directly in the application package, one nested deeper than a feature, or a module that mixes
-   * both forms.
+   * abstract classes (a shared base class is not a use case) and nested types, and reports every
+   * offending module and package in one violation: a use case directly in the application package,
+   * one nested deeper than a feature, or a module that mixes both forms.
    */
   public static DcaRule useCasePackagesUseOneDepth(DcaLayout layout) {
     return DcaRule.check(
@@ -337,7 +344,9 @@ public final class UseCaseRules implements DcaRuleSet {
           continue;
         }
         int depth =
-            pkg.equals(application) ? 0 : pkg.substring(application.length() + 1).split("\\.").length;
+            pkg.equals(application)
+                ? 0
+                : pkg.substring(application.length() + 1).split("\\.").length;
         byDepth.computeIfAbsent(depth, d -> new TreeSet<>()).add(pkg);
       }
       if (byDepth.isEmpty()) {
@@ -383,6 +392,109 @@ public final class UseCaseRules implements DcaRuleSet {
               + " feature)",
           violations);
     }
+  }
+
+  /**
+   * A result is the use case's answer: it may carry primitives, nested records, value objects,
+   * enriched models and read models, never a class assignable to {@link AggregateRoot} or {@link
+   * Entity}. Selects the top-level classes ending in {@code Result} below an application package
+   * and walks their fields transitively: through the raw type and every generic type argument of
+   * each field, and into every record that lives in an application package (part records - nested
+   * in the result, next to it, or shared in {@code application.shared}), which do not carry the
+   * {@code Result} suffix themselves. Records from the domain are values by contract and are not
+   * walked. Reports every offending path in one violation.
+   */
+  public static DcaRule resultsMustNotExposeAggregatesOrEntities(DcaLayout layout) {
+    return DcaRule.check(
+        "DCA-USE-015",
+        "Use Case Result Models must not expose aggregate roots or entities",
+        "A result is the use case's answer, not a handle on the model: identity and behaviour stay"
+            + " behind the port; values, enriched models and read models may cross. Checked"
+            + " transitively through nested records, part records anywhere in the application layer"
+            + " (application.shared included) and generic type arguments (List<T>, Optional<T>,"
+            + " Map<K,V>)",
+        arch -> checkResultsCarryNoIdentities(arch));
+  }
+
+  private static void checkResultsCarryNoIdentities(DcaArchitecture arch) {
+    List<String> violations = new ArrayList<>();
+    for (JavaClass result : arch.classes()) {
+      if (result.isInterface()
+          || result.isNestedClass()
+          || !result.getSimpleName().endsWith("Result")
+          || !residesInAny(result, arch.allApplicationPatterns())) {
+        continue;
+      }
+      walkResult(
+          arch.allApplicationPatterns(),
+          result,
+          result.getSimpleName(),
+          new HashSet<>(),
+          violations);
+    }
+    if (!violations.isEmpty()) {
+      throw new DcaRuleViolation(
+          "Use Case Result Models must not expose aggregate roots or entities", violations);
+    }
+  }
+
+  private static boolean residesInAny(JavaClass javaClass, String[] packagePatterns) {
+    for (String pattern : packagePatterns) {
+      if (JavaClass.Predicates.resideInAPackage(pattern).test(javaClass)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static void walkResult(
+      String[] applicationPatterns,
+      JavaClass current,
+      String path,
+      Set<String> visited,
+      List<String> violations) {
+    if (!visited.add(current.getName())) {
+      return;
+    }
+    for (JavaField field : current.getFields()) {
+      if (field.getModifiers().contains(JavaModifier.STATIC)) {
+        continue;
+      }
+      String fieldPath = path + "." + field.getName();
+      for (JavaClass involved : field.getType().getAllInvolvedRawTypes()) {
+        String identity = identityKind(involved);
+        if (identity != null) {
+          violations.add(fieldPath + " : " + involved.getSimpleName() + " (" + identity + ")");
+        } else if (isPartRecord(involved, applicationPatterns)) {
+          walkResult(
+              applicationPatterns,
+              involved,
+              fieldPath + " -> " + involved.getSimpleName(),
+              visited,
+              violations);
+        }
+      }
+    }
+  }
+
+  /** The marker a class carries into the result, or null when it is a value or plain type. */
+  private static String identityKind(JavaClass javaClass) {
+    if (javaClass.isAssignableTo(AggregateRoot.class)) {
+      return "AggregateRoot";
+    }
+    if (javaClass.isAssignableTo(Entity.class)) {
+      return "Entity";
+    }
+    return null;
+  }
+
+  /**
+   * A part record: a record that lives in an application package - nested in the result, declared
+   * next to it, or shared in {@code application.shared}. Records from other layers (value objects,
+   * read models) are values by contract and are not walked.
+   */
+  private static boolean isPartRecord(JavaClass candidate, String[] applicationPatterns) {
+    return candidate.isRecord() && residesInAny(candidate, applicationPatterns);
   }
 
   private static boolean isTransactional(JavaClass item, String transactional) {

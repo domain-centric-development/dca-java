@@ -142,10 +142,10 @@ public final class CycleRules implements DcaRuleSet {
   }
 
   /**
-   * One slice per immediate child package of a module's application package — the module root
-   * comes from {@link DcaArchitecture#moduleRootOf(String)}, so the slicing holds at any depth
-   * and never assumes a module is a direct child of the base package. Classes directly in the
-   * application package and everything below {@code application.shared} are ignored.
+   * One slice per immediate child package of a module's application package — the module root comes
+   * from {@link DcaArchitecture#moduleRootOf(String)}, so the slicing holds at any depth and never
+   * assumes a module is a direct child of the base package. Classes directly in the application
+   * package and everything below {@code application.shared} are ignored.
    */
   private static SliceAssignment applicationChildSlices(DcaArchitecture arch, DcaLayout layout) {
     return new SliceAssignment() {

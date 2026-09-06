@@ -9,6 +9,7 @@ import com.tngtech.archunit.lang.ArchRule;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
+import dev.domaincentric.dca.buildingblocks.ddd.tactical.DomainService;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.in.InputPort;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.OutputPort;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.Repository;
@@ -19,7 +20,7 @@ import java.util.List;
  * Hexagonal Architecture (Ports and Adapters) rules: separation between ports and adapters,
  * incoming adapters drive the application through its input ports, outgoing adapters implement
  * outbound ports, adapters never talk to each other directly, incoming adapters stay inside their
- * own bounded context.
+ * own bounded context and do not operate the domain through its services.
  */
 public final class HexagonalRules implements DcaRuleSet {
 
@@ -40,7 +41,8 @@ public final class HexagonalRules implements DcaRuleSet {
             repositoryClassesResideInOutgoingAdapter(),
             sharedOutputPortsExtendOutputPort(),
             outputPortsMustNotResideInDomain(),
-            incomingAdaptersMustDependOnInputPortsNotUseCaseClasses());
+            incomingAdaptersMustDependOnInputPortsNotUseCaseClasses(),
+            incomingAdaptersMustNotDependOnDomainServices());
   }
 
   @Override
@@ -265,6 +267,29 @@ public final class HexagonalRules implements DcaRuleSet {
                 .areInterfaces()
                 .should()
                 .resideInAnyPackage(arch.allDomainPatterns())
+                .allowEmptyShould(true));
+  }
+
+  /**
+   * Selects incoming adapters only, event consumers included: they translate and call an input port
+   * like every other driving adapter. Outgoing adapters are deliberately outside the selection.
+   */
+  public DcaRule incomingAdaptersMustNotDependOnDomainServices() {
+    return DcaRule.of(
+        "DCA-HEX-012",
+        "Incoming Adapters must not depend on domain services",
+        "An incoming adapter translates external input, calls an input port and formats its result."
+            + " Injecting or invoking a domain service bypasses the application boundary; the use"
+            + " case owns that collaboration and puts its outcome into the result. Outgoing adapters"
+            + " are outside this rule - repositories and other driven adapters may construct or"
+            + " reconstitute domain objects while implementing output ports",
+        arch ->
+            noClasses()
+                .that()
+                .resideInAnyPackage(arch.allIncomingAdapterPatterns())
+                .should()
+                .dependOnClassesThat()
+                .areAssignableTo(DomainService.class)
                 .allowEmptyShould(true));
   }
 }
