@@ -62,6 +62,12 @@ class ContextDiscoveryTest {
     void isGovernedByTheLayerRules() {
       assertThrows(AssertionError.class, () -> rule("DCA-LAY-002", BASE).check(arch(BASE)));
     }
+
+    /** The web-adapter package of a grouped context is derived from its module root. */
+    @Test
+    void itsViewModelsAreInTheRightPlace() {
+      rule("DCA-NAM-011", BASE).check(arch(BASE));
+    }
   }
 
   @Nested
@@ -78,6 +84,12 @@ class ContextDiscoveryTest {
     @Test
     void isGovernedByTheLayerRules() {
       assertThrows(AssertionError.class, () -> rule("DCA-LAY-002", BASE).check(arch(BASE)));
+    }
+
+    /** {@code base.adapter.incoming.web} is a web-adapter package when the base is the context. */
+    @Test
+    void itsViewModelsAreInTheRightPlace() {
+      rule("DCA-NAM-011", BASE).check(arch(BASE));
     }
   }
 

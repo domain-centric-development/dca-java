@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -88,6 +89,43 @@ class ContextMapRendererTest {
     assertFalse(md.contains("Carrier API"));
     assertFalse(md.contains("planned"), md);
     assertTrue(md.contains("## Upstream relationships"));
+  }
+
+  /**
+   * Node ids are normalised with {@link java.util.Locale#ROOT}: under a Turkish default locale
+   * {@code "API".toLowerCase()} would yield a dotless i and the node {@code ext_carrier_ap_}, so
+   * the rendered file would depend on the machine — and disagree with the collision check of {@code
+   * DCA-MAP-003}, which normalises the same names.
+   */
+  @Test
+  void externalNodeIdsDoNotDependOnTheDefaultLocale() {
+    Locale before = Locale.getDefault();
+    Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+    try {
+      String md = ContextMapRenderer.of(arch).render();
+      assertTrue(md.contains("  ext_carrier_api[[\"Carrier API\"]]"), md);
+      assertEquals("ext_carrier_api", ContextMapRenderer.externalSystemNodeId("Carrier API"));
+    } finally {
+      Locale.setDefault(before);
+    }
+  }
+
+  /** Annotation text goes into table cells and diagram labels escaped for that context. */
+  @Test
+  void escapesAnnotationTextForTablesAndDiagram() {
+    String pkg = "dev.domaincentric.dca.archunit.fixtures.escaping";
+    DcaArchitecture escaping =
+        DcaArchitecture.of(
+            DcaLayout.forBasePackage(pkg), new ClassFileImporter().importPackages(pkg));
+    String md = ContextMapRenderer.of(escaping).render();
+    assertTrue(md.contains("| billing | Billing | Invoices \\| dunning | — |"), md);
+    assertTrue(
+        md.contains(
+            "| Tax \"Pro\" Service | outbound | — | — | Conformist | implemented |"
+                + " Rates come from the provider \\| never computed here |"),
+        md);
+    assertTrue(md.contains("  ext_tax_pro_service[[\"Tax #quot;Pro#quot; Service\"]]"), md);
+    assertTrue(md.contains("  billing -->|\"Conformist / outbound\"| ext_tax_pro_service"), md);
   }
 
   @Test

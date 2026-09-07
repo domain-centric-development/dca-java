@@ -3,6 +3,7 @@ package dev.domaincentric.dca.archunit.rules;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
@@ -241,14 +242,12 @@ public final class NamingRules implements DcaRuleSet {
                 .allowEmptyShould(true));
   }
 
+  /**
+   * The web-adapter packages are derived from the discovered module roots ({@code
+   * root.adapter.incoming.web..}), so a grouped context and a single-context application whose base
+   * package is the context are governed like a flat layout.
+   */
   public static DcaRule viewModelsResideInIncomingWebAdapters(DcaLayout layout) {
-    String incomingWebPattern =
-        layout.basePackage()
-            + ".*."
-            + layout.adapterSubpackage()
-            + "."
-            + layout.incomingSubpackage()
-            + ".web..";
     return DcaRule.of(
         "DCA-NAM-011",
         "ViewModels must reside in adapter.incoming.web packages",
@@ -260,7 +259,21 @@ public final class NamingRules implements DcaRuleSet {
                 .and()
                 .resideInAnyPackage(layout.basePackage() + "..")
                 .should()
-                .resideInAPackage(incomingWebPattern)
+                .resideInAnyPackage(incomingWebAdapterPatterns(arch))
                 .allowEmptyShould(true));
+  }
+
+  private static String[] incomingWebAdapterPatterns(DcaArchitecture arch) {
+    DcaLayout layout = arch.layout();
+    return arch.moduleRoots().stream()
+        .map(
+            root ->
+                root
+                    + "."
+                    + layout.adapterSubpackage()
+                    + "."
+                    + layout.incomingSubpackage()
+                    + ".web..")
+        .toArray(String[]::new);
   }
 }

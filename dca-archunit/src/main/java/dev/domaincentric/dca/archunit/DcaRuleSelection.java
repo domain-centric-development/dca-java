@@ -233,7 +233,14 @@ public final class DcaRuleSelection {
    * dca.rules.freeze.store      = arch/frozen
    * dca.rule.DCA-NAM-002.reason = no DI framework in this project
    * dca.rule.DCA-STR-003.ignore = .*backoffice.*
+   * dca.rule.DCA-STR-003.ignore.1 = .*legacy.*
+   * dca.rule.DCA-STR-003.ignore.2 = Generated.{1,3}Client
    * }</pre>
+   *
+   * <p>The value of an {@code .ignore} key is <em>one</em> regular expression, commas included; a
+   * second expression for the same rule uses an indexed key ({@code .ignore.1}, {@code .ignore.2},
+   * …, applied after the unindexed one, in numeric order). Lists of rule ids and set names are
+   * comma-separated as before.
    *
    * <p>An unknown rule identifier or set name fails immediately — a typo must not silently leave a
    * rule enforced.
@@ -305,15 +312,42 @@ public final class DcaRuleSelection {
     if (store != null && !store.isBlank()) {
       selection = selection.withFreezeStore(Path.of(store.trim()));
     }
-    for (String key : properties.stringPropertyNames()) {
-      if (key.startsWith("dca.rule.") && key.endsWith(".ignore")) {
-        String id = key.substring("dca.rule.".length(), key.length() - ".ignore".length());
-        for (String regex : split(properties.getProperty(key))) {
-          selection = selection.ignoringViolationsMatching(id, regex);
-        }
+    for (Map.Entry<String, List<String>> entry : ignoreExpressions(properties).entrySet()) {
+      for (String regex : entry.getValue()) {
+        selection = selection.ignoringViolationsMatching(entry.getKey(), regex);
       }
     }
     return selection;
+  }
+
+  /** {@code dca.rule.<id>.ignore} and {@code dca.rule.<id>.ignore.<n>}. */
+  private static final Pattern IGNORE_KEY =
+      Pattern.compile("dca\\.rule\\.(.+?)\\.ignore(?:\\.(\\d+))?");
+
+  /**
+   * The ignore expressions per rule id, in the order: the unindexed key first, then the indexed
+   * keys by number. Each value is one regular expression, taken as written — a comma is part of the
+   * expression ({@code Foo.{1,3}Bar}), never a separator.
+   */
+  private static Map<String, List<String>> ignoreExpressions(Properties properties) {
+    Map<String, java.util.TreeMap<Integer, String>> byRule = new java.util.TreeMap<>();
+    for (String key : properties.stringPropertyNames()) {
+      java.util.regex.Matcher matcher = IGNORE_KEY.matcher(key);
+      if (!matcher.matches()) {
+        continue;
+      }
+      String value = properties.getProperty(key);
+      if (value == null || value.isBlank()) {
+        continue;
+      }
+      int index = matcher.group(2) == null ? -1 : Integer.parseInt(matcher.group(2));
+      byRule
+          .computeIfAbsent(matcher.group(1), id -> new java.util.TreeMap<>())
+          .put(index, value.trim());
+    }
+    Map<String, List<String>> ordered = new LinkedHashMap<>();
+    byRule.forEach((id, expressions) -> ordered.put(id, List.copyOf(expressions.values())));
+    return ordered;
   }
 
   private static String reasonFor(Properties properties, String id) {

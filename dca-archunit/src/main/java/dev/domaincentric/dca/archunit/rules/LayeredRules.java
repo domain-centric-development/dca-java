@@ -66,7 +66,8 @@ public final class LayeredRules implements DcaRuleSet {
                 .resideInAnyPackage(arch.allDomainPatterns())
                 .should()
                 .dependOnClassesThat()
-                .resideInAPackage(layout.infrastructurePattern())
+                // The global infrastructure package and every module's own one.
+                .resideInAnyPackage(arch.allInfrastructurePatterns())
                 // A context may legitimately have no domain layer at all - a supporting or generic
                 // subdomain in transaction-script style. An absent domain is not a violation.
                 .allowEmptyShould(true));
@@ -101,23 +102,27 @@ public final class LayeredRules implements DcaRuleSet {
           allowedPatterns.add(
               ".." + layout.adapterSubpackage() + "." + layout.outgoingSubpackage() + "..");
           String[] allowed = allowedPatterns.toArray(String[]::new);
-          methods()
-              .that()
-              .areAnnotatedWith(transactional)
-              .should()
-              .beDeclaredInClassesThat()
-              .resideInAnyPackage(allowed)
-              .because(rationale)
-              .allowEmptyShould(true)
-              .check(arch.classes());
-          classes()
-              .that()
-              .areAnnotatedWith(transactional)
-              .should()
-              .resideInAnyPackage(allowed)
-              .because(rationale)
-              .allowEmptyShould(true)
-              .check(arch.classes());
+          CollectedViolations violations = CollectedViolations.withoutHeader();
+          violations.addAll(
+              methods()
+                  .that()
+                  .areAnnotatedWith(transactional)
+                  .should()
+                  .beDeclaredInClassesThat()
+                  .resideInAnyPackage(allowed)
+                  .allowEmptyShould(true),
+              arch.classes(),
+              rationale);
+          violations.addAll(
+              classes()
+                  .that()
+                  .areAnnotatedWith(transactional)
+                  .should()
+                  .resideInAnyPackage(allowed)
+                  .allowEmptyShould(true),
+              arch.classes(),
+              rationale);
+          violations.throwIfAny();
         });
   }
 

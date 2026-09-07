@@ -134,9 +134,16 @@ carried over by hand.
 A snapshot goes to the Central snapshot repository, not to Central, and can be repeated at will:
 
 ```bash
-./scripts/publish-snapshot.sh                  # both artifacts, version from gradle.properties
+./scripts/publish-snapshot.sh                  # both artifacts, versions from gradle.properties
 ./scripts/publish-snapshot.sh dca-archunit     # one of them
+./scripts/publish-snapshot.sh dca-building-blocks -PbuildingBlocksVersion=0.2.0-SNAPSHOT   # override
 ```
+
+Every artifact that is actually requested must resolve to a `-SNAPSHOT` version — from
+`gradle.properties` or from a `-P` override, which the script forwards to Gradle; it refuses otherwise,
+before any credential is read. Both scripts take the artifact → project → version-property mapping from
+[scripts/lib/artifacts.sh](scripts/lib/artifacts.sh), and both accept either spelling
+(`building-blocks` / `dca-building-blocks`).
 
 Snapshots must be enabled for the namespace first (Portal → the namespace's dropdown → *Enable
 SNAPSHOTs*), otherwise the upload fails with `403 Forbidden` despite a verified namespace.

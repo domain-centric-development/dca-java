@@ -4,7 +4,7 @@
 # docker compose build               → CI-style check: the image builds only if everything is green
 services:
   gradle:
-    image: eclipse-temurin:21-jdk
+    image: docker.io/library/eclipse-temurin:21-jdk
     working_dir: /workspace
     volumes:
       - .:/workspace

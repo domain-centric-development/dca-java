@@ -8,7 +8,7 @@ import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
-import dev.domaincentric.dca.archunit.DcaRuleViolation;
+import dev.domaincentric.dca.archunit.contextmap.ContextMapRenderer;
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.BoundedContext;
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.relationships.ExternalUpstream;
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.relationships.Partnership;
@@ -20,7 +20,6 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -79,7 +78,13 @@ public final class ContextMapRules implements DcaRuleSet {
   // Declaration well-formedness
   // ---------------------------------------------------------------------------------------------
 
-  /** DCA-MAP-001. */
+  /**
+   * DCA-MAP-001. Looks at every package below the base package that an imported class lives in, its
+   * ancestors included — not only at the resolved context roots — so a relationship declared on a
+   * nested package (a use-case package, a feature, a grouping package) is reported instead of being
+   * silently ignored by every other rule and by the renderer. The package that carries the
+   * declaration must itself be the {@code @BoundedContext}.
+   */
   public static DcaRule declarationsOnlyOnBoundedContexts() {
     return DcaRule.check(
         "DCA-MAP-001",
@@ -88,27 +93,34 @@ public final class ContextMapRules implements DcaRuleSet {
         "Context map declarations are reserved for bounded contexts — only a context can be"
             + " downstream of, or partner with, another",
         arch -> {
-          for (String pkg : allRootPackages(arch)) {
+          CollectedViolations violations = CollectedViolations.withoutHeader();
+          for (String pkg : arch.packagesBelowBase()) {
             if (arch.packageAnnotation(pkg, BoundedContext.class).isPresent()) {
               continue;
             }
-            requireNoDeclaration(arch, pkg, Upstream.class, "@Upstream");
-            requireNoDeclaration(arch, pkg, ExternalUpstream.class, "@ExternalUpstream");
-            requireNoDeclaration(arch, pkg, Partnership.class, "@Partnership");
+            requireNoDeclaration(violations, arch, pkg, Upstream.class, "@Upstream");
+            requireNoDeclaration(
+                violations, arch, pkg, ExternalUpstream.class, "@ExternalUpstream");
+            requireNoDeclaration(violations, arch, pkg, Partnership.class, "@Partnership");
           }
+          violations.throwIfAny();
         });
   }
 
   private static void requireNoDeclaration(
-      DcaArchitecture arch, String pkg, Class<? extends Annotation> type, String label) {
-    require(
+      CollectedViolations violations,
+      DcaArchitecture arch,
+      String pkg,
+      Class<? extends Annotation> type,
+      String label) {
+    violations.require(
         arch.packageAnnotations(pkg, type).isEmpty(),
         "Package '"
             + pkg
             + "' declares "
             + label
             + " but is not a @BoundedContext — context map declarations are reserved for bounded"
-            + " contexts");
+            + " contexts; declare the relationship on the context's root package");
   }
 
   /** DCA-MAP-002. */
@@ -119,15 +131,16 @@ public final class ContextMapRules implements DcaRuleSet {
         "The identity of an @ExternalUpstream declaration is (name, interaction); internal"
             + " contexts are declared with @Upstream instead",
         arch -> {
+          CollectedViolations violations = CollectedViolations.withoutHeader();
           Set<String> moduleNames = moduleNames(arch);
           for (String pkg : arch.boundedContextPackages()) {
             String source = arch.contextName(pkg);
             List<String> edges = new ArrayList<>();
             for (ExternalUpstream e : arch.packageAnnotations(pkg, ExternalUpstream.class)) {
-              require(
+              violations.require(
                   !e.name().isBlank(),
                   "Context '" + source + "' declares an @ExternalUpstream with a blank name");
-              require(
+              violations.require(
                   !moduleNames.contains(e.name()),
                   "Context '"
                       + source
@@ -136,7 +149,7 @@ public final class ContextMapRules implements DcaRuleSet {
                       + "', which is an internal bounded context module — use @Upstream for"
                       + " internal contexts");
               String edge = e.name() + " :: " + e.interaction();
-              require(
+              violations.require(
                   !edges.contains(edge),
                   "Context '"
                       + source
@@ -147,6 +160,7 @@ public final class ContextMapRules implements DcaRuleSet {
               edges.add(edge);
             }
           }
+          violations.throwIfAny();
         });
   }
 
@@ -158,12 +172,13 @@ public final class ContextMapRules implements DcaRuleSet {
         "The generated context map renders one node per normalized external system name — two"
             + " spellings of the same system would silently merge into one node",
         arch -> {
+          CollectedViolations violations = CollectedViolations.withoutHeader();
           Map<String, String> idToName = new LinkedHashMap<>();
           for (String pkg : arch.boundedContextPackages()) {
             for (ExternalUpstream e : arch.packageAnnotations(pkg, ExternalUpstream.class)) {
               String id = normalizedExternalId(e.name());
               String known = idToName.getOrDefault(id, e.name());
-              require(
+              violations.require(
                   known.equals(e.name()),
                   "External system names '"
                       + known
@@ -175,6 +190,7 @@ public final class ContextMapRules implements DcaRuleSet {
               idToName.put(id, e.name());
             }
           }
+          violations.throwIfAny();
         });
   }
 
@@ -186,11 +202,12 @@ public final class ContextMapRules implements DcaRuleSet {
             + " context itself",
         "A dangling or self-referencing upstream edge describes a relationship that cannot exist",
         arch -> {
+          CollectedViolations violations = CollectedViolations.withoutHeader();
           Set<String> moduleNames = moduleNames(arch);
           for (String pkg : arch.boundedContextPackages()) {
             String source = arch.contextName(pkg);
             for (Upstream u : arch.packageAnnotations(pkg, Upstream.class)) {
-              require(
+              violations.require(
                   moduleNames.contains(u.context()),
                   "Context '"
                       + source
@@ -199,11 +216,12 @@ public final class ContextMapRules implements DcaRuleSet {
                       + "\") but no bounded context module with that name exists (known: "
                       + moduleNames
                       + ")");
-              require(
+              violations.require(
                   !u.context().equals(source),
                   "Context '" + source + "' declares itself as its own upstream");
             }
           }
+          violations.throwIfAny();
         });
   }
 
@@ -215,11 +233,12 @@ public final class ContextMapRules implements DcaRuleSet {
         "The identity of an @Upstream declaration is (context, via); different translations per"
             + " channel require separate annotations",
         arch -> {
+          CollectedViolations violations = CollectedViolations.withoutHeader();
           for (String pkg : arch.boundedContextPackages()) {
             String source = arch.contextName(pkg);
             List<String> edges = new ArrayList<>();
             for (Upstream u : arch.packageAnnotations(pkg, Upstream.class)) {
-              require(
+              violations.require(
                   u.via().length > 0,
                   "Context '"
                       + source
@@ -228,7 +247,7 @@ public final class ContextMapRules implements DcaRuleSet {
                       + "\") declares no channel — via must not be empty");
               for (Upstream.Consumes channel : u.via()) {
                 String edge = u.context() + " :: " + channelName(arch, channel);
-                require(
+                violations.require(
                     !edges.contains(edge),
                     "Context '"
                         + source
@@ -241,6 +260,7 @@ public final class ContextMapRules implements DcaRuleSet {
               }
             }
           }
+          violations.throwIfAny();
         });
   }
 
@@ -256,6 +276,7 @@ public final class ContextMapRules implements DcaRuleSet {
         "Neither the context map nor the module boundary may know more than the other — an edge"
             + " that exists only on one side is stale",
         arch -> {
+          CollectedViolations violations = CollectedViolations.withoutHeader();
           Optional<Class<? extends Annotation>> moduleAnnotation = moduleAnnotationType();
           if (moduleAnnotation.isEmpty()) {
             return;
@@ -272,7 +293,7 @@ public final class ContextMapRules implements DcaRuleSet {
                 allowed.add(normalized);
               }
             }
-            require(
+            violations.require(
                 declared.equals(allowed),
                 "Context '"
                     + source
@@ -282,6 +303,7 @@ public final class ContextMapRules implements DcaRuleSet {
                     + new TreeSet<>(allowed)
                     + " must describe the same edges — neither side may know more than the other");
           }
+          violations.throwIfAny();
         });
   }
 
@@ -329,6 +351,7 @@ public final class ContextMapRules implements DcaRuleSet {
             + " is PLANNED) and would otherwise pass forever alongside an equally stale module"
             + " boundary entry",
         arch -> {
+          CollectedViolations violations = CollectedViolations.withoutHeader();
           Map<String, String> packagesByName = packagesByName(arch);
           for (String pkg : arch.boundedContextPackages()) {
             String source = arch.contextName(pkg);
@@ -354,7 +377,7 @@ public final class ContextMapRules implements DcaRuleSet {
                     break;
                   }
                 }
-                require(
+                violations.require(
                     exists,
                     "Context '"
                         + source
@@ -371,6 +394,7 @@ public final class ContextMapRules implements DcaRuleSet {
               }
             }
           }
+          violations.throwIfAny();
         });
   }
 
@@ -387,6 +411,7 @@ public final class ContextMapRules implements DcaRuleSet {
             + " API calls, incoming adapters for consumed events — and translates the upstream"
             + " contract into the context's own model there",
         arch -> {
+          CollectedViolations violations = CollectedViolations.withoutHeader();
           Map<String, String> packagesByName = packagesByName(arch);
           for (String pkg : arch.boundedContextPackages()) {
             String source = arch.contextName(pkg);
@@ -401,29 +426,30 @@ public final class ContextMapRules implements DcaRuleSet {
                     channel == Upstream.Consumes.API
                         ? layout.outgoingAdapterPattern(pkg)
                         : layout.incomingAdapterPattern(pkg);
-                noClasses()
-                    .that()
-                    .resideInAPackage(pkg + "..")
-                    .and()
-                    .resideOutsideOfPackage(allowedAdapter)
-                    .should()
-                    .dependOnClassesThat()
-                    .resideInAPackage(targetPkg + "." + channelName(arch, channel) + "..")
-                    .allowEmptyShould(true)
-                    .because(
-                        "Context '"
-                            + source
-                            + "' declares ANTI_CORRUPTION_LAYER towards '"
-                            + u.context()
-                            + "' ("
-                            + channelName(arch, channel)
-                            + ") — upstream contract types must not leave "
-                            + allowedAdapter
-                            + "; translate them there into the context's own model")
-                    .check(arch.classes());
+                violations.addAll(
+                    noClasses()
+                        .that()
+                        .resideInAPackage(pkg + "..")
+                        .and()
+                        .resideOutsideOfPackage(allowedAdapter)
+                        .should()
+                        .dependOnClassesThat()
+                        .resideInAPackage(targetPkg + "." + channelName(arch, channel) + "..")
+                        .allowEmptyShould(true),
+                    arch.classes(),
+                    "Context '"
+                        + source
+                        + "' declares ANTI_CORRUPTION_LAYER towards '"
+                        + u.context()
+                        + "' ("
+                        + channelName(arch, channel)
+                        + ") — upstream contract types must not leave "
+                        + allowedAdapter
+                        + "; translate them there into the context's own model");
               }
             }
           }
+          violations.throwIfAny();
         });
   }
 
@@ -435,6 +461,7 @@ public final class ContextMapRules implements DcaRuleSet {
         "Conformism does not suspend domain purity — the domain layer stays free of foreign"
             + " contract types",
         arch -> {
+          CollectedViolations violations = CollectedViolations.withoutHeader();
           Map<String, String> packagesByName = packagesByName(arch);
           for (String pkg : arch.boundedContextPackages()) {
             String source = arch.contextName(pkg);
@@ -444,26 +471,27 @@ public final class ContextMapRules implements DcaRuleSet {
                 continue;
               }
               for (Upstream.Consumes channel : u.via()) {
-                noClasses()
-                    .that()
-                    .resideInAPackage(layout.domainPattern(pkg))
-                    .should()
-                    .dependOnClassesThat()
-                    .resideInAPackage(targetPkg + "." + channelName(arch, channel) + "..")
-                    .allowEmptyShould(true)
-                    .because(
-                        "Context '"
-                            + source
-                            + "' conforms to '"
-                            + u.context()
-                            + "' ("
-                            + channelName(arch, channel)
-                            + "), but conformism does not suspend domain purity — the domain"
-                            + " layer stays free of foreign contract types")
-                    .check(arch.classes());
+                violations.addAll(
+                    noClasses()
+                        .that()
+                        .resideInAPackage(layout.domainPattern(pkg))
+                        .should()
+                        .dependOnClassesThat()
+                        .resideInAPackage(targetPkg + "." + channelName(arch, channel) + "..")
+                        .allowEmptyShould(true),
+                    arch.classes(),
+                    "Context '"
+                        + source
+                        + "' conforms to '"
+                        + u.context()
+                        + "' ("
+                        + channelName(arch, channel)
+                        + "), but conformism does not suspend domain purity — the domain"
+                        + " layer stays free of foreign contract types");
               }
             }
           }
+          violations.throwIfAny();
         });
   }
 
@@ -475,6 +503,7 @@ public final class ContextMapRules implements DcaRuleSet {
         "An external system's contract types are confined to the adapter where the exchange"
             + " crosses the boundary (ACL) or at least kept out of the domain (Conformist)",
         arch -> {
+          CollectedViolations violations = CollectedViolations.withoutHeader();
           // Without contractPackages (wire-level contract, no vendor SDK) there is nothing to
           // check — the declaration then only documents the relationship.
           for (String pkg : arch.boundedContextPackages()) {
@@ -488,46 +517,47 @@ public final class ContextMapRules implements DcaRuleSet {
                     e.interaction() == ExternalUpstream.Interaction.OUTBOUND
                         ? layout.outgoingAdapterPattern(pkg)
                         : layout.incomingAdapterPattern(pkg);
-                noClasses()
-                    .that()
-                    .resideInAPackage(pkg + "..")
-                    .and()
-                    .resideOutsideOfPackage(allowedAdapter)
-                    .should()
-                    .dependOnClassesThat()
-                    .resideInAnyPackage(e.contractPackages())
-                    .allowEmptyShould(true)
-                    .because(
-                        "Context '"
-                            + source
-                            + "' declares ANTI_CORRUPTION_LAYER towards external system '"
-                            + e.name()
-                            + "' ("
-                            + e.interaction()
-                            + ") — its contract types ("
-                            + String.join(", ", e.contractPackages())
-                            + ") must not leave "
-                            + allowedAdapter)
-                    .check(arch.classes());
+                violations.addAll(
+                    noClasses()
+                        .that()
+                        .resideInAPackage(pkg + "..")
+                        .and()
+                        .resideOutsideOfPackage(allowedAdapter)
+                        .should()
+                        .dependOnClassesThat()
+                        .resideInAnyPackage(e.contractPackages())
+                        .allowEmptyShould(true),
+                    arch.classes(),
+                    "Context '"
+                        + source
+                        + "' declares ANTI_CORRUPTION_LAYER towards external system '"
+                        + e.name()
+                        + "' ("
+                        + e.interaction()
+                        + ") — its contract types ("
+                        + String.join(", ", e.contractPackages())
+                        + ") must not leave "
+                        + allowedAdapter);
               } else {
-                noClasses()
-                    .that()
-                    .resideInAPackage(layout.domainPattern(pkg))
-                    .should()
-                    .dependOnClassesThat()
-                    .resideInAnyPackage(e.contractPackages())
-                    .allowEmptyShould(true)
-                    .because(
-                        "Context '"
-                            + source
-                            + "' conforms to external system '"
-                            + e.name()
-                            + "', but conformism does not suspend domain purity — the domain"
-                            + " layer stays free of its contract types")
-                    .check(arch.classes());
+                violations.addAll(
+                    noClasses()
+                        .that()
+                        .resideInAPackage(layout.domainPattern(pkg))
+                        .should()
+                        .dependOnClassesThat()
+                        .resideInAnyPackage(e.contractPackages())
+                        .allowEmptyShould(true),
+                    arch.classes(),
+                    "Context '"
+                        + source
+                        + "' conforms to external system '"
+                        + e.name()
+                        + "', but conformism does not suspend domain purity — the domain"
+                        + " layer stays free of its contract types");
               }
             }
           }
+          violations.throwIfAny();
         });
   }
 
@@ -539,6 +569,7 @@ public final class ContextMapRules implements DcaRuleSet {
         "Every real dependency on a foreign api/ or events/ package is a context-map edge and must"
             + " be declared as such",
         arch -> {
+          CollectedViolations violations = CollectedViolations.withoutHeader();
           List<String> contexts = arch.boundedContextPackages();
           for (String srcPkg : contexts) {
             String source = arch.contextName(srcPkg);
@@ -552,27 +583,28 @@ public final class ContextMapRules implements DcaRuleSet {
                 if (declared.contains(target + " :: " + channel)) {
                   continue;
                 }
-                noClasses()
-                    .that()
-                    .resideInAPackage(srcPkg + "..")
-                    .should()
-                    .dependOnClassesThat()
-                    .resideInAPackage(tgtPkg + "." + channel + "..")
-                    .allowEmptyShould(true)
-                    .because(
-                        "Context '"
-                            + source
-                            + "' depends on '"
-                            + target
-                            + " :: "
-                            + channel
-                            + "' without declaring it — add @Upstream(context = \""
-                            + target
-                            + "\", translation = ..., via = ...) to its package-info")
-                    .check(arch.classes());
+                violations.addAll(
+                    noClasses()
+                        .that()
+                        .resideInAPackage(srcPkg + "..")
+                        .should()
+                        .dependOnClassesThat()
+                        .resideInAPackage(tgtPkg + "." + channel + "..")
+                        .allowEmptyShould(true),
+                    arch.classes(),
+                    "Context '"
+                        + source
+                        + "' depends on '"
+                        + target
+                        + " :: "
+                        + channel
+                        + "' without declaring it — add @Upstream(context = \""
+                        + target
+                        + "\", translation = ..., via = ...) to its package-info");
               }
             }
           }
+          violations.throwIfAny();
         });
   }
 
@@ -588,26 +620,30 @@ public final class ContextMapRules implements DcaRuleSet {
             + " and must be symmetric",
         "A partnership is a mutual commitment — it exists only when both contexts declare it",
         arch -> {
+          CollectedViolations violations = CollectedViolations.withoutHeader();
           Map<String, String> packagesByName = packagesByName(arch);
           for (String pkg : arch.boundedContextPackages()) {
             String source = arch.contextName(pkg);
             for (Partnership p : arch.packageAnnotations(pkg, Partnership.class)) {
-              require(
-                  packagesByName.containsKey(p.context()),
-                  "Context '"
-                      + source
-                      + "' declares @Partnership(context = \""
-                      + p.context()
-                      + "\") but no bounded context module with that name exists");
-              require(
-                  !p.context().equals(source),
-                  "Context '" + source + "' declares a partnership with itself");
+              if (!packagesByName.containsKey(p.context())) {
+                violations.add(
+                    "Context '"
+                        + source
+                        + "' declares @Partnership(context = \""
+                        + p.context()
+                        + "\") but no bounded context module with that name exists");
+                continue;
+              }
+              if (p.context().equals(source)) {
+                violations.add("Context '" + source + "' declares a partnership with itself");
+                continue;
+              }
               boolean reverse =
                   arch
                       .packageAnnotations(packagesByName.get(p.context()), Partnership.class)
                       .stream()
                       .anyMatch(r -> r.context().equals(source));
-              require(
+              violations.require(
                   reverse,
                   "Partnership between '"
                       + source
@@ -622,6 +658,7 @@ public final class ContextMapRules implements DcaRuleSet {
                       + "'");
             }
           }
+          violations.throwIfAny();
         });
   }
 
@@ -675,23 +712,6 @@ public final class ContextMapRules implements DcaRuleSet {
   // Helpers
   // ---------------------------------------------------------------------------------------------
 
-  private static void require(boolean condition, String message) {
-    if (!condition) {
-      throw new DcaRuleViolation("", List.of(message));
-    }
-  }
-
-  private static Set<String> allRootPackages(DcaArchitecture arch) {
-    Set<String> roots = new LinkedHashSet<>();
-    for (JavaClass javaClass : arch.classes()) {
-      String root = arch.rootContextPackage(javaClass.getPackageName());
-      if (root != null) {
-        roots.add(root);
-      }
-    }
-    return roots;
-  }
-
   private static Set<String> moduleNames(DcaArchitecture arch) {
     Set<String> names = new LinkedHashSet<>();
     arch.boundedContextPackages().forEach(p -> names.add(arch.contextName(p)));
@@ -716,18 +736,15 @@ public final class ContextMapRules implements DcaRuleSet {
   }
 
   private static String channelName(DcaArchitecture arch, Upstream.Consumes channel) {
-    return channel == Upstream.Consumes.API
-        ? arch.layout().apiSubpackage()
-        : arch.layout().eventsSubpackage();
+    return arch.layout().channelSubpackage(channel);
   }
 
-  /** True when packageName is root itself or a sub-package of root (exact segment boundary). */
   private static boolean inPackageTree(String packageName, String root) {
-    return packageName.equals(root) || packageName.startsWith(root + ".");
+    return DcaArchitecture.inPackageTree(packageName, root);
   }
 
-  /** The mermaid node id of an external system in the generated context map. */
+  /** The mermaid node id of an external system — the renderer's own normalisation. */
   private static String normalizedExternalId(String name) {
-    return "ext_" + name.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_");
+    return ContextMapRenderer.externalSystemNodeId(name);
   }
 }

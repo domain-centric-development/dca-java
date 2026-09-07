@@ -459,11 +459,70 @@ public final class DcaArchitecture {
     return moduleRoots().stream().map(layout::outgoingAdapterPattern).toArray(String[]::new);
   }
 
-  /** Classes residing in the global infrastructure implementation packages. */
+  /**
+   * The infrastructure packages of this architecture: the global one ({@code base.infrastructure})
+   * and every isolated module's own ({@code base.cart.infrastructure}), each without pattern
+   * suffix. A module's infrastructure is not a layer — it does not make the module a root — but it
+   * is an implementation detail like the global one, and the rules that keep implementation details
+   * out of the inner layers treat both alike.
+   *
+   * <p>The shared kernel's {@code infrastructure} package is deliberately not in this list. The
+   * shared kernel is the one package everyone may depend on; what it keeps under {@code
+   * infrastructure} — a project-wide lifecycle annotation, say — is shared support, not a detail of
+   * one module that another module's adapter would be reaching into.
+   */
+  public List<String> infrastructurePackages() {
+    List<String> packages = new ArrayList<>();
+    packages.add(layout.infrastructurePackage());
+    for (String root : isolatedModuleRoots()) {
+      String modulePackage = layout.infrastructurePackage(root);
+      if (!packages.contains(modulePackage)) {
+        packages.add(modulePackage);
+      }
+    }
+    return packages;
+  }
+
+  /** {@link #infrastructurePackages()} as patterns, {@code package..} each. */
+  public String[] allInfrastructurePatterns() {
+    return infrastructurePackages().stream().map(p -> p + "..").toArray(String[]::new);
+  }
+
+  /**
+   * Classes residing in an infrastructure package — the package itself or any sub-package, with an
+   * exact segment boundary: {@code base.infrastructure.Wiring} counts, {@code
+   * base.infrastructurex.Other} does not.
+   */
   public DescribedPredicate<JavaClass> infrastructureImplementation() {
-    String prefix = layout.infrastructurePackage() + ".";
+    List<String> packages = infrastructurePackages();
     return DescribedPredicate.describe(
-        "reside in infrastructure implementation", c -> c.getPackageName().startsWith(prefix));
+        "reside in infrastructure implementation",
+        c -> packages.stream().anyMatch(p -> inPackageTree(c.getPackageName(), p)));
+  }
+
+  /**
+   * Every package at or below the base package that an imported class lives in, together with all
+   * its ancestors down to the base package, in encounter order. This is the set of packages that
+   * may carry a {@code package-info} declaration.
+   */
+  public List<String> packagesBelowBase() {
+    String base = layout.basePackage();
+    java.util.LinkedHashSet<String> packages = new java.util.LinkedHashSet<>();
+    for (JavaClass javaClass : classes) {
+      String pkg = javaClass.getPackageName();
+      if (!inPackageTree(pkg, base)) {
+        continue;
+      }
+      for (String candidate = pkg; candidate != null; candidate = parentPackage(candidate, base)) {
+        packages.add(candidate);
+      }
+    }
+    return List.copyOf(packages);
+  }
+
+  /** True when {@code packageName} is {@code root} itself or a sub-package of it. */
+  public static boolean inPackageTree(String packageName, String root) {
+    return packageName.equals(root) || packageName.startsWith(root + ".");
   }
 
   /** Excludes compiled test classes (any {@code build/classes/<lang>/test*} directory). */

@@ -90,6 +90,32 @@ class DcaRuleSelectionPropertiesTest {
     assertEquals(List.of(".*backoffice.*"), selection.ignoredViolationPatterns("DCA-STR-003"));
   }
 
+  /**
+   * The value of an {@code .ignore} key is one regular expression, commas included — {@code
+   * Foo.{1,3}Bar} is a quantifier, not two patterns. Several expressions use indexed keys.
+   */
+  @Test
+  void anIgnoreExpressionIsOneRegexCommasIncluded() {
+    DcaRuleSelection selection =
+        DcaRuleSelection.fromProperties(properties("dca.rule.DCA-STR-003.ignore = Foo.{1,3}Bar"));
+
+    assertEquals(List.of("Foo.{1,3}Bar"), selection.ignoredViolationPatterns("DCA-STR-003"));
+  }
+
+  @Test
+  void severalIgnoreExpressionsUseIndexedKeys() {
+    DcaRuleSelection selection =
+        DcaRuleSelection.fromProperties(
+            properties(
+                "dca.rule.DCA-STR-003.ignore.2 = .*generated.*",
+                "dca.rule.DCA-STR-003.ignore.1 = .*legacy.*",
+                "dca.rule.DCA-STR-003.ignore = .*[a-z],[0-9].*"));
+
+    assertEquals(
+        List.of(".*[a-z],[0-9].*", ".*legacy.*", ".*generated.*"),
+        selection.ignoredViolationPatterns("DCA-STR-003"));
+  }
+
   @Test
   void aTypoInARuleIdFailsLoudly() {
     IllegalArgumentException failure =

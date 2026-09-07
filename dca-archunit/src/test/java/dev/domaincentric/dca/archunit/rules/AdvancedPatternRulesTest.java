@@ -1,13 +1,10 @@
 package dev.domaincentric.dca.archunit.rules;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.tngtech.archunit.core.importer.ClassFileImporter;
-import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
-import java.util.Set;
+import dev.domaincentric.dca.archunit.Fixtures;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
@@ -15,45 +12,26 @@ import org.junit.jupiter.api.TestFactory;
 
 class AdvancedPatternRulesTest {
 
-  private static final String GOOD = "dev.domaincentric.dca.archunit.fixtures.advanced.good";
-  private static final String BAD = "dev.domaincentric.dca.archunit.fixtures.advanced.bad";
-
-  /** Every rule of this set has a negative fixture. */
-  private static final Set<String> NO_NEGATIVE_FIXTURE = Set.of();
-
-  static DcaArchitecture arch(String pkg) {
-    return DcaArchitecture.of(
-        DcaLayout.forBasePackage(pkg), new ClassFileImporter().importPackages(pkg));
-  }
-
-  static AdvancedPatternRules rules(String pkg) {
-    return new AdvancedPatternRules(DcaLayout.forBasePackage(pkg));
-  }
+  private static final String GOOD = Fixtures.ROOT + ".advanced.good";
+  private static final String BAD = Fixtures.ROOT + ".advanced.bad";
 
   @Test
   void setHasExpectedShape() {
-    AdvancedPatternRules set = rules(GOOD);
-    assertTrue(set.name().equals("advanced"));
-    assertTrue(set.rules().size() == 18);
-    assertTrue(set.rules().stream().map(DcaRule::id).distinct().count() == 18);
+    AdvancedPatternRules set = new AdvancedPatternRules(DcaLayout.forBasePackage(GOOD));
+    assertEquals("advanced", set.name());
+    assertEquals(18, set.rules().size());
+    assertEquals(18, set.rules().stream().map(DcaRule::id).distinct().count());
+    Fixtures.assertIdsAreSequential(set, "ADV");
   }
 
   @TestFactory
   Stream<DynamicTest> goodFixturePasses() {
-    DcaArchitecture arch = arch(GOOD);
-    return rules(GOOD).rules().stream()
-        .map(rule -> DynamicTest.dynamicTest(rule.toString(), () -> rule.check(arch)));
+    return Fixtures.goodFixturePasses(AdvancedPatternRules::new, GOOD);
   }
 
+  /** Every rule of this set has a negative fixture. */
   @TestFactory
   Stream<DynamicTest> badFixtureFails() {
-    DcaArchitecture arch = arch(BAD);
-    return rules(BAD).rules().stream()
-        .filter(rule -> !NO_NEGATIVE_FIXTURE.contains(rule.id()))
-        .map(
-            rule ->
-                DynamicTest.dynamicTest(
-                    rule.toString(),
-                    () -> assertThrows(AssertionError.class, () -> rule.check(arch))));
+    return Fixtures.badFixtureFails(AdvancedPatternRules::new, BAD);
   }
 }

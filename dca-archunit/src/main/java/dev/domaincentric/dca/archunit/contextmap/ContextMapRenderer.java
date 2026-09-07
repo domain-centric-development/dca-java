@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -126,9 +127,9 @@ public final class ContextMapRenderer {
       md.append("| ")
           .append(arch.contextName(pkg))
           .append(" | ")
-          .append(contexts.get(pkg).name())
+          .append(cell(contexts.get(pkg).name()))
           .append(" | ")
-          .append(contexts.get(pkg).description())
+          .append(cell(contexts.get(pkg).description()))
           .append(" | ")
           .append(published.isEmpty() ? "—" : String.join(", ", published))
           .append(" |\n");
@@ -156,7 +157,7 @@ public final class ContextMapRenderer {
               .append(" | ")
               .append(statusName(u.status()))
               .append(" | ")
-              .append(u.rationale())
+              .append(cell(u.rationale()))
               .append(" |\n");
         }
       }
@@ -178,19 +179,19 @@ public final class ContextMapRenderer {
             md.append("| ")
                 .append(source)
                 .append(" | ")
-                .append(e.name())
+                .append(cell(e.name()))
                 .append(" | ")
                 .append(interactionName(e.interaction()))
                 .append(" | ")
-                .append(orDash(e.protocol()))
+                .append(cell(orDash(e.protocol())))
                 .append(" | ")
-                .append(orDash(e.exchanges()))
+                .append(cell(orDash(e.exchanges())))
                 .append(" | ")
                 .append(translationLabel(e.translation()))
                 .append(" | ")
                 .append(statusName(e.status()))
                 .append(" | ")
-                .append(e.rationale())
+                .append(cell(e.rationale()))
                 .append(" |\n");
           }
         }
@@ -211,7 +212,7 @@ public final class ContextMapRenderer {
                   .append(" ↔ ")
                   .append(pair.get(1))
                   .append(" | ")
-                  .append(String.join(" — ", rationales))
+                  .append(cell(String.join(" — ", rationales)))
                   .append(" |\n"));
     }
     return md.toString();
@@ -225,7 +226,7 @@ public final class ContextMapRenderer {
       md.append("  ")
           .append(arch.contextName(pkg))
           .append("[\"")
-          .append(contexts.get(pkg).name())
+          .append(label(contexts.get(pkg).name()))
           .append(publishedBadge(pkg))
           .append("\"]\n");
     }
@@ -254,14 +255,19 @@ public final class ContextMapRenderer {
     }
     if (includeExternalSystems) {
       for (String name : externalSystems(packages)) {
-        md.append("  ").append(externalId(name)).append("[[\"").append(name).append("\"]]\n");
+        md.append("  ")
+            .append(externalId(name))
+            .append("[[\"")
+            .append(label(name))
+            .append("\"]]\n");
       }
       for (String pkg : packages) {
         String source = arch.contextName(pkg);
         for (ExternalUpstream e : externalUpstreams(pkg)) {
           // The one-word protocol replaces the generic inbound/outbound in the label — the arrow
           // style already encodes the direction. The full exchanges text lives in the table only.
-          String kind = e.protocol().isEmpty() ? interactionName(e.interaction()) : e.protocol();
+          String kind =
+              e.protocol().isEmpty() ? interactionName(e.interaction()) : label(e.protocol());
           String label =
               translationLabel(e.translation()) + " / " + kind + statusSuffix(e.status());
           String arrow = e.interaction() == ExternalUpstream.Interaction.OUTBOUND ? "-->" : "-.->";
@@ -407,9 +413,28 @@ public final class ContextMapRenderer {
   // Labels
   // ---------------------------------------------------------------------------------------------
 
-  /** Deterministic mermaid node id for an external system name. */
+  /**
+   * The mermaid node id of an external system: {@code ext_} plus the name lower-cased in {@link
+   * Locale#ROOT} with every run of characters outside {@code [a-z0-9]} replaced by an underscore.
+   * Locale-independent, so the rendered map and {@code DCA-MAP-003}'s collision check — which uses
+   * this method — agree on every machine.
+   */
+  public static String externalSystemNodeId(String name) {
+    return "ext_" + name.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_");
+  }
+
   private static String externalId(String name) {
-    return "ext_" + name.toLowerCase().replaceAll("[^a-z0-9]+", "_");
+    return externalSystemNodeId(name);
+  }
+
+  /** Text inside a markdown table cell: pipes escaped, line breaks flattened. */
+  private static String cell(String text) {
+    return text.replace("|", "\\|").replace("\r", " ").replace("\n", " ");
+  }
+
+  /** Text inside a quoted mermaid label: quotes as entities, line breaks flattened. */
+  private static String label(String text) {
+    return text.replace("\"", "#quot;").replace("\r", " ").replace("\n", " ");
   }
 
   private static String interactionName(ExternalUpstream.Interaction interaction) {
@@ -430,9 +455,7 @@ public final class ContextMapRenderer {
   }
 
   private String channelName(Upstream.Consumes channel) {
-    return channel == Upstream.Consumes.API
-        ? arch.layout().apiSubpackage()
-        : arch.layout().eventsSubpackage();
+    return arch.layout().channelSubpackage(channel);
   }
 
   private static String orDash(String value) {

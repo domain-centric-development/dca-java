@@ -1,7 +1,9 @@
 package dev.domaincentric.dca.archunit;
 
+import dev.domaincentric.dca.buildingblocks.ddd.strategic.relationships.Upstream;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 /**
  * Describes how a Domain-Centric Architecture code base is laid out in packages, so that the DCA
@@ -76,66 +78,104 @@ public final class DcaLayout {
   private final List<String> thirdPartyPackagesAllowedInDomain;
   private final FrameworkAnnotations frameworkAnnotations;
 
-  private DcaLayout(
-      String basePackage,
-      String sharedKernelSubpackage,
-      String domainSubpackage,
-      String applicationSubpackage,
-      String adapterSubpackage,
-      String incomingSubpackage,
-      String outgoingSubpackage,
-      String infrastructureSubpackage,
-      String apiSubpackage,
-      String eventsSubpackage,
-      String useCaseSuffix,
-      String restControllerSuffix,
-      List<String> thirdPartyPackagesAllowedInDomain,
-      FrameworkAnnotations frameworkAnnotations) {
-    this.basePackage = requireSegment(basePackage, "basePackage");
-    this.sharedKernelSubpackage = requireSegment(sharedKernelSubpackage, "sharedKernelSubpackage");
-    this.domainSubpackage = requireSegment(domainSubpackage, "domainSubpackage");
-    this.applicationSubpackage = requireSegment(applicationSubpackage, "applicationSubpackage");
-    this.adapterSubpackage = requireSegment(adapterSubpackage, "adapterSubpackage");
-    this.incomingSubpackage = requireSegment(incomingSubpackage, "incomingSubpackage");
-    this.outgoingSubpackage = requireSegment(outgoingSubpackage, "outgoingSubpackage");
+  private DcaLayout(Settings settings) {
+    this.basePackage = requirePackage(settings.basePackage, "basePackage");
+    this.sharedKernelSubpackage =
+        requireSegment(settings.sharedKernelSubpackage, "sharedKernelSubpackage");
+    this.domainSubpackage = requireSegment(settings.domainSubpackage, "domainSubpackage");
+    this.applicationSubpackage =
+        requireSegment(settings.applicationSubpackage, "applicationSubpackage");
+    this.adapterSubpackage = requireSegment(settings.adapterSubpackage, "adapterSubpackage");
+    this.incomingSubpackage = requireSegment(settings.incomingSubpackage, "incomingSubpackage");
+    this.outgoingSubpackage = requireSegment(settings.outgoingSubpackage, "outgoingSubpackage");
     this.infrastructureSubpackage =
-        requireSegment(infrastructureSubpackage, "infrastructureSubpackage");
-    this.apiSubpackage = requireSegment(apiSubpackage, "apiSubpackage");
-    this.eventsSubpackage = requireSegment(eventsSubpackage, "eventsSubpackage");
+        requireSegment(settings.infrastructureSubpackage, "infrastructureSubpackage");
+    this.apiSubpackage = requireSegment(settings.apiSubpackage, "apiSubpackage");
+    this.eventsSubpackage = requireSegment(settings.eventsSubpackage, "eventsSubpackage");
     if (apiSubpackage.equals(eventsSubpackage)) {
       throw new IllegalArgumentException(
           "apiSubpackage and eventsSubpackage must differ, both are '" + apiSubpackage + "'");
     }
-    this.useCaseSuffix = requireSegment(useCaseSuffix, "useCaseSuffix");
-    this.restControllerSuffix = requireSegment(restControllerSuffix, "restControllerSuffix");
-    this.thirdPartyPackagesAllowedInDomain = List.copyOf(thirdPartyPackagesAllowedInDomain);
-    this.frameworkAnnotations = Objects.requireNonNull(frameworkAnnotations);
+    this.useCaseSuffix = requireSuffix(settings.useCaseSuffix, "useCaseSuffix");
+    this.restControllerSuffix =
+        requireSuffix(settings.restControllerSuffix, "restControllerSuffix");
+    this.thirdPartyPackagesAllowedInDomain =
+        List.copyOf(
+            Objects.requireNonNull(
+                settings.thirdPartyPackagesAllowedInDomain, "thirdPartyPackagesAllowedInDomain"));
+    this.frameworkAnnotations =
+        Objects.requireNonNull(settings.frameworkAnnotations, "frameworkAnnotations");
   }
 
   /** The DCA default layout for the given base package. */
   public static DcaLayout forBasePackage(String basePackage) {
-    return new DcaLayout(
-        basePackage,
-        "sharedkernel",
-        "domain",
-        "application",
-        "adapter",
-        "incoming",
-        "outgoing",
-        "infrastructure",
-        "api",
-        "events",
-        "UseCase",
-        "Resource",
-        DEFAULT_THIRD_PARTY_ALLOWED_IN_DOMAIN,
-        FrameworkAnnotations.spring());
+    Settings defaults = new Settings();
+    defaults.basePackage = basePackage;
+    defaults.sharedKernelSubpackage = "sharedkernel";
+    defaults.domainSubpackage = "domain";
+    defaults.applicationSubpackage = "application";
+    defaults.adapterSubpackage = "adapter";
+    defaults.incomingSubpackage = "incoming";
+    defaults.outgoingSubpackage = "outgoing";
+    defaults.infrastructureSubpackage = "infrastructure";
+    defaults.apiSubpackage = "api";
+    defaults.eventsSubpackage = "events";
+    defaults.useCaseSuffix = "UseCase";
+    defaults.restControllerSuffix = "Resource";
+    defaults.thirdPartyPackagesAllowedInDomain = DEFAULT_THIRD_PARTY_ALLOWED_IN_DOMAIN;
+    defaults.frameworkAnnotations = FrameworkAnnotations.spring();
+    return new DcaLayout(defaults);
   }
 
+  /** A complete package name: dot-separated Java identifiers. */
+  private static String requirePackage(String value, String name) {
+    requireNotBlank(value, name);
+    for (String segment : value.split("\\.", -1)) {
+      if (!isJavaIdentifier(segment)) {
+        throw new IllegalArgumentException(name + " must be a package name, was '" + value + "'");
+      }
+    }
+    return value;
+  }
+
+  /** One package segment: a single Java identifier, no dots. */
   private static String requireSegment(String value, String name) {
+    requireNotBlank(value, name);
+    if (!isJavaIdentifier(value)) {
+      throw new IllegalArgumentException(
+          name + " must be a single package segment, was '" + value + "'");
+    }
+    return value;
+  }
+
+  /** A class-name suffix: part of a Java identifier. */
+  private static String requireSuffix(String value, String name) {
+    requireNotBlank(value, name);
+    for (int i = 0; i < value.length(); i++) {
+      if (!Character.isJavaIdentifierPart(value.charAt(i))) {
+        throw new IllegalArgumentException(
+            name + " must be part of a class name, was '" + value + "'");
+      }
+    }
+    return value;
+  }
+
+  private static void requireNotBlank(String value, String name) {
     if (value == null || value.isBlank()) {
       throw new IllegalArgumentException(name + " must not be blank");
     }
-    return value;
+  }
+
+  private static boolean isJavaIdentifier(String segment) {
+    if (segment.isEmpty() || !Character.isJavaIdentifierStart(segment.charAt(0))) {
+      return false;
+    }
+    for (int i = 1; i < segment.length(); i++) {
+      if (!Character.isJavaIdentifierPart(segment.charAt(i))) {
+        return false;
+      }
+    }
+    return true;
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -143,126 +183,35 @@ public final class DcaLayout {
   // ---------------------------------------------------------------------------------------------
 
   public DcaLayout withSharedKernelSubpackage(String value) {
-    return copy(
-        value,
-        domainSubpackage,
-        applicationSubpackage,
-        adapterSubpackage,
-        incomingSubpackage,
-        outgoingSubpackage,
-        infrastructureSubpackage,
-        apiSubpackage,
-        eventsSubpackage,
-        useCaseSuffix,
-        restControllerSuffix,
-        thirdPartyPackagesAllowedInDomain,
-        frameworkAnnotations);
+    return copy(settings -> settings.sharedKernelSubpackage = value);
   }
 
   public DcaLayout withDomainSubpackage(String value) {
-    return copy(
-        sharedKernelSubpackage,
-        value,
-        applicationSubpackage,
-        adapterSubpackage,
-        incomingSubpackage,
-        outgoingSubpackage,
-        infrastructureSubpackage,
-        apiSubpackage,
-        eventsSubpackage,
-        useCaseSuffix,
-        restControllerSuffix,
-        thirdPartyPackagesAllowedInDomain,
-        frameworkAnnotations);
+    return copy(settings -> settings.domainSubpackage = value);
   }
 
   public DcaLayout withApplicationSubpackage(String value) {
-    return copy(
-        sharedKernelSubpackage,
-        domainSubpackage,
-        value,
-        adapterSubpackage,
-        incomingSubpackage,
-        outgoingSubpackage,
-        infrastructureSubpackage,
-        apiSubpackage,
-        eventsSubpackage,
-        useCaseSuffix,
-        restControllerSuffix,
-        thirdPartyPackagesAllowedInDomain,
-        frameworkAnnotations);
+    return copy(settings -> settings.applicationSubpackage = value);
   }
 
   public DcaLayout withAdapterSubpackage(String value) {
-    return copy(
-        sharedKernelSubpackage,
-        domainSubpackage,
-        applicationSubpackage,
-        value,
-        incomingSubpackage,
-        outgoingSubpackage,
-        infrastructureSubpackage,
-        apiSubpackage,
-        eventsSubpackage,
-        useCaseSuffix,
-        restControllerSuffix,
-        thirdPartyPackagesAllowedInDomain,
-        frameworkAnnotations);
+    return copy(settings -> settings.adapterSubpackage = value);
   }
 
   /** Name of the incoming (driving/primary) adapter sub-package — {@code "in"} in some projects. */
   public DcaLayout withIncomingSubpackage(String value) {
-    return copy(
-        sharedKernelSubpackage,
-        domainSubpackage,
-        applicationSubpackage,
-        adapterSubpackage,
-        value,
-        outgoingSubpackage,
-        infrastructureSubpackage,
-        apiSubpackage,
-        eventsSubpackage,
-        useCaseSuffix,
-        restControllerSuffix,
-        thirdPartyPackagesAllowedInDomain,
-        frameworkAnnotations);
+    return copy(settings -> settings.incomingSubpackage = value);
   }
 
   /**
    * Name of the outgoing (driven/secondary) adapter sub-package — {@code "out"} in some projects.
    */
   public DcaLayout withOutgoingSubpackage(String value) {
-    return copy(
-        sharedKernelSubpackage,
-        domainSubpackage,
-        applicationSubpackage,
-        adapterSubpackage,
-        incomingSubpackage,
-        value,
-        infrastructureSubpackage,
-        apiSubpackage,
-        eventsSubpackage,
-        useCaseSuffix,
-        restControllerSuffix,
-        thirdPartyPackagesAllowedInDomain,
-        frameworkAnnotations);
+    return copy(settings -> settings.outgoingSubpackage = value);
   }
 
   public DcaLayout withInfrastructureSubpackage(String value) {
-    return copy(
-        sharedKernelSubpackage,
-        domainSubpackage,
-        applicationSubpackage,
-        adapterSubpackage,
-        incomingSubpackage,
-        outgoingSubpackage,
-        value,
-        apiSubpackage,
-        eventsSubpackage,
-        useCaseSuffix,
-        restControllerSuffix,
-        thirdPartyPackagesAllowedInDomain,
-        frameworkAnnotations);
+    return copy(settings -> settings.infrastructureSubpackage = value);
   }
 
   /**
@@ -272,20 +221,7 @@ public final class DcaLayout {
    * same name for the channel.
    */
   public DcaLayout withApiSubpackage(String value) {
-    return copy(
-        sharedKernelSubpackage,
-        domainSubpackage,
-        applicationSubpackage,
-        adapterSubpackage,
-        incomingSubpackage,
-        outgoingSubpackage,
-        infrastructureSubpackage,
-        value,
-        eventsSubpackage,
-        useCaseSuffix,
-        restControllerSuffix,
-        thirdPartyPackagesAllowedInDomain,
-        frameworkAnnotations);
+    return copy(settings -> settings.apiSubpackage = value);
   }
 
   /**
@@ -293,56 +229,17 @@ public final class DcaLayout {
    * e.g. {@code "events"} (default) or {@code "published"}.
    */
   public DcaLayout withEventsSubpackage(String value) {
-    return copy(
-        sharedKernelSubpackage,
-        domainSubpackage,
-        applicationSubpackage,
-        adapterSubpackage,
-        incomingSubpackage,
-        outgoingSubpackage,
-        infrastructureSubpackage,
-        apiSubpackage,
-        value,
-        useCaseSuffix,
-        restControllerSuffix,
-        thirdPartyPackagesAllowedInDomain,
-        frameworkAnnotations);
+    return copy(settings -> settings.eventsSubpackage = value);
   }
 
   /** Suffix of use-case implementations, e.g. {@code "UseCase"} or {@code "ApplicationService"}. */
   public DcaLayout withUseCaseSuffix(String value) {
-    return copy(
-        sharedKernelSubpackage,
-        domainSubpackage,
-        applicationSubpackage,
-        adapterSubpackage,
-        incomingSubpackage,
-        outgoingSubpackage,
-        infrastructureSubpackage,
-        apiSubpackage,
-        eventsSubpackage,
-        value,
-        restControllerSuffix,
-        thirdPartyPackagesAllowedInDomain,
-        frameworkAnnotations);
+    return copy(settings -> settings.useCaseSuffix = value);
   }
 
   /** Suffix of REST controllers, e.g. {@code "Resource"} or {@code "Controller"}. */
   public DcaLayout withRestControllerSuffix(String value) {
-    return copy(
-        sharedKernelSubpackage,
-        domainSubpackage,
-        applicationSubpackage,
-        adapterSubpackage,
-        incomingSubpackage,
-        outgoingSubpackage,
-        infrastructureSubpackage,
-        apiSubpackage,
-        eventsSubpackage,
-        useCaseSuffix,
-        value,
-        thirdPartyPackagesAllowedInDomain,
-        frameworkAnnotations);
+    return copy(settings -> settings.restControllerSuffix = value);
   }
 
   /**
@@ -350,20 +247,7 @@ public final class DcaLayout {
    * list ({@code java..}, {@code lombok..}, commons-lang3, commons-collections4, jspecify).
    */
   public DcaLayout withThirdPartyPackagesAllowedInDomain(List<String> patterns) {
-    return copy(
-        sharedKernelSubpackage,
-        domainSubpackage,
-        applicationSubpackage,
-        adapterSubpackage,
-        incomingSubpackage,
-        outgoingSubpackage,
-        infrastructureSubpackage,
-        apiSubpackage,
-        eventsSubpackage,
-        useCaseSuffix,
-        restControllerSuffix,
-        patterns,
-        frameworkAnnotations);
+    return copy(settings -> settings.thirdPartyPackagesAllowedInDomain = patterns);
   }
 
   /** Adds third-party packages to the domain allow-list. */
@@ -375,51 +259,46 @@ public final class DcaLayout {
 
   /** Fully qualified names of the framework annotations the rules look for. Defaults to Spring. */
   public DcaLayout withFrameworkAnnotations(FrameworkAnnotations value) {
-    return copy(
-        sharedKernelSubpackage,
-        domainSubpackage,
-        applicationSubpackage,
-        adapterSubpackage,
-        incomingSubpackage,
-        outgoingSubpackage,
-        infrastructureSubpackage,
-        apiSubpackage,
-        eventsSubpackage,
-        useCaseSuffix,
-        restControllerSuffix,
-        thirdPartyPackagesAllowedInDomain,
-        value);
+    return copy(settings -> settings.frameworkAnnotations = value);
   }
 
-  private DcaLayout copy(
-      String sharedKernelSubpackage,
-      String domainSubpackage,
-      String applicationSubpackage,
-      String adapterSubpackage,
-      String incomingSubpackage,
-      String outgoingSubpackage,
-      String infrastructureSubpackage,
-      String apiSubpackage,
-      String eventsSubpackage,
-      String useCaseSuffix,
-      String restControllerSuffix,
-      List<String> thirdPartyPackagesAllowedInDomain,
-      FrameworkAnnotations frameworkAnnotations) {
-    return new DcaLayout(
-        basePackage,
-        sharedKernelSubpackage,
-        domainSubpackage,
-        applicationSubpackage,
-        adapterSubpackage,
-        incomingSubpackage,
-        outgoingSubpackage,
-        infrastructureSubpackage,
-        apiSubpackage,
-        eventsSubpackage,
-        useCaseSuffix,
-        restControllerSuffix,
-        thirdPartyPackagesAllowedInDomain,
-        frameworkAnnotations);
+  /** This layout with one setting changed; validation runs in the constructor as always. */
+  private DcaLayout copy(Consumer<Settings> change) {
+    Settings settings = new Settings();
+    settings.basePackage = basePackage;
+    settings.sharedKernelSubpackage = sharedKernelSubpackage;
+    settings.domainSubpackage = domainSubpackage;
+    settings.applicationSubpackage = applicationSubpackage;
+    settings.adapterSubpackage = adapterSubpackage;
+    settings.incomingSubpackage = incomingSubpackage;
+    settings.outgoingSubpackage = outgoingSubpackage;
+    settings.infrastructureSubpackage = infrastructureSubpackage;
+    settings.apiSubpackage = apiSubpackage;
+    settings.eventsSubpackage = eventsSubpackage;
+    settings.useCaseSuffix = useCaseSuffix;
+    settings.restControllerSuffix = restControllerSuffix;
+    settings.thirdPartyPackagesAllowedInDomain = thirdPartyPackagesAllowedInDomain;
+    settings.frameworkAnnotations = frameworkAnnotations;
+    change.accept(settings);
+    return new DcaLayout(settings);
+  }
+
+  /** The mutable carrier the fluent overrides edit before the constructor validates them. */
+  private static final class Settings {
+    String basePackage;
+    String sharedKernelSubpackage;
+    String domainSubpackage;
+    String applicationSubpackage;
+    String adapterSubpackage;
+    String incomingSubpackage;
+    String outgoingSubpackage;
+    String infrastructureSubpackage;
+    String apiSubpackage;
+    String eventsSubpackage;
+    String useCaseSuffix;
+    String restControllerSuffix;
+    List<String> thirdPartyPackagesAllowedInDomain;
+    FrameworkAnnotations frameworkAnnotations;
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -523,6 +402,20 @@ public final class DcaLayout {
   /** {@code base.infrastructure..} */
   public String infrastructurePattern() {
     return infrastructurePackage() + "..";
+  }
+
+  /** {@code base.cart.infrastructure} — a module's own infrastructure package (no suffix). */
+  public String infrastructurePackage(String modulePackage) {
+    return modulePackage + "." + infrastructureSubpackage;
+  }
+
+  /**
+   * The sub-package a consumed channel maps to: {@link #apiSubpackage()} for {@link
+   * Upstream.Consumes#API}, {@link #eventsSubpackage()} for {@link Upstream.Consumes#EVENTS}. The
+   * context-map rules and the renderer name channels through this one method.
+   */
+  public String channelSubpackage(Upstream.Consumes channel) {
+    return channel == Upstream.Consumes.API ? apiSubpackage : eventsSubpackage;
   }
 
   /**

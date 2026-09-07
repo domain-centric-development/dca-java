@@ -1,101 +1,251 @@
 package dev.domaincentric.dca.archunit.rules;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.tngtech.archunit.core.importer.ClassFileImporter;
-import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
-import dev.domaincentric.dca.archunit.DcaRule;
-import dev.domaincentric.dca.archunit.DcaRuleViolation;
-import java.util.Set;
+import dev.domaincentric.dca.archunit.Fixtures;
+import java.util.List;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.DynamicTest;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 
 class UseCaseRulesTest {
 
-  private static final String FIXTURES = "dev.domaincentric.dca.archunit.fixtures.usecase";
+  private static final String FIXTURES = Fixtures.ROOT + ".usecase";
+  private static final String TRANSACTIONS = Fixtures.ROOT + ".transactions";
 
-  /** Rules without a negative fixture, with the reason. */
-  private static final Set<String> NO_NEGATIVE_FIXTURE = Set.of();
-
-  static DcaArchitecture arch(String pkg) {
-    return DcaArchitecture.of(
-        DcaLayout.forBasePackage(pkg), new ClassFileImporter().importPackages(pkg));
+  @Test
+  void idsAreSequential() {
+    Fixtures.assertIdsAreSequential(new UseCaseRules(DcaLayout.forBasePackage("x")), "USE");
   }
 
   @TestFactory
   Stream<DynamicTest> goodFixturePasses() {
-    DcaArchitecture good = arch(FIXTURES + ".good");
-    return new UseCaseRules(good.layout())
-        .rules().stream()
-            .map(
-                rule ->
-                    DynamicTest.dynamicTest(
-                        rule.toString(), () -> assertDoesNotThrow(() -> rule.check(good))));
+    return Fixtures.goodFixturePasses(UseCaseRules::new, FIXTURES + ".good");
   }
 
+  /** Every use-case rule has a negative fixture. */
   @TestFactory
   Stream<DynamicTest> badFixtureFails() {
-    DcaArchitecture bad = arch(FIXTURES + ".bad");
-    return new UseCaseRules(bad.layout())
-        .rules().stream()
-            .filter(rule -> !NO_NEGATIVE_FIXTURE.contains(rule.id()))
-            .map(
-                rule ->
-                    DynamicTest.dynamicTest(
-                        rule.toString(),
-                        () -> assertThrows(AssertionError.class, () -> rule.check(bad))));
+    return Fixtures.badFixtureFails(UseCaseRules::new, FIXTURES + ".bad");
   }
 
-  @TestFactory
-  Stream<DynamicTest> idsAreSequential() {
-    java.util.List<DcaRule> rules = new UseCaseRules(DcaLayout.forBasePackage("x")).rules();
-    return Stream.of(
-        DynamicTest.dynamicTest(
-            "ids numbered from 001 in order",
-            () -> {
-              for (int i = 0; i < rules.size(); i++) {
-                String expected =
-                    String.format("DCA-%s-%03d", "UseCase".equals("Naming") ? "NAM" : "USE", i + 1);
-                if (!rules.get(i).id().equals(expected)) {
-                  throw new AssertionError(rules.get(i).id() + " != " + expected);
-                }
-              }
-            }));
+  @Nested
+  @DisplayName("DCA-USE-015 — results carry no identities")
+  class ResultShape {
+
+    private List<String> violations() {
+      return Fixtures.violation(FIXTURES + ".bad", "DCA-USE-015").violations();
+    }
+
+    @Test
+    @DisplayName(
+        "names every path to an identity: generic arguments, nested and shared part records")
+    void namesEveryPathToAnIdentity() {
+      List<String> violations = violations();
+      assertTrue(
+          violations.contains("ListOrdersResult.orders : Order (AggregateRoot)"),
+          violations.toString());
+      assertTrue(
+          violations.contains(
+              "ListOrdersResult.highlight -> Highlight.order : Order (AggregateRoot)"),
+          violations.toString());
+      assertTrue(
+          violations.contains(
+              "ListOrdersResult.firstLine -> OrderLine.item : OrderLineItem (Entity)"),
+          violations.toString());
+      assertTrue(
+          violations.contains("ListOrdersResult.parts -> OrderPart.item : OrderLineItem (Entity)"),
+          "a part record shared in application.shared is walked: " + violations);
+      assertTrue(
+          violations.stream().noneMatch(v -> v.startsWith("PlaceOrderResult")),
+          "a result of values is not reported: " + violations);
+    }
+
+    /** The same part record reached through two fields is reported on both paths. */
+    @Test
+    @DisplayName("reports every path through a part record, not only the first")
+    void reportsEveryPathThroughTheSamePartRecord() {
+      List<String> violations = violations();
+      assertTrue(
+          violations.contains(
+              "ListOrdersResult.lastLine -> OrderLine.item : OrderLineItem (Entity)"),
+          violations.toString());
+    }
+
+    /** An instance field inherited from a base class without the suffix is part of the result. */
+    @Test
+    @DisplayName("includes inherited instance fields")
+    void includesInheritedFields() {
+      List<String> violations = violations();
+      assertTrue(
+          violations.contains("ArchivedOrdersResult.pinned : Order (AggregateRoot)"),
+          violations.toString());
+    }
+
+    /**
+     * {@code GenericBase<T>} declares {@code T value}; the result binds {@code T}. The inherited
+     * field is read in the subclass's context, through every level of the hierarchy and inside
+     * containers bound to the parameter.
+     */
+    @Test
+    @DisplayName("resolves inherited generic fields in the result's context")
+    void resolvesInheritedGenericFields() {
+      List<String> violations = violations();
+      assertTrue(
+          violations.contains("GenericOrderResult.value : Order (AggregateRoot)"),
+          "T = Order: " + violations);
+      assertTrue(
+          violations.contains("BatchedOrdersResult.value : Order (AggregateRoot)"),
+          "T = List<U>, U = Order: " + violations);
+      assertTrue(
+          violations.contains("OrdersByRegionResult.value : Order (AggregateRoot)"),
+          "T = Map<String, List<Order>>: " + violations);
+      assertTrue(
+          violations.contains("LineItemResult.value : OrderLineItem (Entity)"),
+          "T = an entity: " + violations);
+    }
+
+    /** A type parameter alone exposes nothing; only fields do. */
+    @Test
+    @DisplayName("reports a bound type parameter only through a field that uses it")
+    void reportsBoundParametersOnlyThroughFields() {
+      List<String> violations = violations();
+      assertTrue(
+          violations.stream().noneMatch(v -> v.contains("count")),
+          "the int field next to T is not reported: " + violations);
+      // the good fixture's OrderCountResult extends UnusedParameterBase<Order> and the results
+      // binding T to String, OrderId and Money all pass - see goodFixturePasses
+    }
   }
 
-  /** DCA-USE-015 walks generic arguments, nested part records and same-package part records. */
-  @Test
-  void resultRuleNamesEveryPathToAnIdentity() {
-    DcaArchitecture bad = arch(FIXTURES + ".bad");
-    DcaRuleViolation violation =
-        assertThrows(
-            DcaRuleViolation.class,
-            () -> UseCaseRules.resultsMustNotExposeAggregatesOrEntities(bad.layout()).check(bad));
-    assertTrue(
-        violation.violations().contains("ListOrdersResult.orders : Order (AggregateRoot)"),
-        violation.toString());
-    assertTrue(
-        violation
-            .violations()
-            .contains("ListOrdersResult.highlight -> Highlight.order : Order (AggregateRoot)"),
-        violation.toString());
-    assertTrue(
-        violation
-            .violations()
-            .contains("ListOrdersResult.firstLine -> OrderLine.item : OrderLineItem (Entity)"),
-        violation.toString());
-    assertTrue(
-        violation
-            .violations()
-            .contains("ListOrdersResult.parts -> OrderPart.item : OrderLineItem (Entity)"),
-        "a part record shared in application.shared is walked: " + violation);
-    assertTrue(
-        violation.violations().stream().noneMatch(v -> v.startsWith("PlaceOrderResult")),
-        "a result of values is not reported: " + violation);
+  /**
+   * Transaction placement is checked per method, following calls within the class: the method that
+   * publishes must be transactional itself, or be reached from one that is (or that draws a
+   * boundary). Whether a call sits inside the block handed to {@code inTransaction} is beyond
+   * bytecode analysis — ArchUnit attributes a lambda's calls to the enclosing method — and is
+   * documented as the remaining limit.
+   */
+  @Nested
+  @DisplayName("DCA-USE-009 / DCA-USE-012 — transaction placement per method")
+  class TransactionPlacement {
+
+    @Test
+    @DisplayName("a transactional executing method may delegate save and publish to a helper")
+    void annotatedMethodReachingAHelperPasses() {
+      String message = Fixtures.failure(TRANSACTIONS, "DCA-USE-012").getMessage();
+      assertFalse(message.contains("AnnotatedExecuteUseCase"), message);
+      String saves = Fixtures.failure(TRANSACTIONS, "DCA-USE-009").getMessage();
+      assertFalse(saves.contains("AnnotatedExecuteUseCase"), saves);
+    }
+
+    @Test
+    @DisplayName("a boundary drawn in the publishing method passes")
+    void boundaryAroundPublicationPasses() {
+      String message = Fixtures.failure(TRANSACTIONS, "DCA-USE-012").getMessage();
+      assertFalse(message.contains("BoundaryAroundUseCase"), message);
+    }
+
+    @Test
+    @DisplayName("an annotation on an unrelated method does not cover the publishing method")
+    void unrelatedAnnotatedMethodDoesNotCount() {
+      String message = Fixtures.failure(TRANSACTIONS, "DCA-USE-012").getMessage();
+      assertTrue(message.contains("UnrelatedAnnotationUseCase"), message);
+      assertTrue(message.contains("execute"), "names the publishing method: " + message);
+    }
+
+    @Test
+    @DisplayName("a boundary in another method does not cover the publishing method")
+    void boundaryElsewhereDoesNotCount() {
+      String message = Fixtures.failure(TRANSACTIONS, "DCA-USE-012").getMessage();
+      assertTrue(message.contains("BoundaryElsewhereUseCase"), message);
+      assertTrue(message.contains("notifyLater"), "names the publishing method: " + message);
+    }
+
+    @Test
+    @DisplayName("a publication in an unconnected method does not cover the saving method")
+    void publicationInUnconnectedMethodDoesNotCount() {
+      String message = Fixtures.failure(TRANSACTIONS, "DCA-USE-009").getMessage();
+      assertTrue(message.contains("SaveWithoutPublishUseCase"), message);
+      assertTrue(message.contains("execute"), "names the saving method: " + message);
+    }
+
+    @Test
+    @DisplayName("a helper two entry methods share does not connect their execution paths")
+    void sharedHelperDoesNotConnectEntryMethods() {
+      String message = Fixtures.failure(TRANSACTIONS, "DCA-USE-009").getMessage();
+      assertTrue(message.contains("SharedHelperUseCase.execute"), message);
+    }
+
+    @Test
+    @DisplayName("an entry method may save through one helper and publish through another")
+    void splitHelpersPass() {
+      String message = Fixtures.failure(TRANSACTIONS, "DCA-USE-009").getMessage();
+      assertFalse(message.contains("SplitHelpersUseCase"), message);
+      String tx = Fixtures.failure(TRANSACTIONS, "DCA-USE-012").getMessage();
+      assertFalse(tx.contains("SplitHelpersUseCase"), tx);
+    }
+
+    @Test
+    @DisplayName("delegation over several steps is followed")
+    void multiStepDelegationPasses() {
+      String message = Fixtures.failure(TRANSACTIONS, "DCA-USE-009").getMessage();
+      assertFalse(message.contains("MultiStepUseCase"), message);
+      String tx = Fixtures.failure(TRANSACTIONS, "DCA-USE-012").getMessage();
+      assertFalse(tx.contains("MultiStepUseCase"), tx);
+    }
+
+    @Test
+    @DisplayName("a shared saving helper is judged per entry path")
+    void sharedSaveHelperIsJudgedPerEntryPath() {
+      String message = Fixtures.failure(TRANSACTIONS, "DCA-USE-009").getMessage();
+      assertTrue(message.contains("SharedSaveHelperUseCase.executeQuietly"), message);
+      assertFalse(
+          message.contains("SharedSaveHelperUseCase.execute "),
+          "the publishing entry path is not reported: " + message);
+    }
+
+    @Test
+    @DisplayName("recursive and mutually recursive helpers terminate")
+    void recursionTerminates() {
+      String message = Fixtures.failure(TRANSACTIONS, "DCA-USE-009").getMessage();
+      assertFalse(message.contains("RecursiveSaveUseCase"), message);
+      assertTrue(message.contains("MutualRecursionUseCase.ping"), message);
+    }
+
+    @Test
+    @DisplayName("a public method stays an entry point when another method calls it")
+    void publicMethodCalledInternallyIsStillAnEntryPoint() {
+      String saves = Fixtures.failure(TRANSACTIONS, "DCA-USE-009").getMessage();
+      assertTrue(saves.contains("DirectEntryUseCase.execute"), saves);
+      assertFalse(saves.contains("DirectEntryUseCase.complete"), saves);
+      String tx = Fixtures.failure(TRANSACTIONS, "DCA-USE-012").getMessage();
+      assertTrue(tx.contains("PublicWrapperUseCase.execute"), tx);
+      assertFalse(tx.contains("PublicWrapperUseCase.complete"), tx);
+    }
+
+    @Test
+    @DisplayName("a boundary on one route to the publisher does not cover another route")
+    void mixedDiamondIsReportedCoveredDiamondPasses() {
+      String tx = Fixtures.failure(TRANSACTIONS, "DCA-USE-012").getMessage();
+      assertTrue(tx.contains("MixedDiamondUseCase.execute"), tx);
+      assertFalse(tx.contains("CoveredDiamondUseCase"), tx);
+      String saves = Fixtures.failure(TRANSACTIONS, "DCA-USE-009").getMessage();
+      assertFalse(saves.contains("DiamondUseCase"), saves);
+    }
+
+    @Test
+    @DisplayName("a shared publishing helper is transactional per entry path")
+    void sharedPublishHelperIsJudgedPerEntryPath() {
+      String message = Fixtures.failure(TRANSACTIONS, "DCA-USE-012").getMessage();
+      assertTrue(message.contains("SharedPublishHelperUseCase.executeQuietly"), message);
+      assertFalse(
+          message.contains("SharedPublishHelperUseCase.execute "),
+          "the annotated entry path is not reported: " + message);
+    }
   }
 }

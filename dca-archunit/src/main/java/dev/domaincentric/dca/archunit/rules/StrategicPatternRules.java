@@ -16,6 +16,7 @@ import dev.domaincentric.dca.buildingblocks.ddd.tactical.IntegrationEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * DDD strategic pattern rules: shared-kernel independence, bounded-context isolation, Open Host
@@ -83,28 +84,30 @@ public final class StrategicPatternRules implements DcaRuleSet {
         "Shared Kernel must not have dependencies on any bounded context",
         "Shared Kernel must be context-independent — it is shared by all contexts and owned by"
             + " none",
-        arch ->
-            arch.sharedKernelPackage()
-                .ifPresent(
-                    sharedKernel -> {
-                      for (Map.Entry<String, BoundedContext> ctx :
-                          arch.boundedContexts().entrySet()) {
-                        noClasses()
-                            .that()
-                            .resideInAPackage(sharedKernel + "..")
-                            .should()
-                            .dependOnClassesThat()
-                            .resideInAPackage(ctx.getKey() + "..")
-                            .allowEmptyShould(true)
-                            .because(
-                                "Shared Kernel must not depend on bounded context '"
-                                    + ctx.getValue().name()
-                                    + "' ("
-                                    + ctx.getKey()
-                                    + ") - Shared Kernel must be context-independent")
-                            .check(arch.classes());
-                      }
-                    }));
+        arch -> {
+          Optional<String> sharedKernel = arch.sharedKernelPackage();
+          if (sharedKernel.isEmpty()) {
+            return;
+          }
+          CollectedViolations violations = CollectedViolations.withoutHeader();
+          for (Map.Entry<String, BoundedContext> ctx : arch.boundedContexts().entrySet()) {
+            violations.addAll(
+                noClasses()
+                    .that()
+                    .resideInAPackage(sharedKernel.get() + "..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage(ctx.getKey() + "..")
+                    .allowEmptyShould(true),
+                arch.classes(),
+                "Shared Kernel must not depend on bounded context '"
+                    + ctx.getValue().name()
+                    + "' ("
+                    + ctx.getKey()
+                    + ") - Shared Kernel must be context-independent");
+          }
+          violations.throwIfAny();
+        });
   }
 
   /**

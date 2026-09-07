@@ -11,6 +11,7 @@ import dev.domaincentric.dca.archunit.rules.StrategicPatternRules;
 import dev.domaincentric.dca.archunit.rules.TacticalPatternRules;
 import dev.domaincentric.dca.archunit.rules.UseCaseRules;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -115,25 +116,40 @@ public final class DcaRules {
     }
   }
 
-  /** Every rule identifier of the catalog, in catalog order. */
+  /** Every rule identifier of the catalog, in catalog order. Unmodifiable. */
   public static Set<String> allIds() {
-    Set<String> ids = new LinkedHashSet<>();
-    all(CATALOG_LAYOUT).forEach(rule -> ids.add(rule.id()));
-    return ids;
+    return Catalog.IDS;
   }
 
-  /** The names of the ten rule sets, in catalog order. */
+  /** The names of the ten rule sets, in catalog order. Unmodifiable. */
   public static Set<String> setNames() {
-    Set<String> names = new LinkedHashSet<>();
-    ruleSets(CATALOG_LAYOUT).forEach(set -> names.add(set.name()));
-    return names;
+    return Catalog.BY_SET.keySet();
   }
 
   /** The catalog keyed by set name — used to resolve set-wide configuration to rule identifiers. */
   static Map<String, List<DcaRule>> ruleSetsByName() {
-    Map<String, List<DcaRule>> byName = new LinkedHashMap<>();
-    ruleSets(CATALOG_LAYOUT).forEach(set -> byName.put(set.name(), set.rules()));
-    return byName;
+    return Catalog.BY_SET;
+  }
+
+  /**
+   * The catalog's metadata — ids and set names — built once. Every {@code DcaRuleSelection} setting
+   * validates its id against it, and a set-wide setting resolves every id of the set; rebuilding
+   * ten rule sets for each of those lookups is wasted work.
+   */
+  private static final class Catalog {
+    static final Map<String, List<DcaRule>> BY_SET;
+    static final Set<String> IDS;
+
+    static {
+      Map<String, List<DcaRule>> bySet = new LinkedHashMap<>();
+      Set<String> ids = new LinkedHashSet<>();
+      for (DcaRuleSet set : ruleSets(CATALOG_LAYOUT)) {
+        bySet.put(set.name(), set.rules());
+        set.rules().forEach(rule -> ids.add(rule.id()));
+      }
+      BY_SET = Collections.unmodifiableMap(bySet);
+      IDS = Collections.unmodifiableSet(ids);
+    }
   }
 
   private record SelectedRuleSet(String name, List<DcaRule> rules) implements DcaRuleSet {}

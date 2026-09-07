@@ -1,11 +1,14 @@
 package dev.domaincentric.dca.archunit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tngtech.archunit.core.importer.ClassFileImporter;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -106,6 +109,11 @@ class DcaRuleExecutionTest {
     assertEquals(DcaRuleOutcome.Status.PASSED, tolerated.status());
   }
 
+  /**
+   * The baseline is taken from one state of the code and a later state is judged against it. Here
+   * the baseline is a fixture without violations and the later state a fixture with them, so every
+   * violation is new — the same store, a different architecture.
+   */
   @Test
   void freezingAcceptsTodaysViolationsAndFailsOnNewOnes(@TempDir Path store) {
     DcaRuleSelection frozen =
@@ -115,14 +123,86 @@ class DcaRuleExecutionTest {
         DcaRuleOutcome.Status.PASSED,
         execute(BAD, ARCH_RULE, frozen).status(),
         "first run records the baseline");
+    assertTrue(Files.isDirectory(store.resolve("frozen")), "the store was written");
     assertEquals(
         DcaRuleOutcome.Status.PASSED,
         execute(BAD, ARCH_RULE, frozen).status(),
         "the same violations stay accepted");
+
+    DcaRuleSelection freshBaseline =
+        DcaRuleSelection.all().frozen(ARCH_RULE).withFreezeStore(store.resolve("empty"));
+    assertEquals(
+        DcaRuleOutcome.Status.PASSED,
+        execute(GOOD, ARCH_RULE, freshBaseline).status(),
+        "a clean fixture records an empty baseline");
+    DcaRuleOutcome newViolation = execute(BAD, ARCH_RULE, freshBaseline);
     assertEquals(
         DcaRuleOutcome.Status.FAILED,
-        execute(BAD, ARCH_RULE, DcaRuleSelection.all()).status(),
-        "without the baseline the rule still fails");
+        newViolation.status(),
+        "a violation absent from the baseline fails: " + newViolation.message());
+    assertTrue(newViolation.message().contains("PlaceOrderService"), newViolation.message());
+  }
+
+  /**
+   * Tolerating one violation must never hide another: a rule that finds several has to collect them
+   * all before the exceptions are applied. One fixture, four rules of different mechanics —
+   * reflective checks, one ArchUnit rule per edge, two ArchUnit rules in sequence, one per context.
+   */
+  @Nested
+  class IgnoringOneOfSeveralViolations {
+
+    private static final String COLLECT = "dev.domaincentric.dca.archunit.fixtures.collect";
+
+    private void assertOtherViolationRemains(String ruleId, String ignored, String remaining) {
+      DcaRuleOutcome enforced = execute(COLLECT, ruleId, DcaRuleSelection.all());
+      assertEquals(DcaRuleOutcome.Status.FAILED, enforced.status(), ruleId + " has violations");
+      assertTrue(enforced.message().contains(ignored), enforced.message());
+      assertTrue(enforced.message().contains(remaining), enforced.message());
+
+      DcaRuleOutcome tolerated =
+          execute(
+              COLLECT,
+              ruleId,
+              DcaRuleSelection.all().ignoringViolationsMatching(ruleId, ".*" + ignored + ".*"));
+      assertEquals(
+          DcaRuleOutcome.Status.FAILED,
+          tolerated.status(),
+          ruleId + " must still fail on " + remaining + ": " + tolerated.message());
+      assertFalse(tolerated.message().contains(ignored), tolerated.message());
+      assertTrue(tolerated.message().contains(remaining), tolerated.message());
+    }
+
+    @Test
+    void danglingUpstreams() {
+      assertOtherViolationRemains("DCA-MAP-004", "missingOne", "missingTwo");
+    }
+
+    @Test
+    void undeclaredCrossContextDependencies() {
+      assertOtherViolationRemains("DCA-MAP-011", "ProductInfo", "PriceQuote");
+    }
+
+    @Test
+    void transactionBoundariesOutsideTheApplicationLayer() {
+      assertOtherViolationRemains("DCA-LAY-004", "CartController", "Cart");
+    }
+
+    @Test
+    void sharedKernelDependingOnSeveralContexts() {
+      assertOtherViolationRemains("DCA-STR-002", "ProductInfo", "PriceQuote");
+    }
+  }
+
+  /** A regular expression is applied as written — a quantifier such as {@code {1,3}} included. */
+  @Test
+  void aToleratedPatternMayContainACommaQuantifier() {
+    DcaRuleOutcome outcome =
+        execute(
+            BAD,
+            ARCH_RULE,
+            DcaRuleSelection.all().ignoringViolationsMatching(ARCH_RULE, "PlaceOrderServ.{1,3}"));
+
+    assertEquals(DcaRuleOutcome.Status.PASSED, outcome.status(), outcome.message());
   }
 
   @Test

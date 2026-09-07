@@ -12,8 +12,11 @@ subprojects {
 
     group = "dev.domaincentric"
 
+    // Build and test on 21 by default; -PjavaToolchain=17 runs the same build on the oldest
+    // supported runtime, which is how the "Java 17+" claim is verified (CI runs both).
+    val javaToolchain = providers.gradleProperty("javaToolchain").map(String::toInt).getOrElse(21)
     extensions.configure<JavaPluginExtension> {
-        toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+        toolchain.languageVersion.set(JavaLanguageVersion.of(javaToolchain))
     }
 
     tasks.withType<JavaCompile>().configureEach {

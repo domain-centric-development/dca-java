@@ -26,20 +26,21 @@ package dev.domaincentric.dca.buildingblocks.ddd.tactical;
  *
  * <p><b>Example:</b>
  *
- * <pre>
- * public class ProductAvailabilitySpecification implements Specification {
+ * <pre>{@code
+ * public final class ProductAvailabilitySpecification implements Specification<Product> {
+ *   @Override
  *   public boolean isSatisfiedBy(Product product) {
  *     return product.isAvailable();
  *   }
  *
- *   public Specification and(Specification other) {
- *     return new AndSpecification(this, other);
+ *   public Specification<Product> and(Specification<Product> other) {
+ *     return candidate -> isSatisfiedBy(candidate) && other.isSatisfiedBy(candidate);
  *   }
  * }
- * </pre>
+ * }</pre>
  *
- * <p><b>Pattern:</b> Typically implements a method like {@code isSatisfiedBy(T candidate)} to
- * evaluate the specification.
+ * <p><b>Pattern:</b> the interface is generic in the candidate type; {@link #isSatisfiedBy(Object)}
+ * evaluates the specification for one candidate.
  *
  * <p><b>References:</b>
  *
@@ -52,5 +53,6 @@ package dev.domaincentric.dca.buildingblocks.ddd.tactical;
  * @see <a href="https://www.domainlanguage.com/ddd/">Domain-Driven Design Reference</a>
  */
 public interface Specification<T> {
+  /** Whether the candidate satisfies this specification. */
   boolean isSatisfiedBy(T candidate);
 }

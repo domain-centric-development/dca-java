@@ -11,7 +11,9 @@ Hexagonal Architecture and Clean Architecture.
 | `dev.domaincentric:dca-building-blocks` | The building blocks your code implements: DDD tactical markers (`AggregateRoot`, `Entity`, `Value`, `DomainEvent`, …), strategic annotations (`@BoundedContext`, `@SharedKernel`, `@Upstream`, `@Partnership`, …) and hexagonal port interfaces (`UseCase`, `Repository`, `Store`, …) and the application-layer `TransactionBoundary` | none |
 | `dev.domaincentric:dca-archunit` | The governance rules: ~110 ArchUnit rules pinned to those building blocks, plus an executable context map | `dca-building-blocks`, ArchUnit |
 
-Both target Java 17+. Versions are independent; see [Versioning](#versioning).
+Both target Java 17+ — built with a Java 21 toolchain at `--release 17`, and the test suite runs on a
+Java 17 runtime as well (`./gradlew test -PjavaToolchain=17`, part of CI). Versions are independent;
+see [Versioning](#versioning).
 
 ## Quick start
 
@@ -125,20 +127,33 @@ dca.rule.DCA-NAM-002.reason = no DI framework in this project
 dca.rules.warn              = DCA-TAC-009
 dca.rules.warn.sets         = naming
 dca.rule.DCA-STR-003.ignore = .*legacy.*
+dca.rule.DCA-STR-003.ignore.1 = Generated.{1,3}Client
 dca.rules.freeze            = DCA-ONI-002
 dca.rules.freeze.store      = arch/frozen
 ```
 
 An unknown rule id or set name fails the run immediately — a typo must never leave a rule silently
-enforced.
+enforced. The value of an `.ignore` key is **one** regular expression, commas included (`{1,3}` is a
+quantifier, not a separator); a second expression for the same rule goes into an indexed key
+(`.ignore.1`, `.ignore.2`, …). Rule-id and set lists stay comma-separated.
 
 Both sources combine: the file is the base, `additionalSelection()` is merged on top, and the later
 entry wins per rule id. Override `additionalSelection()`, not `selection()` — the latter *replaces*
 the file, so a `dca-archunit.properties` added later would be ignored without a word.
 
-**One limitation.** Freezing needs a single ArchUnit rule to build the baseline from. The rules that
+**Two limitations.** Freezing needs a single ArchUnit rule to build the baseline from. The rules that
 run several checks internally — the context-map set and those iterating over bounded contexts —
 cannot be frozen; freezing one fails with a message naming it. Lower those to `warning(...)` instead.
+And the transaction rules (`DCA-USE-009`, `-012`, `-013`) reason per *entry path*, following the directed
+calls within the use case class: an entry point (a method callable from outside the class, or one nothing
+in the class calls) may save through one helper and publish through another, and from every entry point no
+route down to a publication may be free of `@Transactional` or `TransactionBoundary.inTransaction(...)` —
+a helper two entry methods share does not connect them, an annotated caller does not cover another path to
+the same helper, a publishing wrapper does not cover a direct call of the public method it wraps, and a
+boundary on one route does not cover a second route to the same publisher. What they cannot see: ArchUnit folds a lambda's body into the enclosing method (the synthetic
+`lambda$…` methods are not code units of the imported class), so whether a call sits *inside* the block
+handed to `inTransaction`, in which order two calls run, and whether save and publication concern the
+same aggregate are review checks.
 
 Without JUnit's base class:
 
@@ -202,8 +217,13 @@ Tags: `building-blocks/vX.Y.Z`, `archunit/vX.Y.Z` — one tag per released artif
 ```
 ./gradlew build                      # both artifacts, all self-tests
 ./gradlew :dca-archunit:test         # rule self-tests against good/bad fixtures
+./gradlew test -PjavaToolchain=17    # the same tests on the oldest supported runtime
 ./gradlew publishToMavenLocal        # try a snapshot in another project
 ```
+
+`samples/minimal-consumer` is the consumer's view: `./gradlew test -PwithDcaJava` there runs it against
+this checkout, `./gradlew test -PfromMavenLocal -PbuildingBlocksVersion=… -ParchunitVersion=…` against
+what `publishToMavenLocal` produced — POM, module metadata and packaged license included.
 
 Without a local JDK, the same through Docker (Podman works too): `docker compose run --rm build`
 runs the build with a cached dependency volume, `docker compose run --rm catalog` renders

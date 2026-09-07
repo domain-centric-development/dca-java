@@ -23,11 +23,9 @@ package dev.domaincentric.dca.buildingblocks.hexagonal.port.in;
  * <p><b>Example:</b>
  *
  * <pre>{@code
- * public interface CreateProductCommandPort extends UseCase<CreateProductCommand, CreateProductResult> {
- *     CreateProductResult execute(CreateProductCommand input);
- * }
+ * public interface CreateProductInputPort extends UseCase<CreateProductCommand, CreateProductResult> {}
  *
- * public class CreateProductUseCase implements CreateProductCommandPort {
+ * public class CreateProductUseCase implements CreateProductInputPort {
  *     @Override
  *     public CreateProductResult execute(CreateProductCommand input) {
  *         // Use case implementation
@@ -35,8 +33,10 @@ package dev.domaincentric.dca.buildingblocks.hexagonal.port.in;
  * }
  * }</pre>
  *
- * <p><b>Naming Convention:</b> Input ports should be named using the pattern:
- * `{Action}{Entity}UseCase` (e.g., CreateProductCommandPort, UpdateProductPriceCommandPort)
+ * <p><b>Naming Convention:</b> the input port interface is {@code {Action}{Entity}InputPort}
+ * ({@code CreateProductInputPort}, {@code UpdateProductPriceInputPort}); the class implementing it
+ * is {@code {Action}{Entity}UseCase}. The interface inherits {@code execute} from {@code UseCase}
+ * and needs no method of its own.
  *
  * <p><b>References:</b>
  *

@@ -199,3 +199,64 @@ and `DCA-LAY-003`. All five now carry `allowEmptyShould(true)`; `GreenfieldTest`
 catalog green against `fixtures.layout.greenfield`. The .NET library passes every empty selection by
 construction (`DcaRule.Of`), so nothing changes there. Rule count unchanged (114).
 
+### Review follow-up: complete violation collection, per-method transactions (2026-09-06)
+
+A package review of the checkout at `4a882bd` found ten enforcement defects and three tooling gaps;
+`notes/dca-java-review-2026-09-06.md` in the meta-repository carries the dispositions. What changed in
+the library, in the order the rules see it:
+
+- Every rule that checks several things collects first and throws once (`CollectedViolations`, now an
+  accumulator with `require`/`add`/`addAll`): the twelve context-map rules, `DCA-STR-002`, `DCA-LAY-004`.
+  Tolerating one violation cannot pass the rest any more.
+- `DCA-USE-009/-012/-013` reason per method along the class-internal call graph (`IntraClassCalls`).
+  Documented limit: lambda bodies are attributed to the enclosing method by ArchUnit, so placement
+  inside `inTransaction(...)` is not provable statically.
+- One type traversal (`TypeInspection.involvedTypes` = ArchUnit's `getAllInvolvedRawTypes()`) for
+  `DCA-TAC-003/-007/-008/-017` and `DCA-USE-015`; `DCA-USE-015` walks inherited instance fields and
+  reports every path; `DCA-TAC-012` requires `equals(Object)`/`hashCode()` exactly.
+- Package selection: infrastructure = global package + every isolated module's `infrastructure` package,
+  exact segment boundary (shared kernel excluded — its `infrastructure` is shared support, which the
+  reference implementation's `@AsyncInitialize` relies on); `DCA-NAM-011` from module roots; `DCA-MAP-001`
+  over every package below the base package.
+- `.ignore` values are one regex; indexed keys for several. Node ids via `Locale.ROOT`, one function.
+- .NET twin: the same fixes where the defect existed there — `MAP-001` nested namespaces, `USE-015`
+  inherited members and per-path reporting, `NAM-011` from module roots, per-module infrastructure,
+  indexed `.ignore` keys, `USE-009` rationale. The .NET context-map rules already collected, normalised
+  with the invariant culture and matched `Equals(object)` exactly. `USE-012/-013` stay n/a there.
+
+Rule count unchanged (114). Self-tests 319 → 356 (Java, plus 7 in dca-building-blocks) and 326 → 336 (.NET).
+
+### Recheck follow-up: generic inheritance, own-type containers, directed call paths (2026-09-07)
+
+An independent recheck of the review follow-up (`notes/dca-java-recheck-2026-09-07.md` in the
+meta-repository) found four remaining defects; all four are fixed the same day, within the abstractions the
+follow-up introduced:
+
+- `TypeInspection.involvedTypes(JavaField, JavaClass)` reads an inherited field in the inspected class's
+  context — the type arguments of every superclass on the way to the field's owner are substituted, through
+  any number of levels and inside containers (`Intermediate<U> extends Base<List<U>>`). One traversal
+  (`collect`) serves both the field form and the plain `JavaType` form; `getAllInvolvedRawTypes()` remains
+  the leaf. `DCA-TAC-003/-007/-008` and `DCA-USE-015` use the field form.
+- `DCA-TAC-003` tolerates exactly the direct field of the own type again (`isSelfReference`); a container
+  of the own type is reported, as `List<Order>` was before the traversal refactor — and now also
+  `Optional<Order>`, `Order[]`, `Map<String, Order>`, nested lists.
+- `IntraClassCalls` lost `connectedTo` (undirected) and gained `reachableFrom`, `entryPointsOf` and
+  `reachableThrough(start, predicate)`. `DCA-USE-009` judges every entry path to a saving method;
+  `DCA-USE-012` every entry path to a publishing method. Messages name the path (`execute`,
+  `executeQuietly (via persist)`). A second recheck the same day (`notes/dca-java-recheck-2-2026-09-07.md`)
+  tightened both: an entry point is any unit callable from outside the class (non-private, non-synthetic) or
+  one nothing in the class calls — a public method called by a publishing wrapper stays a path of its own;
+  and `DCA-USE-012` searches for an *uncovered route* (`reachableThrough` over units without annotation or
+  boundary) instead of asking whether *some* unit on *some* route is covered — a boundary on one route to a
+  publisher no longer covers a second route. Fixtures `directentry`, `publicwrapper`, `mixeddiamond`,
+  `covereddiamond`.
+- The lambda-placement limit was re-verified against ArchUnit 1.5.0: `JavaClass.getCodeUnits()` holds no
+  `lambda$…` unit, the lambda's calls carry the enclosing method as origin (line numbers only). It stays a
+  documented limit; no bytecode analyser was built.
+
+.NET twin: `IntraClassCalls` ported over the runtime type's IL (async state machines and lambda hosts
+are units of the graph, joined to their declaring method), `DCA-USE-009` per entry path with the same
+fixtures; `DCA-USE-015` already substituted generic bases through reflection; `DCA-TAC-003` already
+rejected the own-type list and gained arrays and generic-base members alongside. Rule count unchanged
+(114). Self-tests 356 → 367 (Java).
+

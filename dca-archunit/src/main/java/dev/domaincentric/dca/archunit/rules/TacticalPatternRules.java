@@ -6,9 +6,6 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaModifier;
-import com.tngtech.archunit.core.domain.JavaParameterizedType;
-import com.tngtech.archunit.core.domain.JavaType;
-import com.tngtech.archunit.core.domain.JavaWildcardType;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
@@ -28,7 +25,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * DDD tactical patterns (building blocks): Aggregate Roots, Entities, Value Objects, Repositories,
@@ -154,18 +150,13 @@ public final class TacticalPatternRules implements DcaRuleSet {
         arch -> {
           List<String> violations = new ArrayList<>();
           for (JavaClass aggregate : concreteClassesAssignableTo(arch, AggregateRoot.class)) {
-            for (JavaField field : aggregate.getAllFields()) {
-              JavaClass fieldType = field.getRawType();
-              if (isConcreteAggregateRoot(fieldType) && !fieldType.equals(aggregate)) {
-                violations.add(
-                    fieldDescription(aggregate, field, fieldType)
-                        + " which is another aggregate root");
-              }
-              for (JavaClass element : collectionElementTypes(field)) {
-                if (isConcreteAggregateRoot(element)) {
+            for (JavaField field : TypeInspection.instanceFields(aggregate)) {
+              for (JavaClass involved : TypeInspection.involvedTypes(field, aggregate)) {
+                if (isConcreteAggregateRoot(involved)
+                    && !isSelfReference(aggregate, field, involved)) {
                   violations.add(
-                      containsDescription(aggregate, field, element)
-                          + " which is an aggregate root");
+                      fieldDescription(aggregate, field, involved)
+                          + " which is another aggregate root");
                 }
               }
             }
@@ -267,16 +258,11 @@ public final class TacticalPatternRules implements DcaRuleSet {
         arch -> {
           List<String> violations = new ArrayList<>();
           for (JavaClass entity : nonRootEntities(arch)) {
-            for (JavaField field : entity.getAllFields()) {
-              JavaClass fieldType = field.getRawType();
-              if (isConcreteAggregateRoot(fieldType)) {
-                violations.add(
-                    fieldDescription(entity, field, fieldType) + " which is an aggregate root");
-              }
-              for (JavaClass element : collectionElementTypes(field)) {
-                if (isConcreteAggregateRoot(element)) {
+            for (JavaField field : TypeInspection.instanceFields(entity)) {
+              for (JavaClass involved : TypeInspection.involvedTypes(field, entity)) {
+                if (isConcreteAggregateRoot(involved)) {
                   violations.add(
-                      containsDescription(entity, field, element) + " which is an aggregate root");
+                      fieldDescription(entity, field, involved) + " which is an aggregate root");
                 }
               }
             }
@@ -300,26 +286,16 @@ public final class TacticalPatternRules implements DcaRuleSet {
         arch -> {
           List<String> violations = new ArrayList<>();
           for (JavaClass valueObject : concreteClassesAssignableTo(arch, Value.class)) {
-            for (JavaField field : valueObject.getAllFields()) {
-              JavaClass fieldType = field.getRawType();
-              if (isConcreteAggregateRoot(fieldType)) {
-                violations.add(
-                    fieldDescription(valueObject, field, fieldType)
-                        + " which is an aggregate root");
-              }
-              if (isConcreteNonRootEntity(fieldType)) {
-                violations.add(
-                    fieldDescription(valueObject, field, fieldType) + " which is an entity");
-              }
-              for (JavaClass element : collectionElementTypes(field)) {
-                if (isConcreteAggregateRoot(element)) {
+            for (JavaField field : TypeInspection.instanceFields(valueObject)) {
+              for (JavaClass involved : TypeInspection.involvedTypes(field, valueObject)) {
+                if (isConcreteAggregateRoot(involved)) {
                   violations.add(
-                      containsDescription(valueObject, field, element)
+                      fieldDescription(valueObject, field, involved)
                           + " which is an aggregate root");
                 }
-                if (isConcreteNonRootEntity(element)) {
+                if (isConcreteNonRootEntity(involved)) {
                   violations.add(
-                      containsDescription(valueObject, field, element) + " which is an entity");
+                      fieldDescription(valueObject, field, involved) + " which is an entity");
                 }
               }
             }
@@ -408,11 +384,10 @@ public final class TacticalPatternRules implements DcaRuleSet {
             if (valueObject.isRecord() || valueObject.isEnum()) {
               continue;
             }
-            if (!overridesOwn(valueObject, "equals", 1)
-                || !overridesOwn(valueObject, "hashCode", 0)) {
+            if (!TypeInspection.declaresAttributeEquality(valueObject)) {
               violations.add(
                   valueObject.getName()
-                      + " is a non-record Value Object without its own equals/hashCode");
+                      + " is a non-record Value Object without its own equals(Object)/hashCode()");
             }
           }
           fail(
@@ -541,7 +516,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
           List<String> violations = new ArrayList<>();
           for (JavaClass repository : repositoryInterfaces(arch)) {
             for (JavaMethod method : repository.getMethods()) {
-              for (JavaClass type : typesInvolvedIn(method.getReturnType())) {
+              for (JavaClass type : TypeInspection.involvedTypes(method.getReturnType())) {
                 if (type.isAssignableTo(Entity.class)
                     && !type.isAssignableTo(AggregateRoot.class)) {
                   violations.add(
@@ -723,43 +698,6 @@ public final class TacticalPatternRules implements DcaRuleSet {
         && !type.isInterface();
   }
 
-  /** Erased type arguments of a {@code List}, {@code Set} or {@code Collection} field. */
-  private static List<JavaClass> collectionElementTypes(JavaField field) {
-    String rawName = field.getRawType().getName();
-    if (!(rawName.startsWith("java.util.List")
-        || rawName.startsWith("java.util.Set")
-        || rawName.startsWith("java.util.Collection"))) {
-      return List.of();
-    }
-    if (field.getType() instanceof JavaParameterizedType) {
-      return ((JavaParameterizedType) field.getType())
-          .getActualTypeArguments().stream().map(JavaType::toErasure).collect(Collectors.toList());
-    }
-    return List.of();
-  }
-
-  /**
-   * Every class involved in a type, including the type arguments of a generic type. Walks the type
-   * recursively, so {@code Optional<CartItem>}, {@code List<? extends CartItem>}, {@code
-   * CartItem[]} and {@code Map<String, List<CartItem>>} all yield {@code CartItem}.
-   */
-  static List<JavaClass> typesInvolvedIn(JavaType type) {
-    List<JavaClass> involved = new ArrayList<>();
-    JavaClass erasure = type.toErasure();
-    involved.add(erasure);
-    erasure.tryGetComponentType().ifPresent(involved::add);
-    if (type instanceof JavaParameterizedType) {
-      for (JavaType argument : ((JavaParameterizedType) type).getActualTypeArguments()) {
-        involved.addAll(typesInvolvedIn(argument));
-      }
-    } else if (type instanceof JavaWildcardType) {
-      for (JavaType bound : ((JavaWildcardType) type).getUpperBounds()) {
-        involved.addAll(typesInvolvedIn(bound));
-      }
-    }
-    return involved;
-  }
-
   private static boolean isSetter(JavaMethod method) {
     String name = method.getName();
     return name.startsWith("set")
@@ -769,21 +707,22 @@ public final class TacticalPatternRules implements DcaRuleSet {
         && method.getRawReturnType().getName().equals("void");
   }
 
-  private static boolean overridesOwn(JavaClass type, String methodName, int parameterCount) {
-    return Stream.of(type.getAllMethods().toArray(new JavaMethod[0]))
-        .anyMatch(
-            m ->
-                m.getName().equals(methodName)
-                    && m.getRawParameterTypes().size() == parameterCount
-                    && !m.getOwner().getName().equals("java.lang.Object"));
+  /**
+   * A field whose own type is the aggregate being inspected — a parent, a root, a predecessor — is
+   * a self-reference and tolerated. A container of that type is not: its elements are
+   * <em>other</em> instances of the aggregate, referenced by identity like any other aggregate.
+   */
+  private static boolean isSelfReference(JavaClass aggregate, JavaField field, JavaClass involved) {
+    return involved.equals(aggregate) && involved.equals(field.getRawType());
   }
 
-  private static String fieldDescription(JavaClass owner, JavaField field, JavaClass fieldType) {
-    return owner.getName() + " has field '" + field.getName() + "' of type " + fieldType.getName();
-  }
-
-  private static String containsDescription(JavaClass owner, JavaField field, JavaClass element) {
-    return owner.getName() + " has field '" + field.getName() + "' containing " + element.getName();
+  /**
+   * {@code Owner has field 'f' of type X} when the field's own type is the offender, {@code Owner
+   * has field 'f' containing X} when it is hidden in a container or type argument.
+   */
+  private static String fieldDescription(JavaClass owner, JavaField field, JavaClass involved) {
+    String relation = involved.equals(field.getRawType()) ? "' of type " : "' containing ";
+    return owner.getName() + " has field '" + field.getName() + relation + involved.getName();
   }
 
   private static void fail(String message, List<String> violations) {

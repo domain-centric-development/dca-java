@@ -6,6 +6,94 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ### Fixed
 
+- **Ignoring one violation no longer hides another.** The context-map rules (`DCA-MAP-001` … `-012`),
+  `DCA-STR-002` and `DCA-LAY-004` used to throw at the first finding — a `require(...)` or an ArchUnit
+  `check(...)` inside a loop — so a rule with two violations and an `ignoringViolationsMatching` pattern
+  for the first one reported **PASSED** while the second stood. All of them now collect every violation
+  first (the `CollectedViolations` accumulator the four isolation rules already used, extended with
+  `require`, `add` and `addAll(rule, classes, explanation)`) and throw one `DcaRuleViolation`, whose
+  entries the selection filters individually. Regression: `fixtures.collect` — two dangling upstreams,
+  two undeclared edges, two misplaced transactions, a shared kernel depending on two contexts — with one
+  entry tolerated each.
+- **Transaction rules check the entry path, not the class.** `DCA-USE-012` accepted `@Transactional` on *any*
+  method and `TransactionBoundary.inTransaction(...)` *anywhere* in the class as covering every
+  publication; `DCA-USE-013` treated one annotated method as making the whole class transactional;
+  `DCA-USE-009` only asked that a `save` and a `publishAndClearEvents` call exist somewhere in the class.
+  All three now follow the *directed* calls within the class (`IntraClassCalls`: callers, callees, entry
+  points and the units reachable on routes through a given kind of unit). An *entry point* is a unit callable
+  from outside the class — any non-private, non-synthetic method or constructor, so a public method stays an
+  entry point even when another method of the class also calls it — or a unit nothing in the class calls.
+  `DCA-USE-009`: for every method that calls `save`, every entry point reaching it must also reach a
+  `publishAndClearEvents` — so an entry method may save through one helper and publish through another,
+  over any number of steps, but a helper two entry methods share (validation, logging) does not connect
+  them, and a saving helper shared by a publishing and a non-publishing entry method is reported for the
+  latter (`Foo.executeQuietly (via persist)`); a public `execute` that only saves is reported even when a
+  public `complete` calls it and publishes afterwards — the direct call is a path of its own. `DCA-USE-012`:
+  for every publishing method and every entry point reaching it, *no route* from the entry down to the
+  publication may be free of an annotation or a boundary — an annotated caller does not cover another,
+  unannotated path to the same helper, and a boundary on one route (`execute -> wrapped -> publish`) does not
+  cover a second route (`execute -> plain -> publish`) to the same publisher. `DCA-USE-013` keeps the wider
+  reading (a remote call inside *any* transactional path is a finding). Recursion and mutual recursion
+  terminate; a method reached only from within a cycle is its own entry point. Rationales of `DCA-USE-009`
+  and `DCA-USE-012` state the remaining limit: ArchUnit folds a lambda's body into the enclosing method
+  (the synthetic `lambda$…` methods are not code units of the imported class), so whether a publication
+  sits *inside* the block handed to `inTransaction(...)` — and in which order two calls run — is not
+  visible in its call model and stays a review check. Fixtures: `fixtures.transactions`.
+- **Identities hidden in containers and behind generic base classes are found.** `DCA-TAC-003`, `-007` and
+  `-008` only looked at the first type argument of a `List`, `Set` or `Collection` field, so a `Value`
+  holding `Map<String, Order>`, `Optional<Shipment>`, `Order[]` or `List<List<Customer>>` passed. The three
+  rules now walk every type a field involves (`TypeInspection.involvedTypes` — erasure, array component,
+  type arguments and wildcard bounds, recursively, on ArchUnit's type model), shared with `DCA-TAC-017` and
+  `DCA-USE-015`; the message says `of type X` for the field's own type and `containing X` for a hidden one.
+  An inherited field is read in the context of the inspected class: for `class Base<T> { T value; }` and
+  `class Shipment extends Base<Order>` the field involves `Order`, through any number of levels
+  (`Intermediate<U> extends Base<List<U>>`) and inside containers; an unbound type parameter contributes its
+  bounds, and a type parameter no field uses exposes nothing. **`DCA-TAC-003` keeps its one tolerance
+  exactly:** a direct field of the aggregate's own type (a parent, a root, a predecessor) is a
+  self-reference and passes; a container of the own type (`List<Order>` in `Order`, now also
+  `Optional<Order>`, `Order[]`, `Map<String, Order>`, `List<List<Order>>`) holds *other* instances of the
+  aggregate and is reported, as `List<Order>` already was.
+- **`DCA-USE-015` includes inherited fields and reports every path.** A `final AnotherResult extends
+  BaseListing` inherited an aggregate field from a base class without the `Result` suffix and passed; the
+  walker read declared fields only. It now walks all instance fields (`getAllFields()`, statics excluded,
+  sorted by name for a stable report) and replaces the global visited set — which reported only the first
+  path through a part record, in hash order — by the records on the current path, so
+  `ListOrdersResult.firstLine -> OrderLine.item` and `ListOrdersResult.lastLine -> OrderLine.item` are both
+  reported. A field inherited from a generic base class is read as the result binds the type parameter:
+  `GenericOrderResult extends GenericBase<Order>` with `T value` in the base reports
+  `GenericOrderResult.value : Order (AggregateRoot)`; `BatchedOrdersResult extends Intermediate<Order>` with
+  `Intermediate<U> extends GenericBase<List<U>>` resolves to `List<Order>`; `String`, an id or a value object
+  bound to the parameter passes, and so does a base whose type parameter no field uses.
+- **`DCA-TAC-012` matches the exact signatures.** `boolean equals(Weight other)` is an overload, not an
+  override — the class still compares by identity — but passed the name-and-arity check. The rule now
+  requires `boolean equals(Object)` and `int hashCode()` (non-static, `Object`'s own excluded).
+- **Infrastructure is selected by exact package, at both levels.** `infrastructureImplementation()` matched
+  `base.infrastructure.` as a prefix, so a class directly in `base.infrastructure` escaped `DCA-LAY-003`,
+  `DCA-HEX-004` and `DCA-HEX-005`, and a module's own `base.cart.infrastructure` was never considered.
+  `DcaArchitecture.infrastructurePackages()` now lists the global package plus every isolated module's
+  `infrastructure` package; the predicate tests package-or-descendant with an exact segment boundary
+  (`base.infrastructurex` does not count); `DCA-LAY-002` uses the same list. The shared kernel's
+  `infrastructure` package is deliberately **not** in it: everyone may depend on the shared kernel, and
+  what it keeps there (a project-wide lifecycle annotation, say) is shared support, not one module's
+  detail — the reference implementation's adapters carry such an annotation.
+- **`DCA-NAM-011` works for grouped and single-context layouts.** The rule still built
+  `base.*.adapter.incoming.web..`, so `base.sales.order.adapter.incoming.web.OrderViewModel` and a
+  view model of an application whose base package is the context failed. The allowed packages are now
+  derived from the module roots, like every other selector.
+- **`DCA-MAP-001` sees declarations on nested packages.** A `@Partnership` on
+  `cart.application.getcart/package-info.java` was neither reported nor rendered, because the rule
+  inspected the resolved context roots only. It now inspects every package below the base package that an
+  imported class lives in, ancestors included (`DcaArchitecture.packagesBelowBase()`), and requires the
+  declaring package itself to carry `@BoundedContext`.
+- **`DCA-MAP-012` no longer stops at a dangling partner.** Collecting instead of throwing exposed that
+  the symmetry check would have dereferenced a missing partner; it now records the dangling declaration
+  and moves on.
+- **External-system node ids are locale-independent.** The renderer lower-cased with the default locale
+  while `DCA-MAP-003` used `Locale.ROOT`; under a Turkish locale `Carrier API` rendered as
+  `ext_carrier_ap_` and the two disagreed. One public function,
+  `ContextMapRenderer.externalSystemNodeId(String)`, serves both. Annotation text is now escaped for its
+  context: `|` and line breaks in markdown cells, `"` (`#quot;`) in Mermaid labels. Channel names come
+  from `DcaLayout.channelSubpackage(Consumes)` in both the rules and the renderer.
 - **Empty selections no longer fail a greenfield project.** `DCA-HEX-002`, `DCA-HEX-004`,
   `DCA-HEX-005`, `DCA-HEX-006` and `DCA-LAY-003` now pass when nothing matches their `that()`
   clause — a context that has a model and a use case but no adapter or infrastructure yet is a
@@ -60,6 +148,13 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ### Changed — breaking
 
+- **An `.ignore` property value is one regular expression.** `dca.rule.<id>.ignore` was split on commas
+  like a list of rule ids, so `Foo.{1,3}Bar` failed as an invalid expression (`Foo.{1`) and a comma inside
+  a character class changed the meaning of an exception. The value is now taken as written; a second
+  expression for the same rule uses an indexed key (`dca.rule.<id>.ignore.1`, `.ignore.2`, …, applied after
+  the unindexed one in numeric order). A configuration that listed several expressions in one comma-separated
+  value must be split into indexed keys — or into one alternation (`a|b`). The fluent
+  `ignoringViolationsMatching(id, regex)` is unchanged.
 - **Bounded contexts are discovered by annotation, at any depth.** `DcaArchitecture.rootContextPackage`
   now walks up from a class's package to the nearest ancestor whose `package-info` carries
   `@BoundedContext` or `@SharedKernel`, instead of cutting at the first segment below the base
@@ -84,6 +179,24 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ### Added
 
+- `DcaArchitecture.infrastructurePackages()`, `allInfrastructurePatterns()`, `packagesBelowBase()` and the
+  static `inPackageTree(packageName, root)`; `DcaLayout.infrastructurePackage(modulePackage)` and
+  `channelSubpackage(Upstream.Consumes)`; `ContextMapRenderer.externalSystemNodeId(String)`.
+- `DcaLayout` validates what it is given: a base package must be a package name, a sub-package setting
+  exactly one segment (`withDomainSubpackage("domain.model")` is rejected), a suffix part of a class name.
+  Internally the thirteen positional copy calls are gone — one settings carrier, one constructor that
+  validates. The public fluent API is unchanged.
+- The catalog's ids and set names are built once (`DcaRules.allIds()` / `setNames()` are now unmodifiable
+  views); `DcaRuleSelection` validated every setting against a freshly built ten-set catalog before.
+- **Tooling.** CI runs the tests on Java 17 as well (`-PjavaToolchain=17`, the oldest supported runtime —
+  the build toolchain stays 21), runs the minimal consumer against the checkout (`-PwithDcaJava`) *and*
+  against the local publication (`-PfromMavenLocal` with the versions from `gradle.properties`, which is
+  what tests the generated POM), and asserts `META-INF/LICENSE` in both jars. The `Dockerfile` copies the
+  `LICENSE` the jar task needs — the image's jars used to lack it — and fails when a jar has none; image
+  names are fully qualified (`docker.io/library/…`) so Podman needs no registry alias.
+  `scripts/publish-snapshot.sh` validates the effective version of every artifact it is asked to publish
+  (with `-P` overrides forwarded to Gradle) before loading credentials; `scripts/lib/artifacts.sh` holds
+  the artifact → project → version-property mapping both publishing scripts use.
 - **Cycle rules slice by module, not by a one-segment pattern.** `DCA-CYC-001`…`004` used
   `slices().matching(base + ".(*)." + layer + "..")`; a slice pattern needs a capture group to derive
   the slice identity, and `(*)` is exactly one segment — so two contexts grouped below an

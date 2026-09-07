@@ -4,6 +4,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaCodeUnit;
 import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.lang.ArchCondition;
@@ -23,13 +24,14 @@ import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.IntegrationEventP
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.OutputPort;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.Repository;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.Store;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.Deque;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.function.Predicate;
 
 /**
  * Use case and mapping patterns: the generic input-port contract, Command/Query/Result models, HTTP
@@ -188,7 +190,13 @@ public final class UseCaseRules implements DcaRuleSet {
         "A saved aggregate must not keep its events: unpublished, they are lost, and stored on the"
             + " instance they may later be published out of context. Publishing belongs after the"
             + " save, in the use case that owns the unit of work - even when the action raised no"
-            + " event",
+            + " event. Checked per entry path, following calls within the use case class: every"
+            + " entry point that reaches a save - a method callable from outside the class, or one"
+            + " nothing in the class calls - must also reach a publication; a wrapper that publishes"
+            + " does not cover a direct call of the public method it wraps, and a helper two methods"
+            + " share does not connect them. That the"
+            + " publication follows the save and concerns the same aggregate is not established"
+            + " statically",
         arch ->
             classes()
                 .that()
@@ -259,7 +267,14 @@ public final class UseCaseRules implements DcaRuleSet {
             + " silently and nothing is registered: the use case succeeds, the other contexts never"
             + " hear of it. The use case that publishes owns the boundary - either declarative"
             + " transaction metadata (@Transactional on the class or the executing method) or an"
-            + " explicit TransactionBoundary.inTransaction(...) around save and publish",
+            + " explicit TransactionBoundary.inTransaction(...) around save and publish. Checked"
+            + " per entry path, following calls within the class: from every entry point - a"
+            + " method callable from outside the class, or one nothing in the class calls - no route"
+            + " down to the publishing method may be free of an annotation or a boundary; a covered"
+            + " caller does not cover another route to the same helper, and a boundary on one route"
+            + " does not cover a second route. Whether the publication sits inside the block"
+            + " handed to inTransaction(...) is not visible in ArchUnit's call model, which folds a"
+            + " lambda's body into the enclosing method; that placement stays a review check",
         arch ->
             classes()
                 .that()
@@ -411,8 +426,9 @@ public final class UseCaseRules implements DcaRuleSet {
         "A result is the use case's answer, not a handle on the model: identity and behaviour stay"
             + " behind the port; values, enriched models and read models may cross. Checked"
             + " transitively through nested records, part records anywhere in the application layer"
-            + " (application.shared included) and generic type arguments (List<T>, Optional<T>,"
-            + " Map<K,V>)",
+            + " (application.shared included), generic type arguments (List<T>, Optional<T>,"
+            + " Map<K,V>) and inherited fields, a generic base class's type parameters resolved as"
+            + " the result binds them",
         arch -> checkResultsCarryNoIdentities(arch));
   }
 
@@ -429,7 +445,7 @@ public final class UseCaseRules implements DcaRuleSet {
           arch.allApplicationPatterns(),
           result,
           result.getSimpleName(),
-          new HashSet<>(),
+          new ArrayDeque<>(),
           violations);
     }
     if (!violations.isEmpty()) {
@@ -447,21 +463,26 @@ public final class UseCaseRules implements DcaRuleSet {
     return false;
   }
 
+  /**
+   * Walks the instance fields of a result or part record — inherited ones included, a base class
+   * need not carry the suffix, and a generic base's type parameters are read as the result binds
+   * them — and every type each field involves. The path of records currently being walked guards
+   * against a self-referencing part record; it is not a global visited set, so the same part record
+   * reached through two fields is reported on both paths.
+   */
   private static void walkResult(
       String[] applicationPatterns,
       JavaClass current,
       String path,
-      Set<String> visited,
+      Deque<String> recordsOnPath,
       List<String> violations) {
-    if (!visited.add(current.getName())) {
+    if (recordsOnPath.contains(current.getName())) {
       return;
     }
-    for (JavaField field : current.getFields()) {
-      if (field.getModifiers().contains(JavaModifier.STATIC)) {
-        continue;
-      }
+    recordsOnPath.push(current.getName());
+    for (JavaField field : TypeInspection.instanceFields(current)) {
       String fieldPath = path + "." + field.getName();
-      for (JavaClass involved : field.getType().getAllInvolvedRawTypes()) {
+      for (JavaClass involved : TypeInspection.involvedTypes(field, current)) {
         String identity = identityKind(involved);
         if (identity != null) {
           violations.add(fieldPath + " : " + involved.getSimpleName() + " (" + identity + ")");
@@ -470,11 +491,12 @@ public final class UseCaseRules implements DcaRuleSet {
               applicationPatterns,
               involved,
               fieldPath + " -> " + involved.getSimpleName(),
-              visited,
+              recordsOnPath,
               violations);
         }
       }
     }
+    recordsOnPath.pop();
   }
 
   /** The marker a class carries into the result, or null when it is a value or plain type. */
@@ -497,14 +519,58 @@ public final class UseCaseRules implements DcaRuleSet {
     return candidate.isRecord() && residesInAny(candidate, applicationPatterns);
   }
 
-  private static boolean isTransactional(JavaClass item, String transactional) {
-    return item.isMetaAnnotatedWith(transactional)
-        || item.getMethods().stream().anyMatch(m -> m.isMetaAnnotatedWith(transactional));
+  private static boolean callsBoundary(JavaCodeUnit unit) {
+    return unit.getMethodCallsFromSelf().stream()
+        .anyMatch(call -> call.getTargetOwner().isAssignableTo(TransactionBoundary.class));
   }
 
-  private static boolean usesTransactionBoundary(JavaClass item) {
-    return item.getMethodCallsFromSelf().stream()
-        .anyMatch(call -> call.getTargetOwner().isAssignableTo(TransactionBoundary.class));
+  private static boolean calls(JavaCodeUnit unit, Class<?> targetType) {
+    return unit.getMethodCallsFromSelf().stream()
+        .anyMatch(call -> call.getTargetOwner().isAssignableTo(targetType));
+  }
+
+  private static boolean calls(JavaCodeUnit unit, Class<?> targetType, String methodName) {
+    return unit.getMethodCallsFromSelf().stream()
+        .anyMatch(
+            call ->
+                call.getTarget().getName().equals(methodName)
+                    && call.getTargetOwner().isAssignableTo(targetType));
+  }
+
+  /**
+   * Whether the unit may run inside declared transaction metadata: the class is annotated, the unit
+   * is, or a unit that reaches it through calls within the class is. Used where one covered path is
+   * enough to matter (a remote call inside a transaction).
+   */
+  private static boolean isTransactional(
+      JavaClass item, JavaCodeUnit unit, IntraClassCalls calls, String transactional) {
+    return item.isMetaAnnotatedWith(transactional)
+        || calls.callersOf(unit).stream().anyMatch(u -> u.isMetaAnnotatedWith(transactional));
+  }
+
+  /**
+   * Whether every route from {@code entry} down to {@code publisher} is covered: the class is
+   * annotated, or no route reaches the publisher through units none of which carries the annotation
+   * or draws an explicit boundary. A boundary on one route does not cover another route to the same
+   * publisher.
+   */
+  private static boolean pathIsTransactional(
+      JavaClass item,
+      JavaCodeUnit entry,
+      JavaCodeUnit publisher,
+      IntraClassCalls calls,
+      String transactional) {
+    if (item.isMetaAnnotatedWith(transactional)) {
+      return true;
+    }
+    Predicate<JavaCodeUnit> uncovered =
+        unit -> !unit.isMetaAnnotatedWith(transactional) && !callsBoundary(unit);
+    return !calls.reachableThrough(entry, uncovered).contains(publisher);
+  }
+
+  /** {@code execute} for the unit itself, {@code execute (via persist)} when reached through it. */
+  private static String pathName(JavaCodeUnit entry, JavaCodeUnit unit) {
+    return entry.equals(unit) ? entry.getName() : entry.getName() + " (via " + unit.getName() + ")";
   }
 
   /**
@@ -517,34 +583,43 @@ public final class UseCaseRules implements DcaRuleSet {
         || owner.isAssignableTo(IntegrationEventPublisher.class);
   }
 
+  private static String simpleName(String annotation) {
+    return annotation.substring(annotation.lastIndexOf('.') + 1);
+  }
+
   private static ArchCondition<JavaClass> notCallRemotePortsWhenTransactional(
       String transactional) {
     return new ArchCondition<>("not call remote-capable output ports while transactional") {
       @Override
       public void check(JavaClass item, ConditionEvents events) {
-        if (!isTransactional(item, transactional)) {
-          return;
-        }
-        List<String> remotePorts =
-            item.getMethodCallsFromSelf().stream()
-                .map(call -> call.getTargetOwner())
-                .filter(owner -> owner.isAssignableTo(OutputPort.class))
-                .filter(owner -> !isTransactionalResource(owner))
-                .map(JavaClass::getSimpleName)
-                .distinct()
-                .sorted()
-                .toList();
-        if (!remotePorts.isEmpty()) {
-          events.add(
-              SimpleConditionEvent.violated(
-                  item,
-                  item.getSimpleName()
-                      + " is @"
-                      + transactional.substring(transactional.lastIndexOf('.') + 1)
-                      + " and calls "
-                      + String.join(", ", remotePorts)
-                      + " inside the transaction - call it before, or draw the boundary with"
-                      + " TransactionBoundary.inTransaction(...)"));
+        IntraClassCalls calls = new IntraClassCalls(item);
+        for (JavaCodeUnit unit : item.getCodeUnits()) {
+          if (!isTransactional(item, unit, calls, transactional)) {
+            continue;
+          }
+          List<String> remotePorts =
+              unit.getMethodCallsFromSelf().stream()
+                  .map(call -> call.getTargetOwner())
+                  .filter(owner -> owner.isAssignableTo(OutputPort.class))
+                  .filter(owner -> !isTransactionalResource(owner))
+                  .map(JavaClass::getSimpleName)
+                  .distinct()
+                  .sorted()
+                  .toList();
+          if (!remotePorts.isEmpty()) {
+            events.add(
+                SimpleConditionEvent.violated(
+                    item,
+                    item.getSimpleName()
+                        + "."
+                        + unit.getName()
+                        + " runs under @"
+                        + simpleName(transactional)
+                        + " and calls "
+                        + String.join(", ", remotePorts)
+                        + " inside the transaction - call it before, or draw the boundary with"
+                        + " TransactionBoundary.inTransaction(...)"));
+          }
         }
       }
     };
@@ -554,24 +629,28 @@ public final class UseCaseRules implements DcaRuleSet {
     return new ArchCondition<>("be transactional when publishing domain events") {
       @Override
       public void check(JavaClass item, ConditionEvents events) {
-        boolean publishes =
-            item.getMethodCallsFromSelf().stream()
-                .anyMatch(call -> call.getTargetOwner().isAssignableTo(DomainEventPublisher.class));
-        if (!publishes) {
-          return;
-        }
-        boolean inTransaction =
-            isTransactional(item, transactional) || usesTransactionBoundary(item);
-        events.add(
-            inTransaction
-                ? SimpleConditionEvent.satisfied(
-                    item, item.getSimpleName() + " publishes inside a transaction")
-                : SimpleConditionEvent.violated(
+        IntraClassCalls calls = new IntraClassCalls(item);
+        for (JavaCodeUnit unit : item.getCodeUnits()) {
+          if (!calls(unit, DomainEventPublisher.class)) {
+            continue;
+          }
+          for (JavaCodeUnit entry : calls.entryPointsOf(unit)) {
+            if (pathIsTransactional(item, entry, unit, calls, transactional)) {
+              continue;
+            }
+            events.add(
+                SimpleConditionEvent.violated(
                     item,
                     item.getSimpleName()
+                        + "."
+                        + pathName(entry, unit)
                         + " publishes domain events without @"
-                        + transactional.substring(transactional.lastIndexOf('.') + 1)
-                        + " and without TransactionBoundary.inTransaction(...) - after-commit listeners are skipped"));
+                        + simpleName(transactional)
+                        + " on the class or on a method of that path, and without"
+                        + " TransactionBoundary.inTransaction(...) on it - after-commit"
+                        + " listeners are skipped"));
+          }
+        }
       }
     };
   }
@@ -580,29 +659,27 @@ public final class UseCaseRules implements DcaRuleSet {
     return new ArchCondition<>("publish the aggregate's domain events after saving it") {
       @Override
       public void check(JavaClass item, ConditionEvents events) {
-        boolean savesAnAggregate =
-            item.getMethodCallsFromSelf().stream()
-                .anyMatch(
-                    call ->
-                        call.getTarget().getName().equals("save")
-                            && call.getTargetOwner().isAssignableTo(Repository.class));
-        if (!savesAnAggregate) {
-          return;
+        IntraClassCalls calls = new IntraClassCalls(item);
+        for (JavaCodeUnit unit : item.getCodeUnits()) {
+          if (!calls(unit, Repository.class, "save")) {
+            continue;
+          }
+          for (JavaCodeUnit entry : calls.entryPointsOf(unit)) {
+            boolean publishes =
+                calls.reachableFrom(entry).stream()
+                    .anyMatch(u -> calls(u, DomainEventPublisher.class, "publishAndClearEvents"));
+            if (!publishes) {
+              events.add(
+                  SimpleConditionEvent.violated(
+                      item,
+                      item.getSimpleName()
+                          + "."
+                          + pathName(entry, unit)
+                          + " saves an aggregate without publishing its domain events - no"
+                          + " method reached from there calls publishAndClearEvents"));
+            }
+          }
         }
-        boolean publishes =
-            item.getMethodCallsFromSelf().stream()
-                .anyMatch(
-                    call ->
-                        call.getTarget().getName().equals("publishAndClearEvents")
-                            && call.getTargetOwner().isAssignableTo(DomainEventPublisher.class));
-        events.add(
-            publishes
-                ? SimpleConditionEvent.satisfied(
-                    item, item.getSimpleName() + " publishes after saving")
-                : SimpleConditionEvent.violated(
-                    item,
-                    item.getSimpleName()
-                        + " saves an aggregate without publishing its domain events"));
       }
     };
   }

@@ -20,33 +20,35 @@ cd "$(dirname "$0")/.."
 
 die() { echo "error: $*" >&2; exit 1; }
 
+# shellcheck source=lib/artifacts.sh
+. scripts/lib/artifacts.sh
+
 [ $# -eq 2 ] || die "usage: $0 <building-blocks|archunit> <version>"
 ARTIFACT="$1"
 VERSION="$2"
 
-case "$ARTIFACT" in
-  building-blocks) PROJECT="dca-building-blocks"; PROP="buildingBlocksVersion" ;;
-  archunit)        PROJECT="dca-archunit";        PROP="archunitVersion" ;;
-  *) die "unknown artifact '$ARTIFACT' (building-blocks|archunit)" ;;
-esac
+PROJECT="$(artifact_project "$ARTIFACT")" || exit 1
+PROP="$(artifact_version_property "$ARTIFACT")"
 
 [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]] || die "not a release version: $VERSION"
+is_snapshot_version "$VERSION" && die "not a release version: $VERSION"
 
 # --- preflight -------------------------------------------------------------------------------------
 
 [ -z "$(git status --porcelain)" ] || die "working tree is dirty — commit the changelog first"
 
-git rev-parse -q --verify "refs/tags/$ARTIFACT/v$VERSION" >/dev/null \
-  && die "tag $ARTIFACT/v$VERSION already exists"
+TAG="${PROJECT#dca-}/v$VERSION"
+git rev-parse -q --verify "refs/tags/$TAG" >/dev/null \
+  && die "tag $TAG already exists"
 
 grep -q "^## \[$VERSION\]" "$PROJECT/CHANGELOG.md" \
   || die "$PROJECT/CHANGELOG.md has no '## [$VERSION]' section"
 
-if [ "$ARTIFACT" = "archunit" ]; then
-  BB_VERSION="$(sed -n 's/^buildingBlocksVersion=//p' gradle.properties)"
-  case "$BB_VERSION" in
-    *-SNAPSHOT|"") die "buildingBlocksVersion in gradle.properties is '$BB_VERSION' — pin the released version, it becomes the POM dependency" ;;
-  esac
+if [ "$PROJECT" = "dca-archunit" ]; then
+  BB_VERSION="$(artifact_version building-blocks)"
+  if [ -z "$BB_VERSION" ] || is_snapshot_version "$BB_VERSION"; then
+    die "buildingBlocksVersion in gradle.properties is '$BB_VERSION' — pin the released version, it becomes the POM dependency"
+  fi
   echo "dca-archunit $VERSION will depend on dca-building-blocks $BB_VERSION"
 fi
 
@@ -111,7 +113,7 @@ echo "next:"
 echo "  1. check the deployment there, then Publish (or Drop, if something is wrong)"
 echo "  2. wait until Maven Central serves it (10–30 minutes):"
 echo "     https://repo1.maven.org/maven2/dev/domaincentric/$PROJECT/$VERSION/"
-echo "  3. git tag $ARTIFACT/v$VERSION && git push origin $ARTIFACT/v$VERSION"
-if [ "$ARTIFACT" = "building-blocks" ]; then
+echo "  3. git tag ${PROJECT#dca-}/v$VERSION && git push origin ${PROJECT#dca-}/v$VERSION"
+if [ "$PROJECT" = "dca-building-blocks" ]; then
   echo "  4. set buildingBlocksVersion=$VERSION in gradle.properties and commit"
 fi

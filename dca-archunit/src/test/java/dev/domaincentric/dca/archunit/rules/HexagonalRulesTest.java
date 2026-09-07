@@ -1,51 +1,51 @@
 package dev.domaincentric.dca.archunit.rules;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.DynamicTest.dynamicTest;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.tngtech.archunit.core.importer.ClassFileImporter;
-import dev.domaincentric.dca.archunit.DcaArchitecture;
-import dev.domaincentric.dca.archunit.DcaLayout;
-import dev.domaincentric.dca.archunit.DcaRule;
-import java.util.Set;
+import dev.domaincentric.dca.archunit.Fixtures;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.DynamicTest;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 
 /** Self-test of {@link HexagonalRules} against the shared hexagonal fixture tree. */
 class HexagonalRulesTest {
 
-  private static final String FIXTURES = "dev.domaincentric.dca.archunit.fixtures.hexagonal";
-
-  /** Rules without a negative fixture, with the reason. */
-  private static final Set<String> NO_NEGATIVE_FIXTURE = Set.of();
-
-  static DcaArchitecture arch(String pkg) {
-    return DcaArchitecture.of(
-        DcaLayout.forBasePackage(pkg), new ClassFileImporter().importPackages(pkg));
-  }
-
-  private static Stream<DcaRule> rules(String pkg) {
-    return new HexagonalRules(DcaLayout.forBasePackage(pkg)).rules().stream();
-  }
+  private static final String FIXTURES = Fixtures.ROOT + ".hexagonal";
+  private static final String INFRASTRUCTURE = Fixtures.ROOT + ".infrastructure";
 
   @TestFactory
   Stream<DynamicTest> goodFixturePasses() {
-    String pkg = FIXTURES + ".good";
-    DcaArchitecture arch = arch(pkg);
-    return rules(pkg).map(rule -> dynamicTest(rule.toString(), () -> rule.check(arch)));
+    return Fixtures.goodFixturePasses(HexagonalRules::new, FIXTURES + ".good");
   }
 
+  /** Every hexagonal rule has a negative fixture. */
   @TestFactory
   Stream<DynamicTest> badFixtureFails() {
-    String pkg = FIXTURES + ".bad";
-    DcaArchitecture arch = arch(pkg);
-    return rules(pkg)
-        .filter(rule -> !NO_NEGATIVE_FIXTURE.contains(rule.id()))
-        .map(
-            rule ->
-                dynamicTest(
-                    rule.toString(),
-                    () -> assertThrows(AssertionError.class, () -> rule.check(arch))));
+    return Fixtures.badFixtureFails(HexagonalRules::new, FIXTURES + ".bad");
+  }
+
+  /**
+   * The infrastructure predicate is exact: the root infrastructure package itself counts, and so
+   * does a module's own {@code infrastructure} package — a class in either is an implementation
+   * detail, wherever below the module it is imported from.
+   */
+  @Test
+  @DisplayName("DCA-HEX-004 sees a class directly in the global infrastructure package")
+  void incomingAdapterDependingOnRootInfrastructureIsReported() {
+    String message = Fixtures.failure(INFRASTRUCTURE, "DCA-HEX-004").getMessage();
+    assertTrue(message.contains("CartController") && message.contains("Wiring"), message);
+  }
+
+  @Test
+  @DisplayName("DCA-HEX-005 sees a module's own infrastructure package")
+  void outgoingAdapterDependingOnModuleInfrastructureIsReported() {
+    String message = Fixtures.failure(INFRASTRUCTURE, "DCA-HEX-005").getMessage();
+    assertTrue(message.contains("CartStorage") && message.contains("CartWiring"), message);
+    assertFalse(
+        message.contains("Lifecycle"),
+        "the shared kernel's infrastructure is shared support, not a module's detail: " + message);
   }
 }

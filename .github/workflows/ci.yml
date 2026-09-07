@@ -13,18 +13,34 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          # 17 is the oldest supported runtime, 21 the build toolchain; Gradle picks by -PjavaToolchain.
+          java-version: |
+            17
+            21
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew build --no-daemon
+      - name: Tests on the oldest supported runtime (Java 17)
+        run: ./gradlew test --no-daemon -PjavaToolchain=17
       - name: Rule catalog is up to date
         run: |
           ./gradlew :dca-archunit:rulesCatalog --no-daemon
           git diff --exit-code -- rules.json RULES.md
       - name: Publishing config is valid
         run: ./gradlew publishToMavenLocal --no-daemon
-      - name: Minimal consumer sample
+      - name: Published jars carry the license
+        run: |
+          for jar in dca-building-blocks/build/libs/dca-building-blocks-*[0-9T].jar dca-archunit/build/libs/dca-archunit-*[0-9T].jar; do
+            unzip -l "$jar" | grep -q ' META-INF/LICENSE$' || { echo "no META-INF/LICENSE in $jar"; exit 1; }
+          done
+      - name: Minimal consumer against the checkout
         working-directory: samples/minimal-consumer
-        run: ./gradlew test --no-daemon
+        run: ./gradlew test --no-daemon -PwithDcaJava
+      - name: Minimal consumer against the local publication
+        working-directory: samples/minimal-consumer
+        run: |
+          BB="$(sed -n 's/^buildingBlocksVersion=//p' ../../gradle.properties)"
+          AU="$(sed -n 's/^archunitVersion=//p' ../../gradle.properties)"
+          ./gradlew test --no-daemon -PfromMavenLocal "-PbuildingBlocksVersion=$BB" "-ParchunitVersion=$AU"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
