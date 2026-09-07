@@ -2,7 +2,11 @@
 
 All notable changes to this artifact. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: SemVer.
 
-## [Unreleased]
+## [0.1.1] - 2026-09-07
+
+Documentation-only release: no type, signature or behaviour changed; the javadoc that ships in the
+`-javadoc` and `-sources` jars is corrected. Binary-compatible with 0.1.0.
+
 
 ### Fixed
 

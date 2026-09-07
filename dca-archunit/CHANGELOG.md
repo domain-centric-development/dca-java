@@ -20,6 +20,7 @@ of the same rules and new rules that a 0.1.0 code base may fail.
    `warning(...)` while you fix it — `dca-archunit.properties` documents the reason.
 
 Before 1.0 a minor version may tighten rules; each such change is listed under *Changed — breaking*.
+Depends on `dca-building-blocks` 0.1.1 (javadoc corrections only; 0.1.0 works as well).
 
 ### Added
 - **Shaping the result — two rules.** A use-case result carries values, never identities, and the
