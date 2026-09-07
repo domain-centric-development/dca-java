@@ -206,7 +206,9 @@ Semantic versioning, independent per artifact:
 - `dca-building-blocks` — rarely changes; a new marker is a minor bump, a removed or renamed one a
   major bump.
 - `dca-archunit` — a new rule is a minor bump (it can fail your build — pin versions), a tightened
-  rule is a major bump, a relaxed rule or fixed false positive a patch.
+  rule is a major bump, a relaxed rule or fixed false positive a patch. **Before 1.0** a minor version
+  may add and tighten rules as well; every such change is listed under *Changed — breaking* in the
+  changelog, with a migration note at the top of the release.
 
 Tags: `building-blocks/vX.Y.Z`, `archunit/vX.Y.Z` — one tag per released artifact; see
 [RELEASING.md](RELEASING.md). `dca-archunit` depends on the `dca-building-blocks` version named in
