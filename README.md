@@ -22,7 +22,7 @@ see [Versioning](#versioning).
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("dev.domaincentric:dca-building-blocks:0.1.0")
+    implementation("dev.domaincentric:dca-building-blocks:0.1.1")
 }
 ```
 
@@ -61,7 +61,7 @@ dev.domaincentric.dca.buildingblocks
 
 ```kotlin
 dependencies {
-    testImplementation("dev.domaincentric:dca-archunit:0.1.0")
+    testImplementation("dev.domaincentric:dca-archunit:0.2.0")
     testImplementation("org.junit.jupiter:junit-jupiter")
 }
 ```
