@@ -1,7 +1,9 @@
 # Porting the sample's Groovy/Spock ArchUnit tests to the `dca-archunit` rule library
 
-Working spec for the port. Source: `../dca-ecommerce-sample-java/src/test-architecture/groovy/de/sample/aiarchitecture/*.groovy`
-(read `BaseArchUnitTest.groovy` first — every helper it offers has a counterpart below).
+Working spec for the port, written in August 2026. Its source was the sample's former Groovy/Spock test suite
+(`src/test-architecture/groovy/…/*.groovy`, base package `de.sample.aiarchitecture` at the time); the sample was renamed
+to `dev.domaincentric.sample` and its own rule code deleted when it started consuming this library (WP-03), so that
+path no longer exists — `PORTING-LOG.md` records what each Groovy rule became. Helper names below refer to `BaseArchUnitTest.groovy`.
 
 ## Target model (already implemented in `dca-archunit/src/main/java/dev/domaincentric/dca/archunit/`)
 
