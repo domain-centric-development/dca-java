@@ -17,7 +17,7 @@ import org.springframework.modulith.core.ApplicationModules;
  * ({@code FooTest$1}, {@code FooSpec$_check_closure1}) are excluded with their owner; a {@code
  * simpleName} check misses those.
  */
-public final class ModulithModules {
+public final class SpringModulithModules {
 
   /**
    * {@code FooTest}, {@code FooTests}, {@code FooSpec}, {@code FooIT} — and every nested class of
@@ -25,7 +25,7 @@ public final class ModulithModules {
    */
   private static final Pattern TEST_CLASS = Pattern.compile(".*(Test|Tests|Spec|IT)(\\$.*)?$");
 
-  private ModulithModules() {}
+  private SpringModulithModules() {}
 
   /** The application modules below the layout's base package, test classes excluded. */
   public static ApplicationModules of(DcaLayout layout) {

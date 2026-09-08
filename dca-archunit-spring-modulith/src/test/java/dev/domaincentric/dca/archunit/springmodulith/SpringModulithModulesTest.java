@@ -29,11 +29,11 @@ class ModulithModulesTest {
             "com.acme.FooTest$Helper",
             "com.acme.FooSpec$_check_closure1",
             "com.acme.FooSpec$_run_closure2$_closure3")) {
-      assertTrue(ModulithModules.isTestClass(name), name);
+      assertTrue(SpringModulithModules.isTestClass(name), name);
     }
     for (String name :
         Set.of("com.acme.Foo", "com.acme.TestData", "com.acme.Contest", "com.acme.Order$Line")) {
-      assertFalse(ModulithModules.isTestClass(name), name);
+      assertFalse(SpringModulithModules.isTestClass(name), name);
     }
   }
 
@@ -46,7 +46,7 @@ class ModulithModulesTest {
 
   @Test
   void withTheFilterTheFixtureVerifies() {
-    ApplicationModules modules = ModulithModules.of(LAYOUT);
+    ApplicationModules modules = SpringModulithModules.of(LAYOUT);
     assertDoesNotThrow(() -> modules.verify());
     assertEquals(
         Set.of("orders", "shipping"),
@@ -57,7 +57,7 @@ class ModulithModulesTest {
 
   @Test
   void rejectsNull() {
-    assertThrows(IllegalArgumentException.class, () -> ModulithModules.of(null));
-    assertFalse(ModulithModules.isTestClass(null));
+    assertThrows(IllegalArgumentException.class, () -> SpringModulithModules.of(null));
+    assertFalse(SpringModulithModules.isTestClass(null));
   }
 }

@@ -27,7 +27,7 @@ consumer's BOM pins the version:
 
 - `dca-spring` (runtime): `SpringDomainEventPublisher`, `SpringTransactionBoundary`,
   `InMemoryTransactionBoundary`, `DcaSpringAutoConfiguration`.
-- `dca-archunit-spring-modulith` (test): `DcaModulithTest`, `ModulithModules` with the test-class filter.
+- `dca-archunit-spring-modulith` (test): `DcaSpringModulithTest`, `SpringModulithModules` with the test-class filter.
 
 `dca-building-blocks` and `dca-archunit` stay framework-free; a build check (`verifyFrameworkFree`) fails
 if Spring appears on their class paths. A consumer therefore pairs two production with two test

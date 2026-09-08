@@ -11,10 +11,10 @@ Depends on `dca-archunit` 0.3.0. `spring-modulith-core` is `compileOnly` (minimu
 
 ### Added
 
-- `DcaModulithTest` — JUnit 5 base class shaped like `DcaArchitectureTest`: `moduleStructureIsValid()`
+- `DcaSpringModulithTest` — JUnit 5 base class shaped like `DcaArchitectureTest`: `moduleStructureIsValid()`
   runs `ApplicationModules.verify()`, a diagnostic test lists the discovered modules and named
   interfaces.
-- `ModulithModules.of(DcaLayout)` — the filtered `ApplicationModules` for projects asserting
-  themselves; `ModulithModules.testClasses()` / `isTestClass(String)` exclude `*Test`, `*Tests`, `*Spec`,
+- `SpringModulithModules.of(DcaLayout)` — the filtered `ApplicationModules` for projects asserting
+  themselves; `SpringModulithModules.testClasses()` / `isTestClass(String)` exclude `*Test`, `*Tests`, `*Spec`,
   `*IT` **and their nested and closure classes** by full name, so architecture tests in the base package
   do not become a synthetic root module.

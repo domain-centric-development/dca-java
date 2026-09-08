@@ -11,7 +11,7 @@ Hexagonal Architecture and Clean Architecture.
 | `dev.domaincentric:dca-building-blocks` | The building blocks your code implements: DDD tactical markers (`AggregateRoot`, `Entity`, `Value`, `DomainEvent`, …), strategic annotations (`@BoundedContext`, `@SharedKernel`, `@Upstream`, `@Partnership`, …) and hexagonal port interfaces (`UseCase`, `Repository`, `Store`, …) and the application-layer `TransactionBoundary` | none |
 | `dev.domaincentric:dca-archunit` | The governance rules: ~110 ArchUnit rules pinned to those building blocks, plus an executable context map | `dca-building-blocks`, ArchUnit |
 | `dev.domaincentric:dca-spring` | The runtime adapters the rules demand: `SpringDomainEventPublisher` (over `ApplicationEventPublisher`), `SpringTransactionBoundary` (over `TransactionTemplate`), an `InMemoryTransactionBoundary` for tests, and a Spring Boot auto-configuration | `dca-building-blocks`; Spring `compileOnly` — your Boot BOM pins the version |
-| `dev.domaincentric:dca-archunit-spring-modulith` | Spring Modulith's module verification as a DCA test: `DcaModulithTest` next to `DcaArchitectureTest`, with the test-class exclusion Modulith needs | `dca-archunit`; `spring-modulith-core` `compileOnly` |
+| `dev.domaincentric:dca-archunit-spring-modulith` | Spring Modulith's module verification as a DCA test: `DcaSpringModulithTest` next to `DcaArchitectureTest`, with the test-class exclusion Modulith needs | `dca-archunit`; `spring-modulith-core` `compileOnly` |
 
 A Spring / Spring Modulith project ends up with two production and two test dependencies; every one
 of them is optional except the building blocks:
@@ -145,7 +145,7 @@ testImplementation("dev.domaincentric:dca-archunit-spring-modulith:0.1.0")
 ```
 
 ```java
-class ModulithTest extends DcaModulithTest {
+class ModulithTest extends DcaSpringModulithTest {
   @Override
   protected DcaLayout layout() {
     return DcaLayout.forBasePackage("com.acme.shop");
@@ -156,7 +156,7 @@ class ModulithTest extends DcaModulithTest {
 Two base classes, two test classes. The artifact's one piece of knowledge is the test-class filter:
 architecture tests in the base package would otherwise become a synthetic root module that Modulith
 reports as depending on non-exposed types — matched by full name, so inner and Groovy closure classes
-(`FooTest$1`, `FooSpec$_check_closure1`) are excluded with their owner. `ModulithModules.of(layout)`
+(`FooTest$1`, `FooSpec$_check_closure1`) are excluded with their owner. `SpringModulithModules.of(layout)`
 returns the filtered `ApplicationModules` for your own assertions.
 
 ### 6. Choose which rules run, and how strictly

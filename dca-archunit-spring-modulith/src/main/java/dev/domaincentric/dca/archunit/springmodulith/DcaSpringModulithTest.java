@@ -13,7 +13,7 @@ import org.springframework.modulith.core.ApplicationModules;
  * DcaArchitectureTest} so a project subclasses both the same way:
  *
  * <pre>{@code
- * class ModulithTest extends DcaModulithTest {
+ * class ModulithTest extends DcaSpringModulithTest {
  *   @Override
  *   protected DcaLayout layout() {
  *     return DcaLayout.forBasePackage("com.acme.shop");
@@ -32,7 +32,7 @@ import org.springframework.modulith.core.ApplicationModules;
  * {@code compileOnly} here; a Modulith project has them through {@code
  * spring-modulith-starter-test}).
  */
-public abstract class DcaModulithTest {
+public abstract class DcaSpringModulithTest {
 
   private ApplicationModules modules;
 
@@ -42,7 +42,7 @@ public abstract class DcaModulithTest {
   /** The modules, built once per test instance with the test-class filter applied. */
   protected ApplicationModules modules() {
     if (modules == null) {
-      modules = ModulithModules.of(layout());
+      modules = SpringModulithModules.of(layout());
     }
     return modules;
   }
