@@ -4,6 +4,8 @@
 #
 #   ./scripts/release.sh building-blocks 0.1.0
 #   ./scripts/release.sh archunit 0.1.0
+#   ./scripts/release.sh spring 0.1.0
+#   ./scripts/release.sh archunit-modulith 0.1.0
 #
 # The Central Portal user token is never stored in a build file. It is taken from, in order:
 #   1. ORG_GRADLE_PROJECT_mavenCentralUsername / …Password in the environment
@@ -23,7 +25,7 @@ die() { echo "error: $*" >&2; exit 1; }
 # shellcheck source=lib/artifacts.sh
 . scripts/lib/artifacts.sh
 
-[ $# -eq 2 ] || die "usage: $0 <building-blocks|archunit> <version>"
+[ $# -eq 2 ] || die "usage: $0 <building-blocks|archunit|spring|archunit-modulith> <version>"
 ARTIFACT="$1"
 VERSION="$2"
 
@@ -44,12 +46,14 @@ git rev-parse -q --verify "refs/tags/$TAG" >/dev/null \
 grep -q "^## \[$VERSION\]" "$PROJECT/CHANGELOG.md" \
   || die "$PROJECT/CHANGELOG.md has no '## [$VERSION]' section"
 
-if [ "$PROJECT" = "dca-archunit" ]; then
-  BB_VERSION="$(artifact_version building-blocks)"
-  if [ -z "$BB_VERSION" ] || is_snapshot_version "$BB_VERSION"; then
-    die "buildingBlocksVersion in gradle.properties is '$BB_VERSION' — pin the released version, it becomes the POM dependency"
+DEPENDENCY="$(artifact_dependency "$ARTIFACT")"
+if [ -n "$DEPENDENCY" ]; then
+  DEP_VERSION="$(artifact_version "$DEPENDENCY")"
+  DEP_PROP="$(artifact_version_property "$DEPENDENCY")"
+  if [ -z "$DEP_VERSION" ] || is_snapshot_version "$DEP_VERSION"; then
+    die "$DEP_PROP in gradle.properties is '$DEP_VERSION' — pin the released version, it becomes the POM dependency"
   fi
-  echo "dca-archunit $VERSION will depend on dca-building-blocks $BB_VERSION"
+  echo "$PROJECT $VERSION will depend on $(artifact_project "$DEPENDENCY") $DEP_VERSION"
 fi
 
 gpg --list-secret-keys "$SIGNING_KEY" >/dev/null 2>&1 || die "no secret key $SIGNING_KEY in this keyring"
@@ -114,6 +118,7 @@ echo "  1. check the deployment there, then Publish (or Drop, if something is wr
 echo "  2. wait until Maven Central serves it (10–30 minutes):"
 echo "     https://repo1.maven.org/maven2/dev/domaincentric/$PROJECT/$VERSION/"
 echo "  3. git tag ${PROJECT#dca-}/v$VERSION && git push origin ${PROJECT#dca-}/v$VERSION"
-if [ "$PROJECT" = "dca-building-blocks" ]; then
-  echo "  4. set buildingBlocksVersion=$VERSION in gradle.properties and commit"
-fi
+case "$PROJECT" in
+  dca-building-blocks|dca-archunit)
+    echo "  4. set $PROP=$VERSION in gradle.properties and commit — the artifacts depending on it read it from there" ;;
+esac

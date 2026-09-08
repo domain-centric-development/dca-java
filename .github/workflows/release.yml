@@ -1,8 +1,10 @@
 name: Release
 
 # Tag-driven, one artifact per tag:
-#   building-blocks/v1.2.0  -> :dca-building-blocks 1.2.0
-#   archunit/v3.4.1         -> :dca-archunit 3.4.1
+#   building-blocks/v1.2.0     -> :dca-building-blocks 1.2.0
+#   archunit/v3.4.1            -> :dca-archunit 3.4.1
+#   spring/v0.1.0              -> :dca-spring 0.1.0
+#   archunit-modulith/v0.1.0   -> :dca-archunit-modulith 0.1.0
 #
 # Publishing to Maven Central happens on the maintainer's machine (./scripts/release.sh) so the GPG
 # signing key never reaches CI. This workflow verifies the tagged version and publishes the GitHub
@@ -12,6 +14,8 @@ on:
     tags:
       - 'building-blocks/v*'
       - 'archunit/v*'
+      - 'spring/v*'
+      - 'archunit-modulith/v*'
 
 jobs:
   release:
@@ -33,8 +37,10 @@ jobs:
           PREFIX="${TAG%%/*}"                     # archunit
           VERSION="${TAG##*/v}"                   # 1.2.3
           case "$PREFIX" in
-            building-blocks) PROJECT=dca-building-blocks; PROP=buildingBlocksVersion ;;
-            archunit)        PROJECT=dca-archunit;        PROP=archunitVersion ;;
+            building-blocks)   PROJECT=dca-building-blocks;   PROP=buildingBlocksVersion ;;
+            archunit)          PROJECT=dca-archunit;          PROP=archunitVersion ;;
+            spring)            PROJECT=dca-spring;            PROP=dcaSpringVersion ;;
+            archunit-modulith) PROJECT=dca-archunit-modulith; PROP=archunitModulithVersion ;;
             *) echo "unknown tag prefix $PREFIX"; exit 1 ;;
           esac
           case "$VERSION" in

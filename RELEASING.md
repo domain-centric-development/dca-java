@@ -1,7 +1,8 @@
 # Releasing
 
-Both artifacts go to Maven Central (Sonatype Central Portal) under the namespace `dev.domaincentric`,
-independently versioned, one tag per artifact.
+All four artifacts — `dca-building-blocks`, `dca-archunit`, `dca-spring`, `dca-archunit-modulith` — go to
+Maven Central (Sonatype Central Portal) under the namespace `dev.domaincentric`, independently versioned,
+one tag per artifact (`building-blocks/v…`, `archunit/v…`, `spring/v…`, `archunit-modulith/v…`).
 
 **Publishing runs on the maintainer's machine**, via [scripts/release.sh](scripts/release.sh). The GPG
 signing key stays there — CI never sees it. GitHub Actions builds and tests every push, and on a release
@@ -72,7 +73,7 @@ The current signing key is `6CE5EF6C96B86413FC5E1F17C6773EDA846201AB` (RSA 4096,
 ## Releasing an artifact
 
 ```bash
-./scripts/release.sh building-blocks 0.1.0     # or: archunit 0.1.0
+./scripts/release.sh building-blocks 0.1.0     # or: archunit 0.1.0 · spring 0.1.0 · archunit-modulith 0.1.0
 ```
 
 The script refuses to continue unless everything is in order, then asks for the GPG passphrase, builds,
@@ -80,8 +81,10 @@ signs, checks the signatures locally, asks for a typed confirmation and uploads:
 
 1. clean working tree, tag not taken, `## [0.1.0]` section present in that artifact's `CHANGELOG.md`,
    signing key in the keyring
-2. for `dca-archunit`: `buildingBlocksVersion` in [gradle.properties](gradle.properties) names a
-   released version — it becomes the dependency version in the published POM
+2. for `dca-archunit` and `dca-spring`: `buildingBlocksVersion` in [gradle.properties](gradle.properties)
+   names a released version; for `dca-archunit-modulith`: `archunitVersion` does — it becomes the
+   dependency version in the published POM. Release order therefore: building blocks, then archunit
+   and spring, then archunit-modulith
 3. Central token from environment, keychain or prompt ([scripts/lib/central-token.sh](scripts/lib/central-token.sh),
    shared with `publish-snapshot.sh`); GPG passphrase prompt (the passphrase reaches
    `gpg` on stdin, never as an argument)
@@ -104,8 +107,10 @@ Afterwards, as the script prints:
    ```
 
 The tag comes **after** the release, so the workflow finds the artifact on Central instead of waiting for
-a publish that has not happened. After a `dca-building-blocks` release, set `buildingBlocksVersion` in
-`gradle.properties` to that version and commit.
+a publish that has not happened. After a `dca-building-blocks` or `dca-archunit` release, set
+`buildingBlocksVersion` / `archunitVersion` in `gradle.properties` to that version and commit — the
+artifacts depending on it read their POM dependency from there. Central takes about ten minutes to serve
+a published deployment; poll `repo1.maven.org` before tagging, or the workflow's wait runs out.
 
 To release without the manual click, change `publishToMavenCentral()` in
 [build.gradle.kts](build.gradle.kts) to `publishToMavenCentral(automaticRelease = true)`. Worth doing

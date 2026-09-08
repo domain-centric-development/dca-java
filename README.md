@@ -10,6 +10,20 @@ Hexagonal Architecture and Clean Architecture.
 |----------|------------|--------------|
 | `dev.domaincentric:dca-building-blocks` | The building blocks your code implements: DDD tactical markers (`AggregateRoot`, `Entity`, `Value`, `DomainEvent`, …), strategic annotations (`@BoundedContext`, `@SharedKernel`, `@Upstream`, `@Partnership`, …) and hexagonal port interfaces (`UseCase`, `Repository`, `Store`, …) and the application-layer `TransactionBoundary` | none |
 | `dev.domaincentric:dca-archunit` | The governance rules: ~110 ArchUnit rules pinned to those building blocks, plus an executable context map | `dca-building-blocks`, ArchUnit |
+| `dev.domaincentric:dca-spring` | The runtime adapters the rules demand: `SpringDomainEventPublisher` (over `ApplicationEventPublisher`), `SpringTransactionBoundary` (over `TransactionTemplate`), an `InMemoryTransactionBoundary` for tests, and a Spring Boot auto-configuration | `dca-building-blocks`; Spring `compileOnly` — your Boot BOM pins the version |
+| `dev.domaincentric:dca-archunit-modulith` | Spring Modulith's module verification as a DCA test: `DcaModulithTest` next to `DcaArchitectureTest`, with the test-class exclusion Modulith needs | `dca-archunit`; `spring-modulith-core` `compileOnly` |
+
+A Spring / Spring Modulith project ends up with two production and two test dependencies; every one
+of them is optional except the building blocks:
+
+```kotlin
+dependencies {
+    implementation("dev.domaincentric:dca-building-blocks:0.1.2")
+    implementation("dev.domaincentric:dca-spring:0.1.0")
+    testImplementation("dev.domaincentric:dca-archunit:0.3.0")
+    testImplementation("dev.domaincentric:dca-archunit-modulith:0.1.0")
+}
+```
 
 Both target Java 17+ — built with a Java 21 toolchain at `--release 17`, and the test suite runs on a
 Java 17 runtime as well (`./gradlew test -PjavaToolchain=17`, part of CI). Versions are independent;
@@ -96,7 +110,56 @@ DcaLayout.forBasePackage("com.acme.shop")
     .withFrameworkAnnotations(FrameworkAnnotations.spring());   // or your own FQNs
 ```
 
-### 4. Choose which rules run, and how strictly
+### 4. Runtime adapters — `dca-spring`
+
+`DCA-USE-009` demands that a use case publishes the saved aggregate's events, `DCA-USE-012` that it
+does so inside a transaction — because Spring's after-commit relays (`@TransactionalEventListener`,
+`@ApplicationModuleListener`) are skipped **silently** without one. `dca-building-blocks` ships the
+ports; `dca-spring` ships the two implementations every project used to copy:
+
+```kotlin
+implementation("dev.domaincentric:dca-spring:0.1.0")
+```
+
+In a Spring Boot application nothing else is needed: the auto-configuration registers
+`SpringDomainEventPublisher` and — once a `PlatformTransactionManager` bean exists —
+`SpringTransactionBoundary`, each unless you define the port yourself. Without Boot, register the two
+classes as beans.
+
+**An in-memory application has no transaction manager**, and `spring-boot-starter` +
+`spring-modulith-starter-core` bring neither one nor Boot's `TransactionAutoConfiguration`. Then
+`@Transactional` compiles and does nothing, and the relays never fire while every rule stays green.
+Add, visibly, `org.springframework.boot:spring-boot-transaction`, a `PlatformTransactionManager` bean of
+your own until a database arrives (`dca-spring` deliberately publishes no no-op manager), and
+`org.springframework.modulith:spring-modulith-events-api` for `@ApplicationModuleListener` itself.
+`InMemoryTransactionBoundary` is for tests: same nesting contract, no Spring.
+
+### 5. Spring Modulith verification — `dca-archunit-modulith`
+
+Modulith's `ApplicationModules.verify()` is not an ArchUnit rule and needs `spring-modulith-core` at
+compile time, so it lives in its own optional artifact instead of `dca-archunit` (which stays
+framework-free — a build check enforces it):
+
+```kotlin
+testImplementation("dev.domaincentric:dca-archunit-modulith:0.1.0")
+```
+
+```java
+class ModulithTest extends DcaModulithTest {
+  @Override
+  protected DcaLayout layout() {
+    return DcaLayout.forBasePackage("com.acme.shop");
+  }
+}
+```
+
+Two base classes, two test classes. The artifact's one piece of knowledge is the test-class filter:
+architecture tests in the base package would otherwise become a synthetic root module that Modulith
+reports as depending on non-exposed types — matched by full name, so inner and Groovy closure classes
+(`FooTest$1`, `FooSpec$_check_closure1`) are excluded with their owner. `ModulithModules.of(layout)`
+returns the filtered `ApplicationModules` for your own assertions.
+
+### 6. Choose which rules run, and how strictly
 
 The catalog is opinionated, and no team adopts all of it on day one. A rule you disagree with, or
 cannot satisfy yet, is a decision to record — not a reason to drop the library. `DcaRuleSelection`
@@ -210,15 +273,20 @@ Semantic versioning, independent per artifact:
   rule is a major bump, a relaxed rule or fixed false positive a patch. **Before 1.0** a minor version
   may add and tighten rules as well; every such change is listed under *Changed — breaking* in the
   changelog, with a migration note at the top of the release.
+- `dca-spring`, `dca-archunit-modulith` — ordinary SemVer on their own APIs; a raised minimum Spring or
+  Modulith version is a minor bump.
 
-Tags: `building-blocks/vX.Y.Z`, `archunit/vX.Y.Z` — one tag per released artifact; see
-[RELEASING.md](RELEASING.md). `dca-archunit` depends on the `dca-building-blocks` version named in
-`gradle.properties`, so that property tracks the latest released marker version. Changelogs: [dca-building-blocks/CHANGELOG.md](dca-building-blocks/CHANGELOG.md), [dca-archunit/CHANGELOG.md](dca-archunit/CHANGELOG.md).
+Tags: `building-blocks/vX.Y.Z`, `archunit/vX.Y.Z`, `spring/vX.Y.Z`, `archunit-modulith/vX.Y.Z` — one tag
+per released artifact; see [RELEASING.md](RELEASING.md). `dca-archunit` and `dca-spring` depend on the
+`dca-building-blocks` version named in `gradle.properties`, `dca-archunit-modulith` on the `dca-archunit`
+version named there, so those properties track the latest released versions. Changelogs:
+[dca-building-blocks/CHANGELOG.md](dca-building-blocks/CHANGELOG.md), [dca-archunit/CHANGELOG.md](dca-archunit/CHANGELOG.md),
+[dca-spring/CHANGELOG.md](dca-spring/CHANGELOG.md), [dca-archunit-modulith/CHANGELOG.md](dca-archunit-modulith/CHANGELOG.md).
 
 ## Build
 
 ```
-./gradlew build                      # both artifacts, all self-tests
+./gradlew build                      # all four artifacts, all self-tests, framework-free check
 ./gradlew :dca-archunit:test         # rule self-tests against good/bad fixtures
 ./gradlew test -PjavaToolchain=17    # the same tests on the oldest supported runtime
 ./gradlew publishToMavenLocal        # try a snapshot in another project

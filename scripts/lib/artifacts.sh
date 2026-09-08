@@ -5,17 +5,30 @@
 
 artifact_project() {
   case "$1" in
-    building-blocks|dca-building-blocks) echo "dca-building-blocks" ;;
-    archunit|dca-archunit)               echo "dca-archunit" ;;
-    *) echo "error: unknown artifact '$1' (building-blocks|archunit)" >&2; return 1 ;;
+    building-blocks|dca-building-blocks)         echo "dca-building-blocks" ;;
+    archunit|dca-archunit)                       echo "dca-archunit" ;;
+    spring|dca-spring)                           echo "dca-spring" ;;
+    archunit-modulith|dca-archunit-modulith)     echo "dca-archunit-modulith" ;;
+    *) echo "error: unknown artifact '$1' (building-blocks|archunit|spring|archunit-modulith)" >&2; return 1 ;;
   esac
 }
 
 artifact_version_property() {
   case "$(artifact_project "$1")" in
-    dca-building-blocks) echo "buildingBlocksVersion" ;;
-    dca-archunit)        echo "archunitVersion" ;;
+    dca-building-blocks)   echo "buildingBlocksVersion" ;;
+    dca-archunit)          echo "archunitVersion" ;;
+    dca-spring)            echo "dcaSpringVersion" ;;
+    dca-archunit-modulith) echo "archunitModulithVersion" ;;
     *) return 1 ;;
+  esac
+}
+
+# The in-repo artifact whose released version becomes a POM dependency of the given one, if any.
+artifact_dependency() {
+  case "$(artifact_project "$1")" in
+    dca-archunit|dca-spring) echo "building-blocks" ;;
+    dca-archunit-modulith)   echo "archunit" ;;
+    *) echo "" ;;
   esac
 }
 

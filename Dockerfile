@@ -12,9 +12,11 @@ COPY gradlew settings.gradle.kts build.gradle.kts gradle.properties LICENSE ./
 COPY gradle ./gradle
 COPY dca-building-blocks ./dca-building-blocks
 COPY dca-archunit ./dca-archunit
+COPY dca-spring ./dca-spring
+COPY dca-archunit-modulith ./dca-archunit-modulith
 RUN --mount=type=cache,target=/root/.gradle ./gradlew --no-daemon build :dca-archunit:rulesCatalog \
  && mkdir -p /out \
- && cp dca-building-blocks/build/libs/*.jar dca-archunit/build/libs/*.jar /out/ \
+ && cp dca-building-blocks/build/libs/*.jar dca-archunit/build/libs/*.jar dca-spring/build/libs/*.jar dca-archunit-modulith/build/libs/*.jar /out/ \
  && cp rules.json RULES.md /out/ \
  && for jar in /out/*.jar; do \
       jar tf "$jar" | grep -qx 'META-INF/LICENSE' || { echo "no META-INF/LICENSE in $jar"; exit 1; }; \

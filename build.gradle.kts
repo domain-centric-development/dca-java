@@ -5,6 +5,11 @@ plugins {
     alias(libs.plugins.mavenPublish) apply false
 }
 
+// dca-building-blocks and dca-archunit are framework-free by contract: the rules forbid Spring in
+// the domain, and these two are what the rules are written against. dca-spring and
+// dca-archunit-modulith exist precisely so that Spring never has to appear here.
+val frameworkFree = setOf("dca-building-blocks", "dca-archunit")
+
 subprojects {
     apply(plugin = "java-library")
     apply(plugin = "com.vanniktech.maven.publish")
@@ -35,6 +40,25 @@ subprojects {
             events("failed")
             exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
         }
+    }
+
+    if (name in frameworkFree) {
+        val verifyFrameworkFree = tasks.register("verifyFrameworkFree") {
+            group = "verification"
+            description = "Fails if Spring appears on the compile or runtime class path of $name"
+            val compile = configurations.named("compileClasspath")
+            val runtime = configurations.named("runtimeClasspath")
+            doLast {
+                val offenders = (compile.get().resolvedConfiguration.resolvedArtifacts +
+                    runtime.get().resolvedConfiguration.resolvedArtifacts)
+                    .map { it.moduleVersion.id }
+                    .filter { it.group.startsWith("org.springframework") }
+                    .map { "${it.group}:${it.name}:${it.version}" }
+                    .toSortedSet()
+                check(offenders.isEmpty()) { "$name must stay framework-free, found: $offenders" }
+            }
+        }
+        tasks.named("check") { dependsOn(verifyFrameworkFree) }
     }
 
     // Every published jar carries the license it is released under.
