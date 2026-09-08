@@ -47,155 +47,210 @@ public final class NamingRules implements DcaRuleSet {
 
   public static DcaRule inputPortImplementationsEndWithUseCaseSuffix(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-NAM-001",
-        "Application layer InputPort implementations must end with '"
-            + layout.useCaseSuffix()
-            + "'",
-        "InputPort implementations (use cases) should follow consistent naming conventions"
-            + " (Hexagonal Architecture)",
-        arch ->
-            classes()
-                .that()
-                .resideInAnyPackage(arch.allApplicationPatterns())
-                .and()
-                .areNotInterfaces()
-                .and()
-                .areNotRecords()
-                .and()
-                .implement(UseCase.class)
-                .should()
-                .haveSimpleNameEndingWith(layout.useCaseSuffix())
-                .allowEmptyShould(true));
+            "DCA-NAM-001",
+            "Application layer InputPort implementations must end with '"
+                + layout.useCaseSuffix()
+                + "'",
+            "InputPort implementations (use cases) should follow consistent naming conventions"
+                + " (Hexagonal Architecture)",
+            arch ->
+                classes()
+                    .that()
+                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .and()
+                    .areNotInterfaces()
+                    .and()
+                    .areNotRecords()
+                    .and()
+                    .implement(UseCase.class)
+                    .should()
+                    .haveSimpleNameEndingWith(layout.useCaseSuffix())
+                    .allowEmptyShould(true))
+        .selecting(
+            "Non-interface, non-record classes in <module>.application.. of every module root that"
+                + " implement UseCase.")
+        .checking(
+            "The simple name ends with the configured use-case suffix. Interfaces and records are"
+                + " not selected; a class implementing only InputPort without UseCase is not"
+                + " selected either. An empty selection passes.");
   }
 
   public static DcaRule useCasesAreServices(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-NAM-002",
-        "Use case classes must be annotated with @Service",
-        "Use case classes must be Spring-managed beans",
-        arch ->
-            classes()
-                .that()
-                .resideInAnyPackage(arch.allApplicationPatterns())
-                .and()
-                .haveSimpleNameEndingWith(layout.useCaseSuffix())
-                .and()
-                .areNotInterfaces()
-                .should()
-                .beAnnotatedWith(layout.frameworkAnnotations().service())
-                .allowEmptyShould(true));
+            "DCA-NAM-002",
+            "Use case classes must be annotated with @Service",
+            "Use case classes must be Spring-managed beans",
+            arch ->
+                classes()
+                    .that()
+                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .and()
+                    .haveSimpleNameEndingWith(layout.useCaseSuffix())
+                    .and()
+                    .areNotInterfaces()
+                    .should()
+                    .beAnnotatedWith(layout.frameworkAnnotations().service())
+                    .allowEmptyShould(true))
+        .selecting(
+            "Non-interface classes in <module>.application.. of every module root whose simple name"
+                + " ends with the configured use-case suffix.")
+        .checking(
+            "The class is annotated with the configured @Service annotation. Records are selected"
+                + " like any other class; the marker interfaces are not consulted - only the suffix"
+                + " selects. An empty selection passes.");
   }
 
   public static DcaRule inputPortInterfacesEndWithInputPort(DcaLayout layout) {
     // Matched by marker, not by package: DCA places each input port in its own use-case folder,
     // so there is no single ..application.port.in.. package to point at.
     return DcaRule.of(
-        "DCA-NAM-003",
-        "InputPort interfaces must end with 'InputPort'",
-        "Input port interfaces should follow consistent naming conventions (Hexagonal Architecture)",
-        arch ->
-            classes()
-                .that()
-                .resideInAnyPackage(arch.allApplicationPatterns())
-                .and()
-                .areInterfaces()
-                .and()
-                .areAssignableTo(InputPort.class)
-                .and()
-                .doNotHaveSimpleName("InputPort")
-                .and()
-                .doNotHaveSimpleName("UseCase")
-                .should()
-                .haveSimpleNameEndingWith("InputPort")
-                .allowEmptyShould(true));
+            "DCA-NAM-003",
+            "InputPort interfaces must end with 'InputPort'",
+            "Input port interfaces should follow consistent naming conventions (Hexagonal Architecture)",
+            arch ->
+                classes()
+                    .that()
+                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .and()
+                    .areInterfaces()
+                    .and()
+                    .areAssignableTo(InputPort.class)
+                    .and()
+                    .doNotHaveSimpleName("InputPort")
+                    .and()
+                    .doNotHaveSimpleName("UseCase")
+                    .should()
+                    .haveSimpleNameEndingWith("InputPort")
+                    .allowEmptyShould(true))
+        .selecting(
+            "Interfaces in <module>.application.. of every module root that are assignable to"
+                + " InputPort, except those named exactly InputPort or UseCase.")
+        .checking(
+            "The simple name ends with InputPort. Classes and records are not selected, and an"
+                + " interface extending InputPort outside an application package is not checked. An"
+                + " empty selection passes.");
   }
 
   public static DcaRule repositoryInterfacesEndWithRepository(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-NAM-004",
-        "Repository Interfaces must end with 'Repository'",
-        "Repository interfaces should follow consistent naming conventions (DDD pattern)",
-        arch ->
-            classes()
-                .that()
-                .resideInAnyPackage(arch.allApplicationPatterns())
-                .and()
-                .areInterfaces()
-                .and()
-                .haveSimpleNameContaining("Repository")
-                .and()
-                .doNotHaveSimpleName("Repository")
-                .should()
-                .haveSimpleNameEndingWith("Repository")
-                .allowEmptyShould(true));
+            "DCA-NAM-004",
+            "Repository Interfaces must end with 'Repository'",
+            "Repository interfaces should follow consistent naming conventions (DDD pattern)",
+            arch ->
+                classes()
+                    .that()
+                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .and()
+                    .areInterfaces()
+                    .and()
+                    .haveSimpleNameContaining("Repository")
+                    .and()
+                    .doNotHaveSimpleName("Repository")
+                    .should()
+                    .haveSimpleNameEndingWith("Repository")
+                    .allowEmptyShould(true))
+        .selecting(
+            "Interfaces in <module>.application.. of every module root whose simple name contains"
+                + " Repository, except one named exactly Repository.")
+        .checking(
+            "The simple name ends with Repository (RepositoryPort or ProductRepositoryAdapter is"
+                + " reported). Selection is by name only - whether the interface extends the"
+                + " Repository marker is not checked, and classes are not selected. An empty"
+                + " selection passes.");
   }
 
   public static DcaRule controllersEndWithController(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-NAM-005",
-        "Controller classes must end with 'Controller'",
-        "@Controller annotated classes should follow naming conventions",
-        arch ->
-            classes()
-                .that()
-                .resideInAnyPackage(arch.allIncomingAdapterPatterns())
-                .and()
-                .areAnnotatedWith(layout.frameworkAnnotations().controller())
-                .should()
-                .haveSimpleNameEndingWith("Controller")
-                .allowEmptyShould(true));
+            "DCA-NAM-005",
+            "Controller classes must end with 'Controller'",
+            "@Controller annotated classes should follow naming conventions",
+            arch ->
+                classes()
+                    .that()
+                    .resideInAnyPackage(arch.allIncomingAdapterPatterns())
+                    .and()
+                    .areAnnotatedWith(layout.frameworkAnnotations().controller())
+                    .should()
+                    .haveSimpleNameEndingWith("Controller")
+                    .allowEmptyShould(true))
+        .selecting(
+            "Classes in <module>.adapter.incoming.. of every module root that are directly"
+                + " annotated with the configured @Controller annotation.")
+        .checking(
+            "The simple name ends with the literal Controller - this suffix is not configurable. A"
+                + " class carrying only the REST-controller annotation is not selected here, and a"
+                + " controller outside an incoming-adapter package is not checked. An empty"
+                + " selection passes.");
   }
 
   public static DcaRule restControllersEndWithRestControllerSuffix(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-NAM-006",
-        "REST Controllers must end with '"
-            + layout.restControllerSuffix()
-            + "' (REST best practice)",
-        "@RestController annotated classes should end with '"
-            + layout.restControllerSuffix()
-            + "' following RESTful naming conventions",
-        arch ->
-            classes()
-                .that()
-                .resideInAnyPackage(arch.allIncomingAdapterPatterns())
-                .and()
-                .areAnnotatedWith(layout.frameworkAnnotations().restController())
-                .should()
-                .haveSimpleNameEndingWith(layout.restControllerSuffix())
-                .allowEmptyShould(true));
+            "DCA-NAM-006",
+            "REST Controllers must end with '"
+                + layout.restControllerSuffix()
+                + "' (REST best practice)",
+            "@RestController annotated classes should end with '"
+                + layout.restControllerSuffix()
+                + "' following RESTful naming conventions",
+            arch ->
+                classes()
+                    .that()
+                    .resideInAnyPackage(arch.allIncomingAdapterPatterns())
+                    .and()
+                    .areAnnotatedWith(layout.frameworkAnnotations().restController())
+                    .should()
+                    .haveSimpleNameEndingWith(layout.restControllerSuffix())
+                    .allowEmptyShould(true))
+        .selecting(
+            "Classes in <module>.adapter.incoming.. of every module root that are directly"
+                + " annotated with the configured @RestController annotation.")
+        .checking(
+            "The simple name ends with the configured REST-controller suffix. Classes annotated"
+                + " with the plain @Controller annotation are not selected, and a REST controller"
+                + " outside an incoming-adapter package is not checked. An empty selection"
+                + " passes.");
   }
 
   public static DcaRule dtosResideInAdapterLayer(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-NAM-007",
-        "DTOs must reside in the adapter layer, not in domain or application",
-        "DTOs are adapter concerns (presentation or external API) - not in domain or application",
-        arch ->
-            classes()
-                .that()
-                .haveSimpleNameEndingWith("Dto")
-                .and()
-                .resideInAnyPackage(layout.basePackage() + "..")
-                .should()
-                .resideInAnyPackage(arch.allAdapterPatterns())
-                .allowEmptyShould(true));
+            "DCA-NAM-007",
+            "DTOs must reside in the adapter layer, not in domain or application",
+            "DTOs are adapter concerns (presentation or external API) - not in domain or application",
+            arch ->
+                classes()
+                    .that()
+                    .haveSimpleNameEndingWith("Dto")
+                    .and()
+                    .resideInAnyPackage(layout.basePackage() + "..")
+                    .should()
+                    .resideInAnyPackage(arch.allAdapterPatterns())
+                    .allowEmptyShould(true))
+        .selecting("Classes under the base package whose simple name ends with Dto.")
+        .checking(
+            "Each resides in an adapter package of some module root (<module>.adapter..), incoming"
+                + " or outgoing. A Dto in a domain, application or infrastructure package is"
+                + " reported; what the class contains is not checked. An empty selection passes.");
   }
 
   public static DcaRule convertersResideInAdapterLayer(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-NAM-008",
-        "Converters must reside in the adapter layer",
-        "Converters/Mappers translate between layers and should be in adapters",
-        arch ->
-            classes()
-                .that()
-                .haveSimpleNameEndingWith("Converter")
-                .and()
-                .resideInAnyPackage(layout.basePackage() + "..")
-                .should()
-                .resideInAnyPackage(arch.allAdapterPatterns())
-                .allowEmptyShould(true));
+            "DCA-NAM-008",
+            "Converters must reside in the adapter layer",
+            "Converters/Mappers translate between layers and should be in adapters",
+            arch ->
+                classes()
+                    .that()
+                    .haveSimpleNameEndingWith("Converter")
+                    .and()
+                    .resideInAnyPackage(layout.basePackage() + "..")
+                    .should()
+                    .resideInAnyPackage(arch.allAdapterPatterns())
+                    .allowEmptyShould(true))
+        .selecting("Classes under the base package whose simple name ends with Converter.")
+        .checking(
+            "Each resides in an adapter package of some module root (<module>.adapter..), incoming"
+                + " or outgoing. Only the Converter suffix is checked - a class named *Mapper or"
+                + " *Assembler is not selected by this rule. An empty selection passes.");
   }
 
   public static DcaRule noTechnicalBucketPackages(DcaLayout layout) {
@@ -203,43 +258,58 @@ public final class NamingRules implements DcaRuleSet {
     // Technical buckets like 'entities' or 'util' hide the domain and attract unrelated code.
     // DTOs/Converters/ViewModels have their own placement rules.
     return DcaRule.of(
-        "DCA-NAM-009",
-        "No technical bucket packages - package by domain concept",
-        "Packages are named after domain concepts from the ubiquitous language, not technical"
-            + " patterns",
-        arch ->
-            noClasses()
-                .that()
-                .resideInAPackage(layout.basePackage() + "..")
-                .should()
-                .resideInAnyPackage(
-                    "..entities..", "..valueobjects..", "..helpers..", "..util..", "..utils..")
-                .allowEmptyShould(true));
+            "DCA-NAM-009",
+            "No technical bucket packages - package by domain concept",
+            "Packages are named after domain concepts from the ubiquitous language, not technical"
+                + " patterns",
+            arch ->
+                noClasses()
+                    .that()
+                    .resideInAPackage(layout.basePackage() + "..")
+                    .should()
+                    .resideInAnyPackage(
+                        "..entities..", "..valueobjects..", "..helpers..", "..util..", "..utils..")
+                    .allowEmptyShould(true))
+        .selecting("Every class under the base package.")
+        .checking(
+            "No class resides in a package whose name contains a segment entities, valueobjects,"
+                + " helpers, util or utils, at any depth. Only these five segments are checked;"
+                + " other technical names such as model, service or impl are not reported. An empty"
+                + " selection passes.");
   }
 
   public static DcaRule noTechnicalSuffixesInDomain(DcaLayout layout) {
     // Domain concepts carry ubiquitous-language names. 'Manager'/'Helper'/'Util' signal
-    // a missing domain concept; 'Impl' signals naming by pattern instead of by specialty.
+    // a missing domain concept; 'Impl'/'Implementation' signal naming by pattern instead of by
+    // specialty.
     return DcaRule.of(
-        "DCA-NAM-010",
-        "Domain classes must not use technical suffixes (Manager, Helper, Util, Impl)",
-        "Domain names come from the ubiquitous language - name services by their specialty, not by"
-            + " technical role",
-        arch ->
-            noClasses()
-                .that()
-                .resideInAnyPackage(arch.allDomainPatterns())
-                .should()
-                .haveSimpleNameEndingWith("Manager")
-                .orShould()
-                .haveSimpleNameEndingWith("Helper")
-                .orShould()
-                .haveSimpleNameEndingWith("Util")
-                .orShould()
-                .haveSimpleNameEndingWith("Utils")
-                .orShould()
-                .haveSimpleNameEndingWith("Impl")
-                .allowEmptyShould(true));
+            "DCA-NAM-010",
+            "Domain classes must not use technical suffixes (Manager, Helper, Util, Impl, Implementation)",
+            "Domain names come from the ubiquitous language - name services by their specialty, not by"
+                + " technical role",
+            arch ->
+                noClasses()
+                    .that()
+                    .resideInAnyPackage(arch.allDomainPatterns())
+                    .should()
+                    .haveSimpleNameEndingWith("Manager")
+                    .orShould()
+                    .haveSimpleNameEndingWith("Helper")
+                    .orShould()
+                    .haveSimpleNameEndingWith("Util")
+                    .orShould()
+                    .haveSimpleNameEndingWith("Utils")
+                    .orShould()
+                    .haveSimpleNameEndingWith("Impl")
+                    .orShould()
+                    .haveSimpleNameEndingWith("Implementation")
+                    .allowEmptyShould(true))
+        .selecting("Classes in <module>.domain.. of every module root.")
+        .checking(
+            "No simple name ends with Manager, Helper, Util, Utils, Impl or Implementation. Only these six"
+                + " suffixes are checked, only in domain packages - a *Service or *Factory in the"
+                + " domain is not reported, and an Impl in an adapter package is not checked. An"
+                + " empty selection passes.");
   }
 
   /**
@@ -249,18 +319,24 @@ public final class NamingRules implements DcaRuleSet {
    */
   public static DcaRule viewModelsResideInIncomingWebAdapters(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-NAM-011",
-        "ViewModels must reside in adapter.incoming.web packages",
-        "ViewModels are presentation concerns and must reside in incoming web adapter packages",
-        arch ->
-            classes()
-                .that()
-                .haveSimpleNameEndingWith("ViewModel")
-                .and()
-                .resideInAnyPackage(layout.basePackage() + "..")
-                .should()
-                .resideInAnyPackage(incomingWebAdapterPatterns(arch))
-                .allowEmptyShould(true));
+            "DCA-NAM-011",
+            "ViewModels must reside in adapter.incoming.web packages",
+            "ViewModels are presentation concerns and must reside in incoming web adapter packages",
+            arch ->
+                classes()
+                    .that()
+                    .haveSimpleNameEndingWith("ViewModel")
+                    .and()
+                    .resideInAnyPackage(layout.basePackage() + "..")
+                    .should()
+                    .resideInAnyPackage(incomingWebAdapterPatterns(arch))
+                    .allowEmptyShould(true))
+        .selecting("Classes under the base package whose simple name ends with ViewModel.")
+        .checking(
+            "Each resides in <module>.adapter.incoming.web.. of some module root - the adapter and"
+                + " incoming segments are the configured ones, the web segment is fixed. A"
+                + " ViewModel in a domain or application package, or in a non-web incoming adapter"
+                + " such as adapter.incoming.mcp, is reported. An empty selection passes.");
   }
 
   private static String[] incomingWebAdapterPatterns(DcaArchitecture arch) {

@@ -32,7 +32,15 @@ Each Spock feature `def "<title>"() { … }` becomes one `DcaRule`:
 DcaRule.of("DCA-TAC-001", "Aggregate roots must implement AggregateRoot",
     "Aggregate roots are the consistency boundary — the marker is what the rules pin to",
     arch -> classes().that()....should()....)          // returns ArchRule; .as()/.because()/.check() added by the factory
+    .selecting("Classes in <module>.domain.model.. whose simple name ends with the configured aggregate suffix.")
+    .checking("Each is assignable to AggregateRoot. An empty selection passes.")
 ```
+
+`selecting(...)` and `checking(...)` are mandatory — the factories return `DcaRule.Undescribed`, which only
+becomes a `DcaRule` once both texts are given. They describe the rule's *mechanics* for the rule catalog:
+which classes the assertion runs over (in layout terms: `<module>.application..`, "the configured use-case
+suffix", marker assignability) and what it asserts, including what does *not* count and what is deliberately
+not established. One to three sentences each, derived from the code, not from the intent.
 
 or, for features that loop over contexts / do reflective checks / run several ArchUnit rules:
 
@@ -40,6 +48,8 @@ or, for features that loop over contexts / do reflective checks / run several Ar
 DcaRule.check("DCA-MAP-007", "Implemented Upstream declarations must be backed by an actual code dependency",
     "A declaration without a dependency is stale — mark it PLANNED or remove it",
     arch -> { for (String ctx : arch.boundedContextPackages()) { … .check(arch.classes()); } })
+    .selecting("Every IMPLEMENTED @Upstream declaration of every package carrying @BoundedContext.")
+    .checking("Some class of the declaring context depends on a class in the declared channel package.")
 ```
 
 Rules:

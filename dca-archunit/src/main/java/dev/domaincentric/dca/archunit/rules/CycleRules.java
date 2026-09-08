@@ -45,74 +45,109 @@ public final class CycleRules implements DcaRuleSet {
 
   public static DcaRule domainPackagesFreeOfCycles(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-CYC-001",
-        "Domain Packages must not have cyclic dependencies",
-        "Domain model packages should have clear boundaries and no cycles (Acyclic Dependencies"
-            + " Principle)",
-        arch ->
-            slices()
-                .assignedFrom(
-                    moduleLayerSlices(
-                        arch, root -> root + "." + layout.domainSubpackage() + ".model"))
-                .should()
-                .beFreeOfCycles()
-                .allowEmptyShould(true));
+            "DCA-CYC-001",
+            "Domain Packages must not have cyclic dependencies",
+            "Domain model packages should have clear boundaries and no cycles (Acyclic Dependencies"
+                + " Principle)",
+            arch ->
+                slices()
+                    .assignedFrom(
+                        moduleLayerSlices(
+                            arch, root -> root + "." + layout.domainSubpackage() + ".model"))
+                    .should()
+                    .beFreeOfCycles()
+                    .allowEmptyShould(true))
+        .selecting(
+            "One slice per module root, holding the classes in <module>.domain.model.. of that"
+                + " module. A module root is the shortest package prefix whose next segment is a"
+                + " layer segment, so modules are found at any depth; classes outside every module"
+                + " or outside domain.model are ignored.")
+        .checking(
+            "The slices form no dependency cycle - no two modules' domain models depend on each"
+                + " other, directly or via further modules' domain models. Cycles between classes"
+                + " inside one module's domain model do not count, and dependencies into other"
+                + " layers do not count. Fewer than two slices pass.");
   }
 
   public static DcaRule applicationLayerFreeOfCycles(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-CYC-002",
-        "Application Layer must not have cyclic dependencies",
-        "Application services should have clear boundaries and no cycles",
-        arch ->
-            slices()
-                .assignedFrom(
-                    moduleLayerSlices(arch, root -> root + "." + layout.applicationSubpackage()))
-                .should()
-                .beFreeOfCycles()
-                .allowEmptyShould(true));
+            "DCA-CYC-002",
+            "Application Layer must not have cyclic dependencies",
+            "Application services should have clear boundaries and no cycles",
+            arch ->
+                slices()
+                    .assignedFrom(
+                        moduleLayerSlices(
+                            arch, root -> root + "." + layout.applicationSubpackage()))
+                    .should()
+                    .beFreeOfCycles()
+                    .allowEmptyShould(true))
+        .selecting(
+            "One slice per module root, holding the classes in <module>.application.. of that"
+                + " module (application.shared included); classes outside every module or outside"
+                + " the application layer are ignored.")
+        .checking(
+            "The slices form no dependency cycle between modules' application layers. Cycles"
+                + " between use cases or features inside one module do not count here (see"
+                + " DCA-CYC-005), nor do dependencies into domain or adapter classes.");
   }
 
   public static DcaRule outgoingAdaptersFreeOfCycles(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-CYC-003",
-        "Outgoing Adapter Packages must not have cyclic dependencies",
-        "Outgoing adapters should have clear boundaries and no cycles",
-        arch ->
-            slices()
-                .assignedFrom(
-                    moduleLayerSlices(
-                        arch,
-                        root ->
-                            root
-                                + "."
-                                + layout.adapterSubpackage()
-                                + "."
-                                + layout.outgoingSubpackage()))
-                .should()
-                .beFreeOfCycles()
-                .allowEmptyShould(true));
+            "DCA-CYC-003",
+            "Outgoing Adapter Packages must not have cyclic dependencies",
+            "Outgoing adapters should have clear boundaries and no cycles",
+            arch ->
+                slices()
+                    .assignedFrom(
+                        moduleLayerSlices(
+                            arch,
+                            root ->
+                                root
+                                    + "."
+                                    + layout.adapterSubpackage()
+                                    + "."
+                                    + layout.outgoingSubpackage()))
+                    .should()
+                    .beFreeOfCycles()
+                    .allowEmptyShould(true))
+        .selecting(
+            "One slice per module root, holding the classes in <module>.adapter.outgoing.. of"
+                + " that module; everything else is ignored.")
+        .checking(
+            "The slices form no dependency cycle between modules' outgoing adapters. Cycles"
+                + " inside"
+                + " one module's outgoing adapters and dependencies into other layers do not"
+                + " count.");
   }
 
   public static DcaRule incomingAdaptersFreeOfCycles(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-CYC-004",
-        "Incoming Adapter Packages must not have cyclic dependencies",
-        "Incoming adapters should have clear boundaries and no cycles",
-        arch ->
-            slices()
-                .assignedFrom(
-                    moduleLayerSlices(
-                        arch,
-                        root ->
-                            root
-                                + "."
-                                + layout.adapterSubpackage()
-                                + "."
-                                + layout.incomingSubpackage()))
-                .should()
-                .beFreeOfCycles()
-                .allowEmptyShould(true));
+            "DCA-CYC-004",
+            "Incoming Adapter Packages must not have cyclic dependencies",
+            "Incoming adapters should have clear boundaries and no cycles",
+            arch ->
+                slices()
+                    .assignedFrom(
+                        moduleLayerSlices(
+                            arch,
+                            root ->
+                                root
+                                    + "."
+                                    + layout.adapterSubpackage()
+                                    + "."
+                                    + layout.incomingSubpackage()))
+                    .should()
+                    .beFreeOfCycles()
+                    .allowEmptyShould(true))
+        .selecting(
+            "One slice per module root, holding the classes in <module>.adapter.incoming.. of"
+                + " that module; everything else is ignored.")
+        .checking(
+            "The slices form no dependency cycle between modules' incoming adapters. Cycles"
+                + " inside"
+                + " one module's incoming adapters and dependencies into other layers do not"
+                + " count.");
   }
 
   /**
@@ -122,23 +157,35 @@ public final class CycleRules implements DcaRuleSet {
    */
   public static DcaRule applicationSlicesFreeOfCycles(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-CYC-005",
-        "Feature and use case packages within a module's application layer must not have cyclic"
-            + " dependencies",
-        "The packages directly below a module's application package are its features"
-            + " (application.<feature>.<usecase>) or, in a flat layout, its use cases"
-            + " (application.<usecase>). A feature is an optional, domain-named group of related"
-            + " use cases; it may depend on another feature in one direction, but a cycle between"
-            + " two of them means the grouping does not carry its weight - the shared concept"
-            + " belongs in application.shared, in the domain, or in one of the two. application.shared"
-            + " is the context-wide port package and is not a slice. The rule does not infer bounded"
-            + " contexts or aggregate ownership from the packages it slices",
-        arch ->
-            slices()
-                .assignedFrom(applicationChildSlices(arch, layout))
-                .should()
-                .beFreeOfCycles()
-                .allowEmptyShould(true));
+            "DCA-CYC-005",
+            "Feature and use case packages within a module's application layer must not have cyclic"
+                + " dependencies",
+            "The packages directly below a module's application package are its features"
+                + " (application.<feature>.<usecase>) or, in a flat layout, its use cases"
+                + " (application.<usecase>). A feature is an optional, domain-named group of related"
+                + " use cases; it may depend on another feature in one direction, but a cycle between"
+                + " two of them means the grouping does not carry its weight - the shared concept"
+                + " belongs in application.shared, in the domain, or in one of the two. application.shared"
+                + " is the context-wide port package and is not a slice. The rule does not infer bounded"
+                + " contexts or aggregate ownership from the packages it slices",
+            arch ->
+                slices()
+                    .assignedFrom(applicationChildSlices(arch, layout))
+                    .should()
+                    .beFreeOfCycles()
+                    .allowEmptyShould(true))
+        .selecting(
+            "One slice per immediate child package of <module>.application, for every module root:"
+                + " a feature in a grouped layout, a use case in a flat one, each with everything"
+                + " below it. Classes directly in the application package and everything below"
+                + " application.shared are ignored.")
+        .checking(
+            "The slices form no dependency cycle: two features or two use cases that depend on"
+                + " each other, directly or through further slices, are reported. Dependencies on"
+                + " application.shared, the domain or an adapter do not count. Slices of all"
+                + " modules are checked together, so a cycle through another module's use case"
+                + " package is"
+                + " reported here as well.");
   }
 
   /**

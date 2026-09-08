@@ -75,170 +75,205 @@ public final class UseCaseRules implements DcaRuleSet {
 
   public static DcaRule baseInputPortResidesInBuildingBlocks(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-USE-001",
-        "Base InputPort interface must be in the building-blocks port in package",
-        "Base InputPort interface defines the generic contract for all use cases (Hexagonal"
-            + " Architecture)",
-        arch ->
-            classes()
-                .that()
-                .areInterfaces()
-                .and()
-                .haveSimpleName("InputPort")
-                .should()
-                .resideInAPackage(DcaLayout.BUILDING_BLOCKS_PORT_IN_PACKAGE)
-                .allowEmptyShould(true));
+            "DCA-USE-001",
+            "Base InputPort interface must be in the building-blocks port in package",
+            "Base InputPort interface defines the generic contract for all use cases (Hexagonal"
+                + " Architecture)",
+            arch ->
+                classes()
+                    .that()
+                    .areInterfaces()
+                    .and()
+                    .haveSimpleName("InputPort")
+                    .should()
+                    .resideInAPackage(DcaLayout.BUILDING_BLOCKS_PORT_IN_PACKAGE)
+                    .allowEmptyShould(true))
+        .selecting("Interfaces named InputPort anywhere on the classpath under scan.")
+        .checking(
+            "The interface resides in the building-blocks package hexagonal.port.in - the generic contract is not redeclared in the project.");
   }
 
   public static DcaRule commandsResideInApplication(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-USE-002",
-        "Use Case Commands must end with 'Command' and reside in application package",
-        "Use case commands should be in application layer (CQRS pattern)",
-        arch ->
-            classes()
-                .that()
-                .haveSimpleNameEndingWith("Command")
-                .and()
-                .resideInAnyPackage(layout.basePackage() + "..")
-                .should()
-                .resideInAnyPackage(arch.allApplicationPatterns())
-                .allowEmptyShould(true));
+            "DCA-USE-002",
+            "Use Case Commands must end with 'Command' and reside in application package",
+            "Use case commands should be in application layer (CQRS pattern)",
+            arch ->
+                classes()
+                    .that()
+                    .haveSimpleNameEndingWith("Command")
+                    .and()
+                    .resideInAnyPackage(layout.basePackage() + "..")
+                    .should()
+                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .allowEmptyShould(true))
+        .selecting("Classes under the base package whose simple name ends with Command.")
+        .checking(
+            "Each resides in an application package of some module root (<module>.application..). A Command in a domain, adapter or infrastructure package is reported.");
   }
 
   public static DcaRule queriesResideInApplication(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-USE-003",
-        "Use Case Queries must end with 'Query' and reside in application package",
-        "Use case queries should be in application layer (CQRS pattern)",
-        arch ->
-            classes()
-                .that()
-                .haveSimpleNameEndingWith("Query")
-                .and()
-                .resideInAnyPackage(layout.basePackage() + "..")
-                .should()
-                .resideInAnyPackage(arch.allApplicationPatterns())
-                .allowEmptyShould(true));
+            "DCA-USE-003",
+            "Use Case Queries must end with 'Query' and reside in application package",
+            "Use case queries should be in application layer (CQRS pattern)",
+            arch ->
+                classes()
+                    .that()
+                    .haveSimpleNameEndingWith("Query")
+                    .and()
+                    .resideInAnyPackage(layout.basePackage() + "..")
+                    .should()
+                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .allowEmptyShould(true))
+        .selecting("Classes under the base package whose simple name ends with Query.")
+        .checking(
+            "Each resides in an application package of some module root (<module>.application..).");
   }
 
   public static DcaRule commandsAreImmutable(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-USE-004",
-        "Use Case Commands should be immutable (final or records)",
-        "Use case commands should be immutable (value objects)",
-        arch -> immutableApplicationModels(arch, "Command"));
+            "DCA-USE-004",
+            "Use Case Commands should be immutable (final or records)",
+            "Use case commands should be immutable (value objects)",
+            arch -> immutableApplicationModels(arch, "Command"))
+        .selecting(
+            "Non-interface, non-record classes in <module>.application.. whose simple name ends with Command.")
+        .checking(
+            "The class is final. Records and interfaces are not selected, so a record Command always passes.");
   }
 
   public static DcaRule queriesAreImmutable(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-USE-005",
-        "Use Case Queries should be immutable (final or records)",
-        "Use case queries should be immutable (value objects)",
-        arch -> immutableApplicationModels(arch, "Query"));
+            "DCA-USE-005",
+            "Use Case Queries should be immutable (final or records)",
+            "Use case queries should be immutable (value objects)",
+            arch -> immutableApplicationModels(arch, "Query"))
+        .selecting(
+            "Non-interface, non-record classes in <module>.application.. whose simple name ends with Query.")
+        .checking("The class is final. Records and interfaces are not selected.");
   }
 
   public static DcaRule resultsResideInApplication(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-USE-006",
-        "Use Case Result Models must end with 'Result' and reside in application package",
-        "Use case result models should be in application layer. Domain Value Objects with 'Result'"
-            + " in name are allowed in domain layer.",
-        arch ->
-            classes()
-                .that()
-                .haveSimpleNameEndingWith("Result")
-                .and()
-                .resideInAnyPackage(layout.basePackage() + "..")
-                .and()
-                .doNotImplement(Value.class)
-                .should()
-                .resideInAnyPackage(arch.allApplicationPatterns())
-                .allowEmptyShould(true));
+            "DCA-USE-006",
+            "Use Case Result Models must end with 'Result' and reside in application package",
+            "Use case result models should be in application layer. Domain Value Objects with 'Result'"
+                + " in name are allowed in domain layer.",
+            arch ->
+                classes()
+                    .that()
+                    .haveSimpleNameEndingWith("Result")
+                    .and()
+                    .resideInAnyPackage(layout.basePackage() + "..")
+                    .and()
+                    .doNotImplement(Value.class)
+                    .should()
+                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .allowEmptyShould(true))
+        .selecting(
+            "Classes under the base package whose simple name ends with Result and that do not implement Value.")
+        .checking(
+            "Each resides in an application package of some module root (<module>.application..). A domain value object named *Result is exempt because it implements Value.");
   }
 
   public static DcaRule resultsAreImmutable(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-USE-007",
-        "Use Case Result Models should be immutable (final or records)",
-        "Use case result models should be immutable (value objects)",
-        arch -> immutableApplicationModels(arch, "Result"));
+            "DCA-USE-007",
+            "Use Case Result Models should be immutable (final or records)",
+            "Use case result models should be immutable (value objects)",
+            arch -> immutableApplicationModels(arch, "Result"))
+        .selecting(
+            "Non-interface, non-record classes in <module>.application.. whose simple name ends with Result.")
+        .checking("The class is final. Records and interfaces are not selected.");
   }
 
   public static DcaRule responsesResideInIncomingAdapters(DcaLayout layout) {
     // Matched by pattern: every incoming adapter, in any context or none, including the shared
     // kernel's adapter where cross-cutting Response classes typically live.
     return DcaRule.of(
-        "DCA-USE-008",
-        "HTTP Response Models must end with 'Response' and reside in adapter incoming package",
-        "HTTP response models should be in adapter incoming layer",
-        arch ->
-            classes()
-                .that()
-                .haveSimpleNameEndingWith("Response")
-                .and()
-                .resideInAnyPackage(layout.basePackage() + "..")
-                .should()
-                .resideInAnyPackage(arch.allIncomingAdapterPatterns())
-                .allowEmptyShould(true));
+            "DCA-USE-008",
+            "HTTP Response Models must end with 'Response' and reside in adapter incoming package",
+            "HTTP response models should be in adapter incoming layer",
+            arch ->
+                classes()
+                    .that()
+                    .haveSimpleNameEndingWith("Response")
+                    .and()
+                    .resideInAnyPackage(layout.basePackage() + "..")
+                    .should()
+                    .resideInAnyPackage(arch.allIncomingAdapterPatterns())
+                    .allowEmptyShould(true))
+        .selecting("Classes under the base package whose simple name ends with Response.")
+        .checking(
+            "Each resides in an incoming-adapter package of some module root (<module>.adapter.incoming..), the shared kernel's included.");
   }
 
   public static DcaRule useCasesPublishDomainEventsAfterSaving(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-USE-009",
-        "Use cases that save an aggregate must publish its domain events",
-        "A saved aggregate must not keep its events: unpublished, they are lost, and stored on the"
-            + " instance they may later be published out of context. Publishing belongs after the"
-            + " save, in the use case that owns the unit of work - even when the action raised no"
-            + " event. Checked per entry path, following calls within the use case class: every"
-            + " entry point that reaches a save - a method callable from outside the class, or one"
-            + " nothing in the class calls - must also reach a publication; a wrapper that publishes"
-            + " does not cover a direct call of the public method it wraps, and a helper two methods"
-            + " share does not connect them. That the"
-            + " publication follows the save and concerns the same aggregate is not established"
-            + " statically",
-        arch ->
-            classes()
-                .that()
-                .resideInAnyPackage(arch.allApplicationPatterns())
-                .and()
-                .haveSimpleNameEndingWith(layout.useCaseSuffix())
-                .and()
-                .areNotInterfaces()
-                .should(publishAfterSaving())
-                .allowEmptyShould(true));
+            "DCA-USE-009",
+            "Use cases that save an aggregate must publish its domain events",
+            "A saved aggregate must not keep its events: unpublished, they are lost, and stored on the"
+                + " instance they may later be published out of context. Publishing belongs after the"
+                + " save, in the use case that owns the unit of work - even when the action raised no"
+                + " event. Checked per entry path, following calls within the use case class: every"
+                + " entry point that reaches a save - a method callable from outside the class, or one"
+                + " nothing in the class calls - must also reach a publication; a wrapper that publishes"
+                + " does not cover a direct call of the public method it wraps, and a helper two methods"
+                + " share does not connect them. That the"
+                + " publication follows the save and concerns the same aggregate is not established"
+                + " statically",
+            arch ->
+                classes()
+                    .that()
+                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .and()
+                    .haveSimpleNameEndingWith(layout.useCaseSuffix())
+                    .and()
+                    .areNotInterfaces()
+                    .should(publishAfterSaving())
+                    .allowEmptyShould(true))
+        .selecting(
+            "Non-interface classes in <module>.application.. whose simple name ends with the configured use-case suffix.")
+        .checking(
+            "For every method of the class that calls Repository.save, every entry point reaching it (a method callable from outside the class, or one nothing in the class calls) also reaches, through calls within the class, a call of DomainEventPublisher.publishAndClearEvents. Only publishAndClearEvents counts - publish(event), even followed by clearDomainEvents(), does not. A use case without a save (a query, a bulk delete) is selected but has nothing to check and passes.");
   }
 
   public static DcaRule noDtosInDomain(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-USE-010",
-        "DTOs must not be used in the Domain Layer",
-        "Domain layer should not depend on DTOs (presentation concerns) - Dependency Inversion"
-            + " Principle",
-        arch ->
-            noClasses()
-                .that()
-                .resideInAnyPackage(arch.allDomainPatterns())
-                .should()
-                .dependOnClassesThat()
-                .haveSimpleNameEndingWith("Dto")
-                .allowEmptyShould(true));
+            "DCA-USE-010",
+            "DTOs must not be used in the Domain Layer",
+            "Domain layer should not depend on DTOs (presentation concerns) - Dependency Inversion"
+                + " Principle",
+            arch ->
+                noClasses()
+                    .that()
+                    .resideInAnyPackage(arch.allDomainPatterns())
+                    .should()
+                    .dependOnClassesThat()
+                    .haveSimpleNameEndingWith("Dto")
+                    .allowEmptyShould(true))
+        .selecting("Classes in <module>.domain.. of every module root.")
+        .checking("No dependency on a class whose simple name ends with Dto.");
   }
 
   public static DcaRule noDtosInApplication(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-USE-011",
-        "DTOs must not be used in the Application Layer",
-        "Application layer should use Command/Query/Response models, not presentation DTOs (Clean"
-            + " Architecture)",
-        arch ->
-            noClasses()
-                .that()
-                .resideInAnyPackage(arch.allApplicationPatterns())
-                .should()
-                .dependOnClassesThat()
-                .haveSimpleNameEndingWith("Dto")
-                .allowEmptyShould(true));
+            "DCA-USE-011",
+            "DTOs must not be used in the Application Layer",
+            "Application layer should use Command/Query/Response models, not presentation DTOs (Clean"
+                + " Architecture)",
+            arch ->
+                noClasses()
+                    .that()
+                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .should()
+                    .dependOnClassesThat()
+                    .haveSimpleNameEndingWith("Dto")
+                    .allowEmptyShould(true))
+        .selecting("Classes in <module>.application.. of every module root.")
+        .checking(
+            "No dependency on a class whose simple name ends with Dto. Command, Query and Result models are not DTOs by this rule's definition - only the Dto suffix is checked.");
   }
 
   private static com.tngtech.archunit.lang.ArchRule immutableApplicationModels(
@@ -259,59 +294,68 @@ public final class UseCaseRules implements DcaRuleSet {
 
   public static DcaRule publishingUseCasesAreTransactional(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-USE-012",
-        "Use cases that publish domain events must have a transaction boundary",
-        "Integration events are relayed after commit (@TransactionalEventListener,"
-            + " @ApplicationModuleListener) and their publication is registered in the publishing"
-            + " transaction. Without an active transaction the after-commit listeners are skipped"
-            + " silently and nothing is registered: the use case succeeds, the other contexts never"
-            + " hear of it. The use case that publishes owns the boundary - either declarative"
-            + " transaction metadata (@Transactional on the class or the executing method) or an"
-            + " explicit TransactionBoundary.inTransaction(...) around save and publish. Checked"
-            + " per entry path, following calls within the class: from every entry point - a"
-            + " method callable from outside the class, or one nothing in the class calls - no route"
-            + " down to the publishing method may be free of an annotation or a boundary; a covered"
-            + " caller does not cover another route to the same helper, and a boundary on one route"
-            + " does not cover a second route. Whether the publication sits inside the block"
-            + " handed to inTransaction(...) is not visible in ArchUnit's call model, which folds a"
-            + " lambda's body into the enclosing method; that placement stays a review check",
-        arch ->
-            classes()
-                .that()
-                .resideInAnyPackage(arch.allApplicationPatterns())
-                .and()
-                .haveSimpleNameEndingWith(layout.useCaseSuffix())
-                .and()
-                .areNotInterfaces()
-                .should(
-                    beTransactionalWhenPublishing(layout.frameworkAnnotations().transactional()))
-                .allowEmptyShould(true));
+            "DCA-USE-012",
+            "Use cases that publish domain events must have a transaction boundary",
+            "Integration events are relayed after commit (@TransactionalEventListener,"
+                + " @ApplicationModuleListener) and their publication is registered in the publishing"
+                + " transaction. Without an active transaction the after-commit listeners are skipped"
+                + " silently and nothing is registered: the use case succeeds, the other contexts never"
+                + " hear of it. The use case that publishes owns the boundary - either declarative"
+                + " transaction metadata (@Transactional on the class or the executing method) or an"
+                + " explicit TransactionBoundary.inTransaction(...) around save and publish. Checked"
+                + " per entry path, following calls within the class: from every entry point - a"
+                + " method callable from outside the class, or one nothing in the class calls - no route"
+                + " down to the publishing method may be free of an annotation or a boundary; a covered"
+                + " caller does not cover another route to the same helper, and a boundary on one route"
+                + " does not cover a second route. Whether the publication sits inside the block"
+                + " handed to inTransaction(...) is not visible in ArchUnit's call model, which folds a"
+                + " lambda's body into the enclosing method; that placement stays a review check",
+            arch ->
+                classes()
+                    .that()
+                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .and()
+                    .haveSimpleNameEndingWith(layout.useCaseSuffix())
+                    .and()
+                    .areNotInterfaces()
+                    .should(
+                        beTransactionalWhenPublishing(
+                            layout.frameworkAnnotations().transactional()))
+                    .allowEmptyShould(true))
+        .selecting(
+            "Non-interface classes in <module>.application.. whose simple name ends with the configured use-case suffix.")
+        .checking(
+            "For every method that calls a DomainEventPublisher, every route from each entry point down to it is covered: the class carries the configured @Transactional, or every uncovered unit on the route is either annotated or calls TransactionBoundary.inTransaction. A covered caller does not cover a second route to the same helper. Whether the publish call sits inside the inTransaction block is not checked - ArchUnit folds a lambda into its enclosing method.");
   }
 
   public static DcaRule transactionalUseCasesDoNotCallRemotePorts(DcaLayout layout) {
     return DcaRule.of(
-        "DCA-USE-013",
-        "Declaratively transactional use cases must not call remote-capable output ports",
-        "A @Transactional use case holds a database connection for its whole run. Calling an"
-            + " output port that may leave the process (another context's API, a payment provider,"
-            + " a mail gateway) inside it blocks that connection for the remote round trip; under"
-            + " load the pool runs dry, and a rollback cannot undo the remote effect. Only"
-            + " transactional resources belong inside the boundary: Repository, Store,"
-            + " DomainEventPublisher, IntegrationEventPublisher. Everything else is called before"
-            + " the transaction - draw the boundary by hand with TransactionBoundary.inTransaction(...)"
-            + " - or after it, as a reaction to an integration event",
-        arch ->
-            classes()
-                .that()
-                .resideInAnyPackage(arch.allApplicationPatterns())
-                .and()
-                .haveSimpleNameEndingWith(layout.useCaseSuffix())
-                .and()
-                .areNotInterfaces()
-                .should(
-                    notCallRemotePortsWhenTransactional(
-                        layout.frameworkAnnotations().transactional()))
-                .allowEmptyShould(true));
+            "DCA-USE-013",
+            "Declaratively transactional use cases must not call remote-capable output ports",
+            "A @Transactional use case holds a database connection for its whole run. Calling an"
+                + " output port that may leave the process (another context's API, a payment provider,"
+                + " a mail gateway) inside it blocks that connection for the remote round trip; under"
+                + " load the pool runs dry, and a rollback cannot undo the remote effect. Only"
+                + " transactional resources belong inside the boundary: Repository, Store,"
+                + " DomainEventPublisher, IntegrationEventPublisher. Everything else is called before"
+                + " the transaction - draw the boundary by hand with TransactionBoundary.inTransaction(...)"
+                + " - or after it, as a reaction to an integration event",
+            arch ->
+                classes()
+                    .that()
+                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .and()
+                    .haveSimpleNameEndingWith(layout.useCaseSuffix())
+                    .and()
+                    .areNotInterfaces()
+                    .should(
+                        notCallRemotePortsWhenTransactional(
+                            layout.frameworkAnnotations().transactional()))
+                    .allowEmptyShould(true))
+        .selecting(
+            "Non-interface classes in <module>.application.. whose simple name ends with the configured use-case suffix.")
+        .checking(
+            "Every method that runs under the configured @Transactional - on the class, on itself, or on a method that reaches it within the class - calls no OutputPort other than Repository, Store, DomainEventPublisher or IntegrationEventPublisher. A use case without @Transactional (explicit TransactionBoundary or none) is selected but never reported.");
   }
 
   /**
@@ -324,19 +368,23 @@ public final class UseCaseRules implements DcaRuleSet {
    */
   public static DcaRule useCasePackagesUseOneDepth(DcaLayout layout) {
     return DcaRule.check(
-        "DCA-USE-014",
-        "Use case packages within a module must use one consistent depth (flat or grouped by"
-            + " feature)",
-        "A use case package sits either directly below the application package"
-            + " (application.<usecase>) or one level deeper inside a feature"
-            + " (application.<feature>.<usecase>). A feature is an optional, domain-named group of"
-            + " related use cases - a navigation boundary inside one bounded context, not a layer,"
-            + " module or aggregate owner. Mixing both forms in one module makes it unclear whether"
-            + " a package is a feature, a use case or a leftover; nesting deeper than a feature hides"
-            + " the use case. The rule checks legibility only: it does not infer bounded contexts,"
-            + " feature semantics or aggregate ownership. application.shared holds the context-wide"
-            + " output ports and is not a use case package",
-        arch -> checkUseCaseDepth(arch, layout));
+            "DCA-USE-014",
+            "Use case packages within a module must use one consistent depth (flat or grouped by"
+                + " feature)",
+            "A use case package sits either directly below the application package"
+                + " (application.<usecase>) or one level deeper inside a feature"
+                + " (application.<feature>.<usecase>). A feature is an optional, domain-named group of"
+                + " related use cases - a navigation boundary inside one bounded context, not a layer,"
+                + " module or aggregate owner. Mixing both forms in one module makes it unclear whether"
+                + " a package is a feature, a use case or a leftover; nesting deeper than a feature hides"
+                + " the use case. The rule checks legibility only: it does not infer bounded contexts,"
+                + " feature semantics or aggregate ownership. application.shared holds the context-wide"
+                + " output ports and is not a use case package",
+            arch -> checkUseCaseDepth(arch, layout))
+        .selecting(
+            "Per module root: non-interface, non-abstract, non-nested classes below <module>.application whose simple name ends with the configured use-case suffix, excluding application.shared and everything below it.")
+        .checking(
+            "All of them sit at one depth: application.<usecase> (flat) or application.<feature>.<usecase> (grouped). Reported are a use case directly in the application package, one nested deeper than a feature, and a module mixing both depths. What a feature means is not checked.");
   }
 
   private static void checkUseCaseDepth(DcaArchitecture arch, DcaLayout layout) {
@@ -421,15 +469,19 @@ public final class UseCaseRules implements DcaRuleSet {
    */
   public static DcaRule resultsMustNotExposeAggregatesOrEntities(DcaLayout layout) {
     return DcaRule.check(
-        "DCA-USE-015",
-        "Use Case Result Models must not expose aggregate roots or entities",
-        "A result is the use case's answer, not a handle on the model: identity and behaviour stay"
-            + " behind the port; values, enriched models and read models may cross. Checked"
-            + " transitively through nested records, part records anywhere in the application layer"
-            + " (application.shared included), generic type arguments (List<T>, Optional<T>,"
-            + " Map<K,V>) and inherited fields, a generic base class's type parameters resolved as"
-            + " the result binds them",
-        arch -> checkResultsCarryNoIdentities(arch));
+            "DCA-USE-015",
+            "Use Case Result Models must not expose aggregate roots or entities",
+            "A result is the use case's answer, not a handle on the model: identity and behaviour stay"
+                + " behind the port; values, enriched models and read models may cross. Checked"
+                + " transitively through nested records, part records anywhere in the application layer"
+                + " (application.shared included), generic type arguments (List<T>, Optional<T>,"
+                + " Map<K,V>) and inherited fields, a generic base class's type parameters resolved as"
+                + " the result binds them",
+            arch -> checkResultsCarryNoIdentities(arch))
+        .selecting(
+            "Non-interface, non-nested classes in <module>.application.. whose simple name ends with Result.")
+        .checking(
+            "No instance field - inherited ones included, walked through raw type and generic type arguments, and transitively into every record that lives in an application package - involves a type assignable to AggregateRoot or Entity. Records outside the application layer (domain value objects, read models) are not walked. Every offending path is reported.");
   }
 
   private static void checkResultsCarryNoIdentities(DcaArchitecture arch) {

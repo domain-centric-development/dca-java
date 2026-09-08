@@ -260,3 +260,19 @@ fixtures; `DCA-USE-015` already substituted generic bases through reflection; `D
 rejected the own-type list and gained arrays and generic-base members alongside. Rule count unchanged
 (114). Self-tests 356 → 367 (Java).
 
+## Rule descriptions (all sets, 2026-09-07)
+
+Every rule gained `selecting(...)` / `checking(...)` texts (mandatory, see `PORTING.md`). Writing them against the
+code surfaced no defect in the rules themselves, but it made three asymmetries explicit that the texts now state
+rather than hide: `DCA-NAM-005` and `DCA-HEX-003` test the literal suffix `Controller` while `DCA-NAM-006`
+reads the configured REST-controller suffix; `DCA-USE-009` accepts only `publishAndClearEvents`, not
+`publish(event)` + `clearDomainEvents()`; `DCA-USE-013` never reports a use case without the configured
+`@Transactional`, however it draws its boundary.
+
+## Parity with the .NET port (WP-26 Part B, 2026-09-08)
+
+Two rules moved towards the .NET reading: `DCA-ADV-012`/`DCA-ADV-016` check inherited fields
+(`haveOnlyFinalFieldsIncludingInherited()` over `getAllFields()`, `Object`'s excluded); `DCA-NAM-010` adds
+`Implementation`. Everything else in `TODO.md` #47 was either fixed on the .NET side or recorded as a deliberate
+difference.
+

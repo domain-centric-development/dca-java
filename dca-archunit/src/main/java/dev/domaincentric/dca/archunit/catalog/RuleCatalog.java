@@ -11,9 +11,9 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * Renders the rule catalog — every rule set with id, title and rationale — as markdown ({@code
- * RULES.md}) and as machine-readable JSON ({@code rules.json}, consumed by the DCA knowledge
- * catalog).
+ * Renders the rule catalog — every rule set with id, title, rationale and the two mechanics
+ * descriptions ({@code selects}, {@code checks}) — as markdown ({@code RULES.md}) and as
+ * machine-readable JSON ({@code rules.json}, consumed by the DCA knowledge catalog).
  *
  * <p>Run via {@code ./gradlew :dca-archunit:rulesCatalog} or {@code java -cp … RuleCatalog
  * <outputDir>}.
@@ -51,7 +51,8 @@ public final class RuleCatalog {
         .append(" sets.\n\n");
     for (DcaRuleSet set : sets) {
       sb.append("## `").append(set.name()).append("`\n\n");
-      sb.append("| Id | Rule | Rationale |\n|----|------|-----------|\n");
+      sb.append(
+          "| Id | Rule | Rationale | Selects | Checks |\n|----|------|-----------|---------|--------|\n");
       for (DcaRule rule : set.rules()) {
         sb.append("| `")
             .append(rule.id())
@@ -59,6 +60,10 @@ public final class RuleCatalog {
             .append(escapeCell(rule.title()))
             .append(" | ")
             .append(escapeCell(rule.rationale()))
+            .append(" | ")
+            .append(escapeCell(rule.selects()))
+            .append(" | ")
+            .append(escapeCell(rule.checks()))
             .append(" |\n");
       }
       sb.append('\n');
@@ -66,7 +71,10 @@ public final class RuleCatalog {
     return sb.toString();
   }
 
-  /** The catalog as JSON: {@code [{"set":…,"id":…,"title":…,"rationale":…}, …]}. */
+  /**
+   * The catalog as JSON: {@code [{"set":…,"id":…,"title":…,"rationale":…,"selects":…,"checks":…},
+   * …]}.
+   */
   public static String json() {
     StringBuilder sb = new StringBuilder("[\n");
     boolean first = true;
@@ -84,6 +92,10 @@ public final class RuleCatalog {
             .append(quote(rule.title()))
             .append(", \"rationale\": ")
             .append(quote(rule.rationale()))
+            .append(", \"selects\": ")
+            .append(quote(rule.selects()))
+            .append(", \"checks\": ")
+            .append(quote(rule.checks()))
             .append('}');
       }
     }

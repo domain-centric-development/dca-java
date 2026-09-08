@@ -4,6 +4,26 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Added
+
+- Every rule describes its mechanics: `DcaRule.selects()` names the classes the rule looks at, `DcaRule.checks()`
+  what it asserts about them - including what does not count (`publish(event)` is no publication for
+  `DCA-USE-009`; a `Result` that implements `Value` is exempt from `DCA-USE-006`) and what is deliberately not
+  established. `rules.json` carries both as `selects`/`checks`, `RULES.md` shows them as two columns; the
+  knowledge catalog renders them as **Selection**/**Check** and embeds the private helpers a rule calls, so
+  nobody needs the sources jar to predict a rule.
+
+### Changed
+
+- `DCA-ADV-012` / `DCA-ADV-016` (stateless domain services and factories) check **inherited** fields too, not
+  only the ones the class declares - a mutable field from a base class is state all the same. Aligns with
+  the .NET twin.
+- `DCA-NAM-010` forbids a sixth suffix in the domain: `Implementation`, the spelled-out `Impl`. Aligns with
+  the .NET twin.
+- **Rule authors:** `DcaRule.of(...)` and `DcaRule.check(...)` return `DcaRule.Undescribed`; the rule is
+  completed with `.selecting(String).checking(String)`, both mandatory (blank text throws). Consumers that
+  only run the catalog (`DcaArchitectureTest`, `DcaRules.checkAll`) are unaffected.
+
 ## [0.2.0] - 2026-09-07
 
 **Migrating from 0.1.0.** Four things can break a consumer; everything else is stricter enforcement
