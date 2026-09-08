@@ -4,6 +4,10 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-08
+
+Depends on `dca-building-blocks` 0.1.2.
+
 ### Added
 
 - Every rule describes its mechanics: `DcaRule.selects()` names the classes the rule looks at, `DcaRule.checks()`

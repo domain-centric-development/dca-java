@@ -4,6 +4,11 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-08
+
+Documentation-only release: no type, signature or behaviour changed; the javadoc that ships in the
+`-javadoc` and `-sources` jars is what the knowledge catalog now renders. Binary-compatible with 0.1.1.
+
 ### Changed
 
 - `Repository`'s javadoc names `findById`/`save`/`deleteById` as the deliberate minimum and says that a
