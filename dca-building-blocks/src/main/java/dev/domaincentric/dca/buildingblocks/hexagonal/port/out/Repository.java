@@ -40,6 +40,12 @@ import java.util.Optional;
  *   <li>{@code deleteById(ID)} - Remove an aggregate from the collection
  * </ul>
  *
+ * <p>These three are the deliberate minimum: what every aggregate's life cycle needs and nothing a
+ * concrete port would have to override. The port extends them freely with the questions its use
+ * cases ask - {@code findBySku(SKU)}, {@code existsBySku(SKU)}, {@code count()}, {@code
+ * deleteAll()}; the marker adds no generic {@code existsById} or {@code findAll}, because whether
+ * such a question is asked at all is a decision of the owning context, not of the building block.
+ *
  * <p><b>Example:</b>
  *
  * <pre>

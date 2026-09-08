@@ -24,12 +24,14 @@ import java.util.List;
  * // 2. Repository saves aggregate
  * productRepository.save(product);
  *
- * // 3. Application service publishes events
- * product.domainEvents().forEach(eventPublisher::publish);
- *
- * // 4. Clear events after publishing
- * product.clearDomainEvents();
+ * // 3. Use case publishes and clears the events, still inside the transaction
+ * eventPublisher.publishAndClearEvents(product);
  * </pre>
+ *
+ * <p>Publishing and clearing is one step, {@code DomainEventPublisher.publishAndClearEvents}: the
+ * publisher dispatches every collected event and clears the aggregate only once every listener
+ * returned. Iterating {@code domainEvents()} and calling {@code publish} per event leaves the
+ * clearing to the caller and is not the sanctioned form.
  *
  * @param <T> the aggregate root type
  * @param <ID> the aggregate root ID type

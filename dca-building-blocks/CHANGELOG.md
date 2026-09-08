@@ -4,6 +4,20 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Changed
+
+- `Repository`'s javadoc names `findById`/`save`/`deleteById` as the deliberate minimum and says that a
+  concrete port extends them freely (`existsBySku`, `count`, `deleteAll`) - the marker adds no generic
+  `existsById`/`findAll` on purpose. Documentation only; the sentence flows verbatim into the knowledge
+  catalog's marker node.
+- `Id`, `Entity` and `Value` had no javadoc at all - their knowledge-catalog nodes read "Marker for
+  Entity." They now describe the contract: identity vs. attribute equality, why identifiers are typed,
+  non-root Entities created only through their root and never returned from a Repository, Value Objects
+  immutable and self-validating; `Entity.id()` and `sameIdentityAs` are documented.
+- `AggregateRoot`'s usage pattern showed `domainEvents().forEach(eventPublisher::publish)` followed by
+  `clearDomainEvents()` - the form `DCA-USE-009` rejects. It now shows
+  `eventPublisher.publishAndClearEvents(product)` and says that this is the one sanctioned form.
+
 ## [0.1.1] - 2026-09-07
 
 Documentation-only release: no type, signature or behaviour changed; the javadoc that ships in the
