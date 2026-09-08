@@ -25,7 +25,7 @@ for arg in "$@"; do
     *)   ARTIFACTS+=("$arg") ;;
   esac
 done
-[ ${#ARTIFACTS[@]} -gt 0 ] || ARTIFACTS=(dca-building-blocks dca-archunit dca-spring dca-archunit-modulith)
+[ ${#ARTIFACTS[@]} -gt 0 ] || ARTIFACTS=(dca-building-blocks dca-archunit dca-spring dca-archunit-spring-modulith)
 
 TASKS=()
 for artifact in "${ARTIFACTS[@]}"; do

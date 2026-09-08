@@ -27,11 +27,11 @@ consumer's BOM pins the version:
 
 - `dca-spring` (runtime): `SpringDomainEventPublisher`, `SpringTransactionBoundary`,
   `InMemoryTransactionBoundary`, `DcaSpringAutoConfiguration`.
-- `dca-archunit-modulith` (test): `DcaModulithTest`, `ModulithModules` with the test-class filter.
+- `dca-archunit-spring-modulith` (test): `DcaModulithTest`, `ModulithModules` with the test-class filter.
 
 `dca-building-blocks` and `dca-archunit` stay framework-free; a build check (`verifyFrameworkFree`) fails
 if Spring appears on their class paths. A consumer therefore pairs two production with two test
-dependencies: building blocks + spring, archunit + archunit-modulith.
+dependencies: building blocks + spring, archunit + archunit-spring-modulith.
 
 **No no-op `PlatformTransactionManager` is published.** The in-memory phase needs one, but a published
 no-op is a footgun that survives into production. The auto-configuration's javadoc, the README and the

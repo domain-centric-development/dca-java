@@ -1,8 +1,8 @@
 # Releasing
 
-All four artifacts — `dca-building-blocks`, `dca-archunit`, `dca-spring`, `dca-archunit-modulith` — go to
+All four artifacts — `dca-building-blocks`, `dca-archunit`, `dca-spring`, `dca-archunit-spring-modulith` — go to
 Maven Central (Sonatype Central Portal) under the namespace `dev.domaincentric`, independently versioned,
-one tag per artifact (`building-blocks/v…`, `archunit/v…`, `spring/v…`, `archunit-modulith/v…`).
+one tag per artifact (`building-blocks/v…`, `archunit/v…`, `spring/v…`, `archunit-spring-modulith/v…`).
 
 **Publishing runs on the maintainer's machine**, via [scripts/release.sh](scripts/release.sh). The GPG
 signing key stays there — CI never sees it. GitHub Actions builds and tests every push, and on a release
@@ -73,7 +73,7 @@ The current signing key is `6CE5EF6C96B86413FC5E1F17C6773EDA846201AB` (RSA 4096,
 ## Releasing an artifact
 
 ```bash
-./scripts/release.sh building-blocks 0.1.0     # or: archunit 0.1.0 · spring 0.1.0 · archunit-modulith 0.1.0
+./scripts/release.sh building-blocks 0.1.0     # or: archunit 0.1.0 · spring 0.1.0 · archunit-spring-modulith 0.1.0
 ```
 
 The script refuses to continue unless everything is in order, then asks for the GPG passphrase, builds,
@@ -82,9 +82,9 @@ signs, checks the signatures locally, asks for a typed confirmation and uploads:
 1. clean working tree, tag not taken, `## [0.1.0]` section present in that artifact's `CHANGELOG.md`,
    signing key in the keyring
 2. for `dca-archunit` and `dca-spring`: `buildingBlocksVersion` in [gradle.properties](gradle.properties)
-   names a released version; for `dca-archunit-modulith`: `archunitVersion` does — it becomes the
+   names a released version; for `dca-archunit-spring-modulith`: `archunitVersion` does — it becomes the
    dependency version in the published POM. Release order therefore: building blocks, then archunit
-   and spring, then archunit-modulith
+   and spring, then archunit-spring-modulith
 3. Central token from environment, keychain or prompt ([scripts/lib/central-token.sh](scripts/lib/central-token.sh),
    shared with `publish-snapshot.sh`); GPG passphrase prompt (the passphrase reaches
    `gpg` on stdin, never as an argument)

@@ -7,7 +7,7 @@ plugins {
 
 // dca-building-blocks and dca-archunit are framework-free by contract: the rules forbid Spring in
 // the domain, and these two are what the rules are written against. dca-spring and
-// dca-archunit-modulith exist precisely so that Spring never has to appear here.
+// dca-archunit-spring-modulith exist precisely so that Spring never has to appear here.
 val frameworkFree = setOf("dca-building-blocks", "dca-archunit")
 
 subprojects {

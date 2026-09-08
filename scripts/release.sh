@@ -5,7 +5,7 @@
 #   ./scripts/release.sh building-blocks 0.1.0
 #   ./scripts/release.sh archunit 0.1.0
 #   ./scripts/release.sh spring 0.1.0
-#   ./scripts/release.sh archunit-modulith 0.1.0
+#   ./scripts/release.sh archunit-spring-modulith 0.1.0
 #
 # The Central Portal user token is never stored in a build file. It is taken from, in order:
 #   1. ORG_GRADLE_PROJECT_mavenCentralUsername / …Password in the environment
@@ -25,7 +25,7 @@ die() { echo "error: $*" >&2; exit 1; }
 # shellcheck source=lib/artifacts.sh
 . scripts/lib/artifacts.sh
 
-[ $# -eq 2 ] || die "usage: $0 <building-blocks|archunit|spring|archunit-modulith> <version>"
+[ $# -eq 2 ] || die "usage: $0 <building-blocks|archunit|spring|archunit-spring-modulith> <version>"
 ARTIFACT="$1"
 VERSION="$2"
 

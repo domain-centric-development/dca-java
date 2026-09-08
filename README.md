@@ -11,7 +11,7 @@ Hexagonal Architecture and Clean Architecture.
 | `dev.domaincentric:dca-building-blocks` | The building blocks your code implements: DDD tactical markers (`AggregateRoot`, `Entity`, `Value`, `DomainEvent`, …), strategic annotations (`@BoundedContext`, `@SharedKernel`, `@Upstream`, `@Partnership`, …) and hexagonal port interfaces (`UseCase`, `Repository`, `Store`, …) and the application-layer `TransactionBoundary` | none |
 | `dev.domaincentric:dca-archunit` | The governance rules: ~110 ArchUnit rules pinned to those building blocks, plus an executable context map | `dca-building-blocks`, ArchUnit |
 | `dev.domaincentric:dca-spring` | The runtime adapters the rules demand: `SpringDomainEventPublisher` (over `ApplicationEventPublisher`), `SpringTransactionBoundary` (over `TransactionTemplate`), an `InMemoryTransactionBoundary` for tests, and a Spring Boot auto-configuration | `dca-building-blocks`; Spring `compileOnly` — your Boot BOM pins the version |
-| `dev.domaincentric:dca-archunit-modulith` | Spring Modulith's module verification as a DCA test: `DcaModulithTest` next to `DcaArchitectureTest`, with the test-class exclusion Modulith needs | `dca-archunit`; `spring-modulith-core` `compileOnly` |
+| `dev.domaincentric:dca-archunit-spring-modulith` | Spring Modulith's module verification as a DCA test: `DcaModulithTest` next to `DcaArchitectureTest`, with the test-class exclusion Modulith needs | `dca-archunit`; `spring-modulith-core` `compileOnly` |
 
 A Spring / Spring Modulith project ends up with two production and two test dependencies; every one
 of them is optional except the building blocks:
@@ -21,7 +21,7 @@ dependencies {
     implementation("dev.domaincentric:dca-building-blocks:0.1.2")
     implementation("dev.domaincentric:dca-spring:0.1.0")
     testImplementation("dev.domaincentric:dca-archunit:0.3.0")
-    testImplementation("dev.domaincentric:dca-archunit-modulith:0.1.0")
+    testImplementation("dev.domaincentric:dca-archunit-spring-modulith:0.1.0")
 }
 ```
 
@@ -134,14 +134,14 @@ your own until a database arrives (`dca-spring` deliberately publishes no no-op 
 `org.springframework.modulith:spring-modulith-events-api` for `@ApplicationModuleListener` itself.
 `InMemoryTransactionBoundary` is for tests: same nesting contract, no Spring.
 
-### 5. Spring Modulith verification — `dca-archunit-modulith`
+### 5. Spring Modulith verification — `dca-archunit-spring-modulith`
 
 Modulith's `ApplicationModules.verify()` is not an ArchUnit rule and needs `spring-modulith-core` at
 compile time, so it lives in its own optional artifact instead of `dca-archunit` (which stays
 framework-free — a build check enforces it):
 
 ```kotlin
-testImplementation("dev.domaincentric:dca-archunit-modulith:0.1.0")
+testImplementation("dev.domaincentric:dca-archunit-spring-modulith:0.1.0")
 ```
 
 ```java
@@ -273,15 +273,15 @@ Semantic versioning, independent per artifact:
   rule is a major bump, a relaxed rule or fixed false positive a patch. **Before 1.0** a minor version
   may add and tighten rules as well; every such change is listed under *Changed — breaking* in the
   changelog, with a migration note at the top of the release.
-- `dca-spring`, `dca-archunit-modulith` — ordinary SemVer on their own APIs; a raised minimum Spring or
+- `dca-spring`, `dca-archunit-spring-modulith` — ordinary SemVer on their own APIs; a raised minimum Spring or
   Modulith version is a minor bump.
 
-Tags: `building-blocks/vX.Y.Z`, `archunit/vX.Y.Z`, `spring/vX.Y.Z`, `archunit-modulith/vX.Y.Z` — one tag
+Tags: `building-blocks/vX.Y.Z`, `archunit/vX.Y.Z`, `spring/vX.Y.Z`, `archunit-spring-modulith/vX.Y.Z` — one tag
 per released artifact; see [RELEASING.md](RELEASING.md). `dca-archunit` and `dca-spring` depend on the
-`dca-building-blocks` version named in `gradle.properties`, `dca-archunit-modulith` on the `dca-archunit`
+`dca-building-blocks` version named in `gradle.properties`, `dca-archunit-spring-modulith` on the `dca-archunit`
 version named there, so those properties track the latest released versions. Changelogs:
 [dca-building-blocks/CHANGELOG.md](dca-building-blocks/CHANGELOG.md), [dca-archunit/CHANGELOG.md](dca-archunit/CHANGELOG.md),
-[dca-spring/CHANGELOG.md](dca-spring/CHANGELOG.md), [dca-archunit-modulith/CHANGELOG.md](dca-archunit-modulith/CHANGELOG.md).
+[dca-spring/CHANGELOG.md](dca-spring/CHANGELOG.md), [dca-archunit-spring-modulith/CHANGELOG.md](dca-archunit-spring-modulith/CHANGELOG.md).
 
 ## Build
 

@@ -8,8 +8,8 @@ artifact_project() {
     building-blocks|dca-building-blocks)         echo "dca-building-blocks" ;;
     archunit|dca-archunit)                       echo "dca-archunit" ;;
     spring|dca-spring)                           echo "dca-spring" ;;
-    archunit-modulith|dca-archunit-modulith)     echo "dca-archunit-modulith" ;;
-    *) echo "error: unknown artifact '$1' (building-blocks|archunit|spring|archunit-modulith)" >&2; return 1 ;;
+    archunit-spring-modulith|dca-archunit-spring-modulith)     echo "dca-archunit-spring-modulith" ;;
+    *) echo "error: unknown artifact '$1' (building-blocks|archunit|spring|archunit-spring-modulith)" >&2; return 1 ;;
   esac
 }
 
@@ -18,7 +18,7 @@ artifact_version_property() {
     dca-building-blocks)   echo "buildingBlocksVersion" ;;
     dca-archunit)          echo "archunitVersion" ;;
     dca-spring)            echo "dcaSpringVersion" ;;
-    dca-archunit-modulith) echo "archunitModulithVersion" ;;
+    dca-archunit-spring-modulith) echo "archunitSpringModulithVersion" ;;
     *) return 1 ;;
   esac
 }
@@ -27,7 +27,7 @@ artifact_version_property() {
 artifact_dependency() {
   case "$(artifact_project "$1")" in
     dca-archunit|dca-spring) echo "building-blocks" ;;
-    dca-archunit-modulith)   echo "archunit" ;;
+    dca-archunit-spring-modulith)   echo "archunit" ;;
     *) echo "" ;;
   esac
 }

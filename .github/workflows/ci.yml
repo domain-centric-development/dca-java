@@ -29,7 +29,7 @@ jobs:
         run: ./gradlew publishToMavenLocal --no-daemon
       - name: Published jars carry the license
         run: |
-          for jar in dca-building-blocks/build/libs/dca-building-blocks-*[0-9T].jar dca-archunit/build/libs/dca-archunit-*[0-9T].jar dca-spring/build/libs/dca-spring-*[0-9T].jar dca-archunit-modulith/build/libs/dca-archunit-modulith-*[0-9T].jar; do
+          for jar in dca-building-blocks/build/libs/dca-building-blocks-*[0-9T].jar dca-archunit/build/libs/dca-archunit-*[0-9T].jar dca-spring/build/libs/dca-spring-*[0-9T].jar dca-archunit-spring-modulith/build/libs/dca-archunit-spring-modulith-*[0-9T].jar; do
             unzip -l "$jar" | grep -q ' META-INF/LICENSE$' || { echo "no META-INF/LICENSE in $jar"; exit 1; }
           done
       - name: Minimal consumer against the checkout
