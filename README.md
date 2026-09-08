@@ -91,6 +91,7 @@ DcaLayout.forBasePackage("com.acme.shop")
     .withOutgoingSubpackage("out")
     .withApiSubpackage("contract")            // published sync contract (default: api); events: withEventsSubpackage
     .withUseCaseSuffix("ApplicationService")
+    .withControllerSuffix("Page")
     .allowingInDomain("org.jmolecules..")     // extra third-party packages allowed in the domain
     .withFrameworkAnnotations(FrameworkAnnotations.spring());   // or your own FQNs
 ```

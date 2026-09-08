@@ -111,7 +111,7 @@ public final class HexagonalRules implements DcaRuleSet {
             arch ->
                 noClasses()
                     .that()
-                    .haveSimpleNameEndingWith("Controller")
+                    .haveSimpleNameEndingWith(layout.controllerSuffix())
                     .or()
                     .haveSimpleNameEndingWith(layout.restControllerSuffix())
                     .should()
@@ -120,8 +120,8 @@ public final class HexagonalRules implements DcaRuleSet {
                     .allowEmptyShould(true))
         .selecting(
             "Classes anywhere on the classpath under scan whose simple name ends with the"
-                + " literal Controller or with the configured REST-controller suffix. Selected by"
-                + " name, not by annotation, and not restricted to adapter packages.")
+                + " configured controller suffix or with the configured REST-controller suffix."
+                + " Selected by name, not by annotation, and not restricted to adapter packages.")
         .checking(
             "No dependency on a class assignable to Repository - the port interface or an"
                 + " implementation. Other output ports (Store, event publishers) are not checked; a"

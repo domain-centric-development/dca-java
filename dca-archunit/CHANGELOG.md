@@ -13,8 +13,14 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
   knowledge catalog renders them as **Selection**/**Check** and embeds the private helpers a rule calls, so
   nobody needs the sources jar to predict a rule.
 
+- `DcaLayout.withControllerSuffix(String)` (default `Controller`): the suffix of MVC controllers is configurable like
+  the REST one. `DCA-NAM-005` checks it for classes carrying the configured `@Controller` annotation, `DCA-HEX-003`
+  selects controllers by either suffix. Previously `Controller` was hard-coded in both rules.
+
 ### Changed
 
+- `DCA-USE-009`'s rationale states what its check always did: only `publishAndClearEvents` counts as a publication;
+  `publish(event)` per event, even followed by `clearDomainEvents()`, is reported. A fixture pins it.
 - `DCA-ADV-012` / `DCA-ADV-016` (stateless domain services and factories) check **inherited** fields too, not
   only the ones the class declares - a mutable field from a base class is state all the same. Aligns with
   the .NET twin.

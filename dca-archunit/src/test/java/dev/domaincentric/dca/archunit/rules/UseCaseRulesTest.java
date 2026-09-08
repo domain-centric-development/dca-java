@@ -175,6 +175,13 @@ class UseCaseRulesTest {
     }
 
     @Test
+    @DisplayName("publish(event) per event plus clearDomainEvents() is not a publication")
+    void publishLoopIsReported() {
+      String message = Fixtures.failure(TRANSACTIONS, "DCA-USE-009").getMessage();
+      assertTrue(message.contains("PublishLoopUseCase"), message);
+    }
+
+    @Test
     @DisplayName("a helper two entry methods share does not connect their execution paths")
     void sharedHelperDoesNotConnectEntryMethods() {
       String message = Fixtures.failure(TRANSACTIONS, "DCA-USE-009").getMessage();

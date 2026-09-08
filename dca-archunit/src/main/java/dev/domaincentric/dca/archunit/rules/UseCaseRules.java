@@ -222,7 +222,9 @@ public final class UseCaseRules implements DcaRuleSet {
                 + " does not cover a direct call of the public method it wraps, and a helper two methods"
                 + " share does not connect them. That the"
                 + " publication follows the save and concerns the same aggregate is not established"
-                + " statically",
+                + " statically. Only DomainEventPublisher.publishAndClearEvents counts as a publication:"
+                + " iterating domainEvents() and calling publish(event), even followed by"
+                + " clearDomainEvents(), separates dispatch from acknowledgement and is not accepted",
             arch ->
                 classes()
                     .that()

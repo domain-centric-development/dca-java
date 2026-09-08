@@ -27,6 +27,8 @@ class DcaLayoutTest {
     assertEquals("events", layout.eventsSubpackage());
     assertEquals("Service", layout.useCaseSuffix());
     assertEquals("Resource", layout.restControllerSuffix());
+    assertEquals("Controller", layout.controllerSuffix());
+    assertEquals("Page", DEFAULTS.withControllerSuffix("Page").controllerSuffix());
     assertEquals(
         DEFAULTS.thirdPartyPackagesAllowedInDomain(), layout.thirdPartyPackagesAllowedInDomain());
     assertEquals("incoming", DEFAULTS.incomingSubpackage(), "the original is untouched");

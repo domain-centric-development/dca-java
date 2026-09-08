@@ -74,6 +74,7 @@ public final class DcaLayout {
   private final String apiSubpackage;
   private final String eventsSubpackage;
   private final String useCaseSuffix;
+  private final String controllerSuffix;
   private final String restControllerSuffix;
   private final List<String> thirdPartyPackagesAllowedInDomain;
   private final FrameworkAnnotations frameworkAnnotations;
@@ -97,6 +98,7 @@ public final class DcaLayout {
           "apiSubpackage and eventsSubpackage must differ, both are '" + apiSubpackage + "'");
     }
     this.useCaseSuffix = requireSuffix(settings.useCaseSuffix, "useCaseSuffix");
+    this.controllerSuffix = requireSuffix(settings.controllerSuffix, "controllerSuffix");
     this.restControllerSuffix =
         requireSuffix(settings.restControllerSuffix, "restControllerSuffix");
     this.thirdPartyPackagesAllowedInDomain =
@@ -121,6 +123,7 @@ public final class DcaLayout {
     defaults.apiSubpackage = "api";
     defaults.eventsSubpackage = "events";
     defaults.useCaseSuffix = "UseCase";
+    defaults.controllerSuffix = "Controller";
     defaults.restControllerSuffix = "Resource";
     defaults.thirdPartyPackagesAllowedInDomain = DEFAULT_THIRD_PARTY_ALLOWED_IN_DOMAIN;
     defaults.frameworkAnnotations = FrameworkAnnotations.spring();
@@ -237,6 +240,16 @@ public final class DcaLayout {
     return copy(settings -> settings.useCaseSuffix = value);
   }
 
+  /**
+   * Suffix of MVC (server-rendered) controllers, e.g. {@code "Controller"} (default) or {@code
+   * "Page"}. Read by the naming rule for classes carrying the configured {@code @Controller}
+   * annotation and by the rule that keeps controllers away from repositories; the REST suffix is
+   * configured separately.
+   */
+  public DcaLayout withControllerSuffix(String value) {
+    return copy(settings -> settings.controllerSuffix = value);
+  }
+
   /** Suffix of REST controllers, e.g. {@code "Resource"} or {@code "Controller"}. */
   public DcaLayout withRestControllerSuffix(String value) {
     return copy(settings -> settings.restControllerSuffix = value);
@@ -276,6 +289,7 @@ public final class DcaLayout {
     settings.apiSubpackage = apiSubpackage;
     settings.eventsSubpackage = eventsSubpackage;
     settings.useCaseSuffix = useCaseSuffix;
+    settings.controllerSuffix = controllerSuffix;
     settings.restControllerSuffix = restControllerSuffix;
     settings.thirdPartyPackagesAllowedInDomain = thirdPartyPackagesAllowedInDomain;
     settings.frameworkAnnotations = frameworkAnnotations;
@@ -296,6 +310,7 @@ public final class DcaLayout {
     String apiSubpackage;
     String eventsSubpackage;
     String useCaseSuffix;
+    String controllerSuffix;
     String restControllerSuffix;
     List<String> thirdPartyPackagesAllowedInDomain;
     FrameworkAnnotations frameworkAnnotations;
@@ -356,6 +371,10 @@ public final class DcaLayout {
 
   public String useCaseSuffix() {
     return useCaseSuffix;
+  }
+
+  public String controllerSuffix() {
+    return controllerSuffix;
   }
 
   public String restControllerSuffix() {

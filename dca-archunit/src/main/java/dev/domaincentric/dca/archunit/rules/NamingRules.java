@@ -162,7 +162,7 @@ public final class NamingRules implements DcaRuleSet {
   public static DcaRule controllersEndWithController(DcaLayout layout) {
     return DcaRule.of(
             "DCA-NAM-005",
-            "Controller classes must end with 'Controller'",
+            "Controller classes must end with '" + layout.controllerSuffix() + "'",
             "@Controller annotated classes should follow naming conventions",
             arch ->
                 classes()
@@ -171,13 +171,13 @@ public final class NamingRules implements DcaRuleSet {
                     .and()
                     .areAnnotatedWith(layout.frameworkAnnotations().controller())
                     .should()
-                    .haveSimpleNameEndingWith("Controller")
+                    .haveSimpleNameEndingWith(layout.controllerSuffix())
                     .allowEmptyShould(true))
         .selecting(
             "Classes in <module>.adapter.incoming.. of every module root that are directly"
                 + " annotated with the configured @Controller annotation.")
         .checking(
-            "The simple name ends with the literal Controller - this suffix is not configurable. A"
+            "The simple name ends with the configured controller suffix (default Controller). A"
                 + " class carrying only the REST-controller annotation is not selected here, and a"
                 + " controller outside an incoming-adapter package is not checked. An empty"
                 + " selection passes.");
