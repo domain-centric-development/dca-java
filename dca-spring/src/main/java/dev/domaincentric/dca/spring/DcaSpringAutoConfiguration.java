@@ -5,6 +5,7 @@ import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.DomainEventPublis
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -13,6 +14,16 @@ import org.springframework.transaction.PlatformTransactionManager;
  * Spring Boot auto-configuration: registers {@link SpringDomainEventPublisher} and — when a {@link
  * PlatformTransactionManager} exists — {@link SpringTransactionBoundary}, each only if the
  * application defines no bean of that port itself.
+ *
+ * <p><b>A default, not a prescription.</b> The DCA rules check that a use case publishes through
+ * the {@code DomainEventPublisher} port inside a transaction boundary; which implementation stands
+ * behind the port is the project's choice. Three ways to make a different one: define your own
+ * {@code DomainEventPublisher} or {@code TransactionBoundary} bean (this configuration backs off
+ * per port), set {@code dca.spring.enabled=false} (nothing is registered, the classes stay usable
+ * by hand), or leave {@code dca-spring} off the class path altogether. {@code
+ * ApplicationEventPublisher} is the default because it is what Spring's after-commit listeners and
+ * Spring Modulith already build on; an integration-event publisher — outbox table, Modulith's event
+ * publication registry, a broker — is deliberately not provided here, that choice is the project's.
  *
  * <p><b>Why the boundary needs a manager, and why you may have none.</b> {@code
  * spring-boot-starter} and {@code spring-modulith-starter-core} bring neither a transaction manager
@@ -35,6 +46,7 @@ import org.springframework.transaction.PlatformTransactionManager;
  */
 @AutoConfiguration(
     afterName = "org.springframework.boot.transaction.autoconfigure.TransactionAutoConfiguration")
+@ConditionalOnProperty(name = "dca.spring.enabled", havingValue = "true", matchIfMissing = true)
 public class DcaSpringAutoConfiguration {
 
   @Bean

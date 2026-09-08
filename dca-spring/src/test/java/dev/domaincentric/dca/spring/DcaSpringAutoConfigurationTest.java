@@ -64,6 +64,18 @@ class DcaSpringAutoConfigurationTest {
   }
 
   @Test
+  void registersNothingWhenSwitchedOff() {
+    runner
+        .withUserConfiguration(WithManager.class)
+        .withPropertyValues("dca.spring.enabled=false")
+        .run(
+            ctx -> {
+              assertTrue(ctx.getBeansOfType(DomainEventPublisher.class).isEmpty());
+              assertTrue(ctx.getBeansOfType(TransactionBoundary.class).isEmpty());
+            });
+  }
+
+  @Test
   void backsOffWhenTheApplicationDefinesThePortsItself() {
     runner
         .withUserConfiguration(WithManager.class, OwnPorts.class)

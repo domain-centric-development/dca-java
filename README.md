@@ -126,6 +126,15 @@ In a Spring Boot application nothing else is needed: the auto-configuration regi
 `SpringTransactionBoundary`, each unless you define the port yourself. Without Boot, register the two
 classes as beans.
 
+**A default, not a prescription.** The rules check that a use case publishes through the
+`DomainEventPublisher` port inside a transaction boundary — not which class stands behind the port.
+`ApplicationEventPublisher` is the default because Spring's after-commit listeners and Spring Modulith
+build on it. To choose differently: define your own `DomainEventPublisher` / `TransactionBoundary` bean
+(the auto-configuration backs off per port), set `dca.spring.enabled=false` (nothing registered, the
+classes remain usable by hand), or leave `dca-spring` out and keep only the building blocks. What
+`dca-spring` deliberately does not provide is an `IntegrationEventPublisher`: outbox table, Modulith's
+event publication registry or a broker is a project decision.
+
 **An in-memory application has no transaction manager**, and `spring-boot-starter` +
 `spring-modulith-starter-core` bring neither one nor Boot's `TransactionAutoConfiguration`. Then
 `@Transactional` compiles and does nothing, and the relays never fire while every rule stays green.

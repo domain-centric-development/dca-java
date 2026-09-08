@@ -20,7 +20,8 @@ consumer's BOM pins them; built and tested against Spring 7.0.3 and Boot 4.0.2.
 - `InMemoryTransactionBoundary` — the same nesting contract without Spring, for tests and the
   in-memory phase.
 - `DcaSpringAutoConfiguration` — registers the publisher, and the boundary once a
-  `PlatformTransactionManager` exists, each unless the application defines the port itself. Ships no
+  `PlatformTransactionManager` exists, each unless the application defines the port itself;
+  `dca.spring.enabled=false` switches it off entirely. Ships no
   no-op transaction manager on purpose; its javadoc names the three things an in-memory application
   needs for after-commit relays to fire (`spring-boot-transaction`, a manager bean,
   `spring-modulith-events-api`).
