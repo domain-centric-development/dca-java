@@ -251,9 +251,18 @@ public final class ContextMapRenderer {
       }
     }
     if (includeExternalSystems) {
+      Map<String, String> externalIds = new LinkedHashMap<>();
+      java.util.Set<String> usedIds = new java.util.HashSet<>();
+      packages.forEach(p -> usedIds.add(arch.contextName(p)));
+      for (String name : externalSystems(packages)) {
+        String base = externalSystemNodeId(name), id = base;
+        int suffix = 2;
+        while (!usedIds.add(id)) id = base + "_" + suffix++;
+        externalIds.put(name, id);
+      }
       for (String name : externalSystems(packages)) {
         md.append("  ")
-            .append(externalId(name))
+            .append(externalIds.get(name))
             .append("[[\"")
             .append(label(name))
             .append("\"]]\n");
@@ -275,7 +284,7 @@ public final class ContextMapRenderer {
               .append("|\"")
               .append(label)
               .append("\"| ")
-              .append(externalId(e.name()))
+              .append(externalIds.get(e.name()))
               .append('\n');
         }
       }

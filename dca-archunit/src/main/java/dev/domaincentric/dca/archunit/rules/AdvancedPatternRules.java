@@ -1,7 +1,6 @@
 package dev.domaincentric.dca.archunit.rules;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
-import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaModifier;
@@ -13,7 +12,6 @@ import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
 import dev.domaincentric.dca.archunit.DcaRuleViolation;
-import dev.domaincentric.dca.archunit.FrameworkAnnotations;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.DomainEvent;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.DomainService;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.Factory;
@@ -36,7 +34,8 @@ import java.util.function.Predicate;
  */
 public final class AdvancedPatternRules implements DcaRuleSet {
 
-  private static final String VERSION_FIELD = "version";
+  private static final java.util.Set<String> SCHEMA_FIELDS =
+      java.util.Set.of("schemaVersion", "eventVersion", "contractVersion");
 
   private final DcaLayout layout;
   private final List<DcaRule> rules;
@@ -47,7 +46,6 @@ public final class AdvancedPatternRules implements DcaRuleSet {
         List.of(
             domainEventsAreRecords(),
             domainEventsResideInDomain(),
-            domainEventsAreImmutable(),
             domainEventsHaveNoFrameworkAnnotations(),
             integrationEventsAreAnnotatedWithIntegrationEventType(),
             integrationEventsHaveNoVersionField(),
@@ -82,8 +80,8 @@ public final class AdvancedPatternRules implements DcaRuleSet {
   public DcaRule domainEventsAreRecords() {
     return DcaRule.of(
             "DCA-ADV-001",
-            "Domain Events must implement DomainEvent Marker Interface and be records",
-            "Domain events should be immutable records implementing DomainEvent (named in past tense,"
+            "Domain Events must implement DomainEvent and have immutable shape",
+            "Domain events should have immutable state implementing DomainEvent (named in past tense,"
                 + " e.g., ProductCreated, CartCleared)",
             arch ->
                 classes()
@@ -91,15 +89,14 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                     .implement(DomainEvent.class)
                     .and()
                     .areNotInterfaces()
-                    .should()
-                    .beRecords()
+                    .should(TypeInspection.haveImmutableShape())
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes anywhere on the classpath under scan that are assignable to DomainEvent"
                 + " - directly or through a supertype.")
         .checking(
-            "The class is a record. A final class or an enum implementing DomainEvent is reported; interfaces"
-                + " are not selected. An empty selection passes.");
+            "The class is final or a record with final inherited instance fields and no instance set*(x): void methods."
+                + " Referenced objects and collection contents are not inspected. Interfaces are excluded.");
   }
 
   public DcaRule domainEventsResideInDomain() {
@@ -150,29 +147,15 @@ public final class AdvancedPatternRules implements DcaRuleSet {
   }
 
   public DcaRule domainEventsHaveNoFrameworkAnnotations() {
-    FrameworkAnnotations annotations = layout.frameworkAnnotations();
-    return DcaRule.of(
+    return DcaRule.check(
             "DCA-ADV-004",
-            "Domain Events must not carry container annotations",
-            "Domain events are framework-independent plain objects - neither managed components nor"
-                + " listeners",
-            arch ->
-                noClasses()
-                    .that()
-                    .resideInAnyPackage(arch.allDomainPatterns())
-                    .and()
-                    .implement(DomainEvent.class)
-                    .should(
-                        AnnotationRoles.beAnnotatedWithAny(
-                            annotations.injectable(), annotations.eventListener()))
-                    .allowEmptyShould(true))
+            "Domain events must not carry prohibited framework metadata",
+            "Domain objects carry no metadata for container management, persistence or transaction coordination",
+            arch -> DomainMetadata.check(arch, "DCA-ADV-004"))
         .selecting(
-            "Non-interface classes in <module>.domain.. of every module root that are assignable to"
-                + " DomainEvent.")
+            "Non-interface domain events in domain packages. Metadata ownership is exclusive: events, services, factories, specifications, then domain.model types.")
         .checking(
-            "None carries one of the configured injectable stereotypes or event-listener annotations"
-                + " directly on the class. Only the configured annotations are checked - others, and"
-                + " meta-annotations, are not. An empty selection passes, and so do empty roles.");
+            "Direct or meta-annotations: types prohibit injectable, persistenceEntity and transactional roles; fields prohibit injectionSite and persistenceMapping; methods prohibit transactional and eventListener, plus injectionSite except on events; constructors prohibit injectionSite. Unclassified annotations are allowed by this check. Empty configured roles select no metadata; wiring is not established.");
   }
 
   public DcaRule integrationEventsAreAnnotatedWithIntegrationEventType() {
@@ -202,9 +185,9 @@ public final class AdvancedPatternRules implements DcaRuleSet {
   public DcaRule integrationEventsHaveNoVersionField() {
     return DcaRule.check(
             "DCA-ADV-006",
-            "Integration Events must not have a version field",
+            "Integration events carry the schema version in their type metadata, not in the payload",
             "The schema version is a class property (@IntegrationEventType), never per-instance payload"
-                + " data — a version data field duplicates the annotation and can drift from it",
+                + " data — an explicit schema-version data field duplicates the annotation and can drift from it",
             arch -> {
               List<String> violations =
                   violations(
@@ -213,26 +196,24 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                       AdvancedPatternRules::hasVersionField,
                       c ->
                           c.getName()
-                              + " carries a version data field — declare the version in"
+                              + " carries an explicit schema-version field — declare the version in"
                               + " @IntegrationEventType instead");
               failIfAny(
                   violations,
-                  "Integration Events must not have a version field — @IntegrationEventType is the"
+                  "Integration events carry the schema version in their type metadata, not in the payload — @IntegrationEventType is the"
                       + " single source of truth:");
             })
         .selecting(
             "Non-interface classes anywhere on the classpath under scan that are assignable to"
                 + " IntegrationEvent.")
         .checking(
-            "No field named exactly version - declared by the class or inherited from a supertype, static or"
-                + " not, of any type. A record component named version counts as a field. Every offender is"
-                + " reported in one violation; an empty selection passes.");
+            "Name heuristic: declared or inherited fields named schemaVersion, eventVersion or contractVersion are reported, including record components. A business revision named version is allowed, whatever its type. This does not infer a field's business meaning; an empty selection passes.");
   }
 
   public DcaRule domainOnlyEventsHaveNoVersionField() {
     return DcaRule.check(
             "DCA-ADV-007",
-            "Domain Events that are not Integration Events must not have a version field",
+            "Domain events that are not integration events carry no schema version",
             "Versioning is a contract concern of integration events — a purely internal domain event"
                 + " has no wire contract to version",
             arch -> {
@@ -246,19 +227,18 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                       AdvancedPatternRules::hasVersionField,
                       c ->
                           c.getName()
-                              + " has a version field but is not an IntegrationEvent — only"
-                              + " IntegrationEvents need versioning");
+                              + " has an explicit schema-version field but is not an IntegrationEvent — only"
+                              + " IntegrationEvents need schema versioning");
               failIfAny(
                   violations,
-                  "Domain Events (non-IntegrationEvent) must not have a version field — versioning is"
+                  "Domain Events (non-IntegrationEvent) must not have an explicit schema-version field — schema versioning is"
                       + " only for IntegrationEvents:");
             })
         .selecting(
             "Non-interface classes anywhere on the classpath under scan that are assignable to DomainEvent"
                 + " but not to IntegrationEvent. A class assignable to both is not selected.")
         .checking(
-            "No field named exactly version - declared by the class or inherited from a supertype, static or"
-                + " not, of any type. Every offender is reported in one violation; an empty selection passes.");
+            "Name heuristic: declared or inherited fields named schemaVersion, eventVersion or contractVersion are reported, including record components. A business revision named version is allowed, whatever its type. This does not infer a field's business meaning; an empty selection passes.");
   }
 
   public DcaRule domainEventsHaveTimestampField() {
@@ -297,7 +277,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
   public DcaRule domainServicesResideInDomainService() {
     return DcaRule.of(
             "DCA-ADV-009",
-            "Domain Services must implement DomainService Marker Interface and reside in domain.service",
+            "Marked domain services reside in the configured domain service segment",
             "Domain services implement DomainService marker and reside in domain.service packages"
                 + " (named descriptively, e.g., PricingService, CartTotalCalculator)",
             arch ->
@@ -321,7 +301,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
   public DcaRule domainServicesResideInDomain() {
     return DcaRule.of(
             "DCA-ADV-010",
-            "Domain Services must reside in domain package",
+            "Marked domain services reside in a module domain",
             "Domain services are part of the domain layer, not application layer",
             arch ->
                 classes()
@@ -339,25 +319,15 @@ public final class AdvancedPatternRules implements DcaRuleSet {
   }
 
   public DcaRule domainServicesHaveNoFrameworkAnnotations() {
-    FrameworkAnnotations annotations = layout.frameworkAnnotations();
-    return DcaRule.of(
+    return DcaRule.check(
             "DCA-ADV-011",
-            "Domain Services must not carry container annotations",
-            "Domain services are framework-independent - the application layer instantiates or"
-                + " wires them, the domain does not know the container",
-            arch ->
-                noClasses()
-                    .that()
-                    .implement(DomainService.class)
-                    .should(AnnotationRoles.beAnnotatedWithAny(annotations.injectable()))
-                    .allowEmptyShould(true))
+            "Domain services must not carry prohibited framework metadata",
+            "Domain objects carry no metadata for container management, persistence or transaction coordination",
+            arch -> DomainMetadata.check(arch, "DCA-ADV-011"))
         .selecting(
-            "Non-interface classes anywhere on the classpath under scan that are assignable to"
-                + " DomainService.")
+            "Non-interface domain services in domain packages. Metadata ownership is exclusive: events, services, factories, specifications, then domain.model types.")
         .checking(
-            "None carries one of the configured injectable stereotypes directly on the class. Only"
-                + " the configured annotations are checked - others, and meta-annotations, are not."
-                + " An empty selection passes, and so does an empty role.");
+            "Direct or meta-annotations: types prohibit injectable, persistenceEntity and transactional roles; fields prohibit injectionSite and persistenceMapping; methods prohibit transactional and eventListener, plus injectionSite except on events; constructors prohibit injectionSite. Unclassified annotations are allowed by this check. Empty configured roles select no metadata; wiring is not established.");
   }
 
   public DcaRule domainServicesAreStateless() {
@@ -424,26 +394,15 @@ public final class AdvancedPatternRules implements DcaRuleSet {
   }
 
   public DcaRule factoriesHaveNoFrameworkAnnotations() {
-    FrameworkAnnotations annotations = layout.frameworkAnnotations();
-    return DcaRule.of(
+    return DcaRule.check(
             "DCA-ADV-015",
-            "Factories must not carry container annotations",
-            "Factories are framework-independent domain objects",
-            arch ->
-                noClasses()
-                    .that()
-                    .implement(Factory.class)
-                    .and()
-                    .resideInAnyPackage(arch.allDomainPatterns())
-                    .should(AnnotationRoles.beAnnotatedWithAny(annotations.injectable()))
-                    .allowEmptyShould(true))
+            "Factories must not carry prohibited framework metadata",
+            "Domain objects carry no metadata for container management, persistence or transaction coordination",
+            arch -> DomainMetadata.check(arch, "DCA-ADV-015"))
         .selecting(
-            "Non-interface classes in <module>.domain.. of every module root that are assignable to"
-                + " Factory.")
+            "Non-interface factories in domain packages. Metadata ownership is exclusive: events, services, factories, specifications, then domain.model types.")
         .checking(
-            "None carries one of the configured injectable stereotypes directly on the class. Only"
-                + " the configured annotations are checked - others, and meta-annotations, are not."
-                + " An empty selection passes, and so does an empty role.");
+            "Direct or meta-annotations: types prohibit injectable, persistenceEntity and transactional roles; fields prohibit injectionSite and persistenceMapping; methods prohibit transactional and eventListener, plus injectionSite except on events; constructors prohibit injectionSite. Unclassified annotations are allowed by this check. Empty configured roles select no metadata; wiring is not established.");
   }
 
   public DcaRule factoriesAreStateless() {
@@ -497,26 +456,15 @@ public final class AdvancedPatternRules implements DcaRuleSet {
   }
 
   public DcaRule specificationsHaveNoFrameworkAnnotations() {
-    FrameworkAnnotations annotations = layout.frameworkAnnotations();
-    return DcaRule.of(
+    return DcaRule.check(
             "DCA-ADV-018",
-            "Specifications must not carry container annotations",
-            "Specifications are framework-independent value objects",
-            arch ->
-                noClasses()
-                    .that()
-                    .haveSimpleNameEndingWith("Specification")
-                    .and()
-                    .resideInAnyPackage(arch.allDomainPatterns())
-                    .should(AnnotationRoles.beAnnotatedWithAny(annotations.injectable()))
-                    .allowEmptyShould(true))
+            "Specifications must not carry prohibited framework metadata",
+            "Domain objects carry no metadata for container management, persistence or transaction coordination",
+            arch -> DomainMetadata.check(arch, "DCA-ADV-018"))
         .selecting(
-            "Classes in <module>.domain.. of every module root whose simple name ends with Specification -"
-                + " interfaces included.")
+            "Non-interface specifications in domain packages. Metadata ownership is exclusive: events, services, factories, specifications, then domain.model types.")
         .checking(
-            "None carries one of the configured injectable stereotypes directly on the class. Only"
-                + " the configured annotations are checked - others, and meta-annotations, are not."
-                + " An empty selection passes, and so does an empty role.");
+            "Direct or meta-annotations: types prohibit injectable, persistenceEntity and transactional roles; fields prohibit injectionSite and persistenceMapping; methods prohibit transactional and eventListener, plus injectionSite except on events; constructors prohibit injectionSite. Unclassified annotations are allowed by this check. Empty configured roles select no metadata; wiring is not established.");
   }
 
   // ============================================================================
@@ -551,7 +499,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
   }
 
   private static boolean hasVersionField(JavaClass eventClass) {
-    return eventClass.getAllFields().stream().anyMatch(f -> VERSION_FIELD.equals(f.getName()));
+    return eventClass.getAllFields().stream().anyMatch(f -> SCHEMA_FIELDS.contains(f.getName()));
   }
 
   private static boolean hasTimestampField(JavaClass eventClass) {

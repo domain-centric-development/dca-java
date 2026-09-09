@@ -39,12 +39,12 @@ public abstract class BaseAggregateRoot<T extends AggregateRoot<T, ID>, ID exten
    * Registers a domain event to be published after the aggregate is persisted.
    *
    * <p>Call this method from within your aggregate's business methods when something significant
-   * happens that other parts of the system might care about. This method is public to allow
-   * factories to register events during aggregate creation.
+   * happens that other parts of the system might care about. Only the aggregate registers events;
+   * factories delegate to its creation method.
    *
    * @param event the domain event to register
    */
-  public void registerEvent(final DomainEvent event) {
+  protected void registerEvent(final DomainEvent event) {
     if (event == null) {
       throw new IllegalArgumentException("Domain event cannot be null");
     }

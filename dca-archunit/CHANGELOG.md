@@ -4,6 +4,10 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+- WP-33: allow domain Manager terms, outgoing Response models, use-case-local ports and Store lookup by key. Operation containers normalize marker-or-suffix discovery; entity construction checks caller roles and context, with aggregate-ownership limits documented. TAC-022 retirement remains in the WP-37 registry batch.
+
+- WP-32: shallow immutable state on classes and records, including inherited fields and setters. Same-type and marker-interface aggregate references are rejected, wrapper traversal is covered, and controllers are selected by configured roles or suffixes.
+
 Framework-neutral vocabulary (WP-30). Minor bump: the old accessors stay as deprecated delegates; three accessors change
 their return type (see *Changed*).
 
@@ -414,3 +418,34 @@ Rule identifiers, titles and rationales are unchanged — `RULES.md` and `rules.
 - `DCA-USE-012` — use cases that publish domain events must be transactional (`@Transactional` on class or method): without an active transaction Spring skips after-commit listeners (`@TransactionalEventListener`, `@ApplicationModuleListener`) silently and Modulith registers no publication. Accepts `TransactionBoundary.inTransaction(...)` as the boundary.
 - `DCA-USE-013` — transactional use cases must not call remote-capable output ports (anything but `Repository`, `Store`, `DomainEventPublisher`, `IntegrationEventPublisher`, `TransactionBoundary`): a remote round trip inside the transaction holds the connection and cannot be rolled back. Catalog: 109 rules.
 - `DCA-HEX-011` — incoming adapters must depend on input port interfaces, not on use case classes. Injecting the concrete implementation couples the adapter to one realisation, defeats the Dependency Inversion Principle the port exists for, and makes the adapter untestable without the real use case. Catalog: 110 rules.
+
+- 2026-09-09 WP-34 (unreleased): NAM-002 Java diagnostic never fails (.NET n/a); HEX-005 permits own/global infrastructure; ONI-003 and ADV-004/011/015/018 share exclusive role-by-target metadata checks. Java gains injectionSite/persistenceMapping presets and composed detection; .NET gains attribute namespaces and base-attribute detection, replacing the allow-list. No wiring guarantee; no new marker. Shared catalog regeneration pending WP-37.
+
+- 2026-09-09 WP-35 (unreleased): shared new IDs USE-016 (operation invocation, including helpers) and USE-017 (effective public input-port surface); CYC-005 slices operations inside features, respecting containers; MAP-008 requires per-interaction translation evidence without package exclusivity. NET-003 uses the generic interface map (inherited/explicit valid). No coordination marker; anchored caller-side ignore is the explicit exception. Counts await the shared regeneration.
+
+### WP-36 (unreleased 0.4.0)
+
+- `DCA-USE-009` permits event-free saves only with a resolved, fully inspected aggregate; unresolvable types remain checked.
+- `DCA-USE-012` has the same id in both languages. Its static graph proves boundary evidence, not block containment.
+- **Breaking migration from 0.3.0:** `DCA-STR-007` accepts only the configured events segment. Move contracts from
+  adapter/outgoing/event to events, or temporarily exclude DCA-STR-007 by id during migration. Translators stay in adapters.
+- `DCA-ADV-006/007` intentionally stop banning business `version`; the three explicit schema-version names are a heuristic.
+- `DCA-HEX-006` is directional; `DCA-HEX-007` names integration events and published APIs correctly.
+
+
+## Catalog kinds and retired identities (2026-09-09)
+
+Catalog entries distinguish enforced rules from informational diagnostics: LAY-001, STR-001, STR-010, MAP-013,
+and Java NAM-002. Test runners and generated catalogs report both counts separately. Informational entries do
+not prove architectural correctness or runtime wiring. `kind()` / `Kind` is explicit metadata, independent of severity.
+
+Retired ids are never reused: MAP-003 delegates normalized-name collision handling to the context-map renderer;
+ADV-003 is covered by ADV-001's immutable-shape check; TAC-022 is covered by TAC-008..012 for value models,
+with enrichment guidance in the guide/catalog. `DcaRules.retired()` / `Retired()` retain reason, replacement and
+version. Properties exclusions/severity settings and programmatic exclusions using these ids keep loading and
+are reported as retired. Unknown ids still fail. The change is intentional in unreleased 0.4.0 for 0.3.0 consumers.
+
+USE-001 retains consumer redeclaration coverage; LAY-005 checks imported consumer implementations in the reserved
+building-blocks output-port namespace/package. An imported original interface passes. Name-discovery rules remain:
+unmarked types would otherwise evade marker-only selection. Current counts come from generated `rules.json`,
+including status and the separate retirement registry, rather than a hard-coded expected total.

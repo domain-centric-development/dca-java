@@ -51,7 +51,6 @@ public final class ContextMapRules implements DcaRuleSet {
         List.of(
             declarationsOnlyOnBoundedContexts(),
             externalUpstreamsWellFormed(),
-            externalSystemNamesDistinctAfterNormalization(),
             upstreamsReferenceExistingContexts(),
             upstreamsUniquePerContextAndChannel(),
             upstreamsAgreeWithModuleDependencies(),
@@ -510,6 +509,41 @@ public final class ContextMapRules implements DcaRuleSet {
                         channel == Upstream.Consumes.API
                             ? layout.outgoingAdapterPattern(pkg)
                             : layout.incomingAdapterPattern(pkg);
+                    String contractPattern = targetPkg + "." + channelName(arch, channel) + "..";
+                    boolean translationSite =
+                        arch.classes().stream()
+                            .filter(
+                                c ->
+                                    com.tngtech.archunit.core.domain.JavaClass.Predicates
+                                        .resideInAPackage(allowedAdapter)
+                                        .test(c))
+                            .anyMatch(
+                                c ->
+                                    c.getDirectDependenciesFromSelf().stream()
+                                            .anyMatch(
+                                                d ->
+                                                    com.tngtech.archunit.core.domain.JavaClass
+                                                        .Predicates.resideInAPackage(
+                                                            contractPattern)
+                                                        .test(d.getTargetClass()))
+                                        && c.getDirectDependenciesFromSelf().stream()
+                                            .anyMatch(
+                                                d ->
+                                                    com.tngtech.archunit.core.domain.JavaClass
+                                                        .Predicates.resideInAnyPackage(
+                                                            layout.domainPattern(pkg),
+                                                            layout.applicationPattern(pkg))
+                                                        .test(d.getTargetClass())));
+                    violations.require(
+                        translationSite,
+                        "Context '"
+                            + source
+                            + "' needs translation evidence towards '"
+                            + u.context()
+                            + "' ("
+                            + channelName(arch, channel)
+                            + ") in "
+                            + allowedAdapter);
                     violations.addAll(
                         noClasses()
                             .that()
@@ -546,8 +580,7 @@ public final class ContextMapRules implements DcaRuleSet {
                 + " depends on a class in the target context's channel sub-package or below:"
                 + " the outgoing adapter (<context>.adapter.outgoing..) for the API channel,"
                 + " the incoming adapter (<context>.adapter.incoming..) for the EVENTS channel."
-                + " That the adapter actually translates the contract into the context's own"
-                + " model is not established.");
+                + " Each declared interaction also needs a class in that adapter depending on both that upstream channel and its own domain/application. Multiple upstream translators may share the package. Structure establishes a translation site, not translation quality.");
   }
 
   /** DCA-MAP-009. */
@@ -809,7 +842,7 @@ public final class ContextMapRules implements DcaRuleSet {
 
   /** DCA-MAP-013 — never fails. */
   public static DcaRule displayDeclaredContextMap() {
-    return DcaRule.check(
+    return DcaRule.informational(
             "DCA-MAP-013",
             "Diagnostic: Display declared context map",
             "Printing the declared edges makes the executable context map reviewable at a glance",

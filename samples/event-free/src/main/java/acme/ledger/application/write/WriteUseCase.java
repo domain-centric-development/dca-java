@@ -1,0 +1,2 @@
+package acme.ledger.application.write;
+public final class WriteUseCase implements WriteInputPort {private final EntryRepository entries;public WriteUseCase(EntryRepository entries){this.entries=entries;}public WriteResult execute(WriteCommand command){var entry=new acme.ledger.domain.model.Entry(new acme.ledger.domain.model.EntryId(command.id()));entry.change();entries.save(entry);return new WriteResult(command.id());}}

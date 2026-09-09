@@ -1,0 +1,3 @@
+package acme.ledger.application.write;
+ @org.springframework.transaction.annotation.Transactional
+public final class WriteUseCase implements WriteInputPort {private final EntryRepository entries;private final dev.domaincentric.dca.buildingblocks.hexagonal.port.out.DomainEventPublisher events;public WriteUseCase(EntryRepository entries,dev.domaincentric.dca.buildingblocks.hexagonal.port.out.DomainEventPublisher events){this.entries=entries;this.events=events;}public WriteResult execute(WriteCommand command){var entry=new acme.ledger.domain.model.Entry(new acme.ledger.domain.model.EntryId(command.id()));entry.change();entries.save(entry);events.publishAndClearEvents(entry);return new WriteResult(command.id());}}

@@ -1,6 +1,5 @@
 package dev.domaincentric.dca.archunit.rules;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.domaincentric.dca.archunit.Fixtures;
@@ -40,12 +39,7 @@ class HexagonalRulesTest {
   }
 
   @Test
-  @DisplayName("DCA-HEX-005 sees a module's own infrastructure package")
-  void outgoingAdapterDependingOnModuleInfrastructureIsReported() {
-    String message = Fixtures.failure(INFRASTRUCTURE, "DCA-HEX-005").getMessage();
-    assertTrue(message.contains("CartStorage") && message.contains("CartWiring"), message);
-    assertFalse(
-        message.contains("Lifecycle"),
-        "the shared kernel's infrastructure is shared support, not a module's detail: " + message);
+  void outgoingAdapterMayReuseOwnAndGlobalInfrastructure() {
+    Fixtures.rule(INFRASTRUCTURE, "DCA-HEX-005").check(Fixtures.arch(INFRASTRUCTURE));
   }
 }

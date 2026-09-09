@@ -46,7 +46,7 @@ public final class CycleRules implements DcaRuleSet {
   public static DcaRule domainPackagesFreeOfCycles(DcaLayout layout) {
     return DcaRule.of(
             "DCA-CYC-001",
-            "Domain Packages must not have cyclic dependencies",
+            "Domain Packages must not have cyclic dependencies (package-based slice discovery)",
             "Domain model packages should have clear boundaries and no cycles (Acyclic Dependencies"
                 + " Principle)",
             arch ->
@@ -72,7 +72,7 @@ public final class CycleRules implements DcaRuleSet {
   public static DcaRule applicationLayerFreeOfCycles(DcaLayout layout) {
     return DcaRule.of(
             "DCA-CYC-002",
-            "Application Layer must not have cyclic dependencies",
+            "Application Layer must not have cyclic dependencies (package-based slice discovery)",
             "Application services should have clear boundaries and no cycles",
             arch ->
                 slices()
@@ -175,10 +175,7 @@ public final class CycleRules implements DcaRuleSet {
                     .beFreeOfCycles()
                     .allowEmptyShould(true))
         .selecting(
-            "One slice per immediate child package of <module>.application, for every module root:"
-                + " a feature in a grouped layout, a use case in a flat one, each with everything"
-                + " below it. Classes directly in the application package and everything below"
-                + " application.shared are ignored.")
+            "One slice per operation-root package (marker or suffix), with configured containers stripped; supporting subfolders join the nearest operation root. Classes directly in an enclosing feature package form its feature slice. Shared and direct application classes are ignored.")
         .checking(
             "The slices form no dependency cycle: two features or two use cases that depend on"
                 + " each other, directly or through further slices, are reported. Dependencies on"
@@ -208,10 +205,42 @@ public final class CycleRules implements DcaRuleSet {
         if (!pkg.startsWith(application + ".")) {
           return SliceIdentifier.ignore();
         }
-        String child = pkg.substring(application.length() + 1).split("\\.")[0];
-        return child.equals("shared")
-            ? SliceIdentifier.ignore()
-            : SliceIdentifier.of(application + "." + child);
+        String relative = pkg.substring(application.length() + 1);
+        String[] segments = relative.split("\\.");
+        int index = 0;
+        while (index < segments.length && layout.operationContainers().contains(segments[index]))
+          index++;
+        if (index == segments.length || segments[index].equals("shared"))
+          return SliceIdentifier.ignore();
+        String operationRoot =
+            arch.classes().stream()
+                .filter(c -> OperationPolicy.operation(c, arch))
+                .map(JavaClass::getPackageName)
+                .filter(
+                    p ->
+                        p.startsWith(application + ".")
+                            && (pkg.equals(p) || pkg.startsWith(p + ".")))
+                .max(java.util.Comparator.comparingInt(String::length))
+                .orElse(null);
+        String physicalFeature =
+            application
+                + "."
+                + String.join(".", java.util.Arrays.copyOfRange(segments, 0, index + 1));
+        if (operationRoot == null) {
+          boolean feature =
+              arch.classes().stream()
+                  .anyMatch(
+                      c ->
+                          OperationPolicy.operation(c, arch)
+                              && c.getPackageName().startsWith(physicalFeature + "."));
+          if (!feature) return SliceIdentifier.ignore();
+          operationRoot = physicalFeature;
+        }
+        String logical =
+            java.util.Arrays.stream(operationRoot.substring(application.length() + 1).split("\\."))
+                .filter(segment -> !layout.operationContainers().contains(segment))
+                .collect(java.util.stream.Collectors.joining("."));
+        return SliceIdentifier.of(application + "." + logical);
       }
 
       @Override

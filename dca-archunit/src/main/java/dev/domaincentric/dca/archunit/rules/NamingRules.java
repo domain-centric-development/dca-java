@@ -76,33 +76,34 @@ public final class NamingRules implements DcaRuleSet {
   }
 
   public static DcaRule useCasesAreServices(DcaLayout layout) {
-    List<String> injectable = layout.frameworkAnnotations().injectable();
-    return DcaRule.of(
+    return DcaRule.informational(
             "DCA-NAM-002",
-            "Use case classes must carry the injectable stereotype the container needs",
-            "Use cases are container-managed components: the incoming adapters receive them by"
-                + " injection, and the container's transaction and event plumbing only applies to"
-                + " managed beans",
-            arch ->
-                classes()
-                    .that()
-                    .resideInAnyPackage(arch.allApplicationPatterns())
-                    .and()
-                    .haveSimpleNameEndingWith(layout.useCaseSuffix())
-                    .and()
-                    .areNotInterfaces()
-                    .and(AnnotationRoles.whenConfigured(injectable))
-                    .should(AnnotationRoles.beAnnotatedWithAny(injectable))
-                    .allowEmptyShould(true))
+            "Diagnostic: use cases without injectable stereotypes",
+            "Use cases may be registered by configuration or annotated; static references cannot prove wiring",
+            arch -> {
+              List<String> injectable = layout.frameworkAnnotations().injectable();
+              if (injectable.isEmpty()) return;
+              for (var type : arch.classes()) {
+                if (!type.isInterface()
+                    && !type.isNestedClass()
+                    && com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage(
+                            arch.allApplicationPatterns())
+                        .test(type)
+                    && (type.isAssignableTo(InputPort.class)
+                        || type.getSimpleName().endsWith(layout.useCaseSuffix()))
+                    && !AnnotationRoles.annotatedWithAny(injectable).test(type)
+                    && !AnnotationRoles.isMetaAnnotatedWithAny(type, injectable)) {
+                  System.out.println(
+                      "[DCA-NAM-002] "
+                          + type.getName()
+                          + ": register by configuration or annotate");
+                }
+              }
+            })
         .selecting(
-            "Non-interface classes in <module>.application.. of every module root whose simple name"
-                + " ends with the configured use-case suffix - provided the layout configures at"
-                + " least one injectable stereotype; with an empty role (a hand-wired application)"
-                + " nothing is selected.")
+            "Concrete non-nested application operations selected by InputPort marker or use-case suffix when the injectable role is configured.")
         .checking(
-            "The class is directly annotated with one of the configured injectable stereotypes."
-                + " Records are selected like any other class; the marker interfaces are not"
-                + " consulted - only the suffix selects. An empty selection passes.");
+            "Informational diagnostic only: lists operations without a direct or composed injectable stereotype and never fails. Configuration registration is equally valid; this does not prove wiring.");
   }
 
   public static DcaRule inputPortInterfacesEndWithInputPort(DcaLayout layout) {
@@ -139,7 +140,7 @@ public final class NamingRules implements DcaRuleSet {
   public static DcaRule repositoryInterfacesEndWithRepository(DcaLayout layout) {
     return DcaRule.of(
             "DCA-NAM-004",
-            "Repository Interfaces must end with 'Repository'",
+            "Repository Interfaces must end with 'Repository' (name-based discovery)",
             "Repository interfaces should follow consistent naming conventions (DDD pattern)",
             arch ->
                 classes()
@@ -286,12 +287,12 @@ public final class NamingRules implements DcaRuleSet {
   }
 
   public static DcaRule noTechnicalSuffixesInDomain(DcaLayout layout) {
-    // Domain concepts carry ubiquitous-language names. 'Manager'/'Helper'/'Util' signal
+    // Domain concepts carry ubiquitous-language names. 'Helper'/'Util' signal
     // a missing domain concept; 'Impl'/'Implementation' signal naming by pattern instead of by
     // specialty.
     return DcaRule.of(
             "DCA-NAM-010",
-            "Domain classes must not use technical suffixes (Manager, Helper, Util, Impl, Implementation)",
+            "Domain classes must not use technical suffixes (Helper, Util, Impl, Implementation)",
             "Domain names come from the ubiquitous language - name services by their specialty, not by"
                 + " technical role",
             arch ->
@@ -299,8 +300,6 @@ public final class NamingRules implements DcaRuleSet {
                     .that()
                     .resideInAnyPackage(arch.allDomainPatterns())
                     .should()
-                    .haveSimpleNameEndingWith("Manager")
-                    .orShould()
                     .haveSimpleNameEndingWith("Helper")
                     .orShould()
                     .haveSimpleNameEndingWith("Util")
@@ -313,7 +312,7 @@ public final class NamingRules implements DcaRuleSet {
                     .allowEmptyShould(true))
         .selecting("Classes in <module>.domain.. of every module root.")
         .checking(
-            "No simple name ends with Manager, Helper, Util, Utils, Impl or Implementation. Only these six"
+            "No simple name ends with Helper, Util, Utils, Impl or Implementation. Only these five"
                 + " suffixes are checked, only in domain packages - a *Service or *Factory in the"
                 + " domain is not reported, and an Impl in an adapter package is not checked. An"
                 + " empty selection passes.");

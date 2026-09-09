@@ -40,6 +40,30 @@ public final class DcaRules {
    */
   private static final DcaLayout CATALOG_LAYOUT = DcaLayout.forBasePackage("com.example");
 
+  /** A retired identity is never reused. */
+  public record RetiredRule(String reason, String replacement, String since) {}
+
+  /** Stable registry for compatibility, migration and catalog history. */
+  public static Map<String, RetiredRule> retired() {
+    return RETIRED;
+  }
+
+  private static final Map<String, RetiredRule> RETIRED =
+      Map.of(
+          "DCA-MAP-003",
+              new RetiredRule(
+                  "Renderer disambiguates normalized external-system identifiers",
+                  "ContextMapRenderer",
+                  "0.4.0"),
+          "DCA-ADV-003",
+              new RetiredRule(
+                  "Immutable event shape is checked by DCA-ADV-001", "DCA-ADV-001", "0.4.0"),
+          "DCA-TAC-022",
+              new RetiredRule(
+                  "Value model already covered; enrichment remains guide and catalog guidance",
+                  "DCA-TAC-008..012",
+                  "0.4.0"));
+
   private DcaRules() {}
 
   /** All rule sets, in catalog order. */

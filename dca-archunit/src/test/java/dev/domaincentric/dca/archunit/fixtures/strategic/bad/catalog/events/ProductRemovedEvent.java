@@ -5,6 +5,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 public final class ProductRemovedEvent implements IntegrationEvent {
+  private int amount;
+
   @Override
   public UUID eventId() {
     return UUID.randomUUID();

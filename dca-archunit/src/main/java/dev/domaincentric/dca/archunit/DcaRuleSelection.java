@@ -419,7 +419,7 @@ public final class DcaRuleSelection {
   }
 
   private static void requireKnownId(String ruleId) {
-    if (!DcaRules.allIds().contains(ruleId)) {
+    if (!DcaRules.allIds().contains(ruleId) && !DcaRules.retired().containsKey(ruleId)) {
       throw new IllegalArgumentException(
           "Unknown rule id: " + ruleId + ". See RULES.md for the catalog.");
     }
@@ -438,6 +438,7 @@ public final class DcaRuleSelection {
   @Override
   public String toString() {
     List<String> parts = new ArrayList<>();
+    parts.add("retired " + DcaRules.retired().keySet());
     parts.add(includedSets == null ? "all sets" : "sets " + includedSets);
     if (includedIds != null) {
       parts.add("ids " + includedIds);

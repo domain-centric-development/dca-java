@@ -24,6 +24,6 @@ class NamingRulesTest {
   /** Every naming rule has a negative fixture. */
   @TestFactory
   Stream<DynamicTest> badFixtureFails() {
-    return Fixtures.badFixtureFails(NamingRules::new, FIXTURES + ".bad");
+    return Fixtures.badFixtureFails(NamingRules::new, FIXTURES + ".bad", "DCA-NAM-002");
   }
 }

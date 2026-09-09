@@ -4,8 +4,11 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
-Documentation-only (WP-30): the javadoc that flows into the knowledge catalog no longer names a framework or the
-shop. Binary-compatible with 0.1.2.
+WP-30 documentation change: the javadoc that flows into the knowledge catalog no longer names a framework or the
+shop. That documentation change alone is binary-compatible with 0.1.2.
+
+WP-39 targets **0.2.0 (unreleased)**: `BaseAggregateRoot.registerEvent` is protected. This deliberately breaks external
+registration from 0.1.2 clients. Move registration into the aggregate creation method; let the factory delegate.
 
 ### Changed
 

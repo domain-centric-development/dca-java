@@ -10,6 +10,8 @@ import java.util.Map;
  * hidden in a nested container).
  */
 public final class Order extends BaseAggregateRoot<Order, OrderId> {
+  private final OrderReference linkedOrder = null;
+  private final java.util.function.Supplier<Order> suppliedOrder = () -> null;
   private final OrderId id;
   private final Customer customer;
   private final OrderRepository repository;

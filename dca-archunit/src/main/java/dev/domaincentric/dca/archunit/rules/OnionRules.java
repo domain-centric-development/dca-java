@@ -6,7 +6,6 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
-import dev.domaincentric.dca.archunit.FrameworkAnnotations;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -98,27 +97,14 @@ public final class OnionRules implements DcaRuleSet {
   }
 
   public DcaRule domainModelsMustNotHaveFrameworkAnnotations() {
-    FrameworkAnnotations annotations = layout.frameworkAnnotations();
-    return DcaRule.of(
+    return DcaRule.check(
             "DCA-ONI-003",
-            "Domain Models must not carry container or persistence annotations",
-            "Domain models are framework-independent: no injectable stereotype makes them a managed"
-                + " component, no mapping annotation ties them to a persistence framework - the"
-                + " outgoing adapter maps them",
-            arch ->
-                noClasses()
-                    .that()
-                    .resideInAnyPackage(arch.allDomainModelPatterns())
-                    .should(
-                        AnnotationRoles.beAnnotatedWithAny(
-                            annotations.injectable(), annotations.persistenceEntity()))
-                    .allowEmptyShould(true))
-        .selecting("Classes in <module>.domain.model.. of every module root.")
+            "Domain models must not carry prohibited framework metadata",
+            "Domain objects carry no metadata for container management, persistence or transaction coordination",
+            arch -> DomainMetadata.check(arch, "DCA-ONI-003"))
+        .selecting(
+            "Non-interface domain models in domain packages. Metadata ownership is exclusive: events, services, factories, specifications, then domain.model types.")
         .checking(
-            "None carries one of the configured injectable stereotypes or persistence-entity"
-                + " annotations directly on the class. Only the configured annotations are checked;"
-                + " other framework annotations, meta-annotations, and classes elsewhere in the"
-                + " domain layer (domain.service, domain.event) are not. With both roles empty the"
-                + " rule has nothing to forbid and passes.");
+            "Direct or meta-annotations: types prohibit injectable, persistenceEntity and transactional roles; fields prohibit injectionSite and persistenceMapping; methods prohibit transactional and eventListener, plus injectionSite except on events; constructors prohibit injectionSite. Unclassified annotations are allowed by this check. Empty configured roles select no metadata; wiring is not established.");
   }
 }

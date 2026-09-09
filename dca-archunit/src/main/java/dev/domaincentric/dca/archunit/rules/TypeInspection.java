@@ -72,6 +72,35 @@ final class TypeInspection {
         .toList();
   }
 
+  /** Shallow immutable state, including inherited state; referenced contents are not inspected. */
+  static boolean isImmutableShape(JavaClass type) {
+    return (type.isRecord() || type.getModifiers().contains(JavaModifier.FINAL))
+        && instanceFields(type).stream()
+            .allMatch(f -> f.getModifiers().contains(JavaModifier.FINAL))
+        && type.getAllMethods().stream()
+            .noneMatch(
+                m ->
+                    !m.getModifiers().contains(JavaModifier.STATIC)
+                        && m.getName().startsWith("set")
+                        && !m.getRawParameterTypes().isEmpty()
+                        && m.getRawReturnType().getName().equals("void"));
+  }
+
+  static com.tngtech.archunit.lang.ArchCondition<JavaClass> haveImmutableShape() {
+    return new com.tngtech.archunit.lang.ArchCondition<>("have shallow immutable instance state") {
+      @Override
+      public void check(JavaClass item, com.tngtech.archunit.lang.ConditionEvents events) {
+        if (!isImmutableShape(item)) {
+          events.add(
+              com.tngtech.archunit.lang.SimpleConditionEvent.violated(
+                  item,
+                  item.getName()
+                      + " must be final or a record with final instance fields and no setter methods"));
+        }
+      }
+    };
+  }
+
   /**
    * Whether the class overrides both {@code boolean equals(Object)} and {@code int hashCode()} —
    * exactly those signatures. An overload such as {@code equals(Money)} does not count: the class

@@ -77,10 +77,14 @@ public final class Fixtures {
                     }));
   }
 
-  /** The set's ids are {@code DCA-<PREFIX>-001}, {@code -002}, … in catalog order. */
+  /** Active ids keep catalog order; gaps require a registered retirement. */
   public static void assertIdsAreSequential(DcaRuleSet set, String prefix) {
+    int ordinal = 1;
     for (int i = 0; i < set.rules().size(); i++) {
-      String expected = String.format("DCA-%s-%03d", prefix, i + 1);
+      String expected;
+      do {
+        expected = String.format("DCA-%s-%03d", prefix, ordinal++);
+      } while (DcaRules.retired().containsKey(expected));
       if (!set.rules().get(i).id().equals(expected)) {
         throw new AssertionError(set.rules().get(i).id() + " != " + expected);
       }

@@ -150,7 +150,13 @@ public abstract class DcaArchitectureTest {
   Stream<DynamicNode> dcaRules() {
     DcaArchitecture arch = architecture();
     DcaRuleSelection selection = selection();
-    Map<String, List<DcaRule>> bySet = groupBySet(rules());
+    var selectedRules = rules();
+    long informational =
+        selectedRules.stream().filter(r -> r.kind() == DcaRule.Kind.INFORMATIONAL).count();
+    String counts =
+        (selectedRules.size() - informational) + " enforced, " + informational + " informational";
+    System.out.println(counts + "; retired: " + DcaRules.retired());
+    Map<String, List<DcaRule>> bySet = groupBySet(selectedRules);
     Stream<DynamicNode> sets =
         bySet.entrySet().stream()
             .map(
@@ -160,7 +166,11 @@ public abstract class DcaArchitectureTest {
                         entry.getValue().stream()
                             .map(rule -> test(rule, arch, selection))
                             .toList()));
-    return Stream.concat(Stream.of(layoutDiagnostics(arch.layout())), sets);
+    return Stream.concat(
+        Stream.of(
+            layoutDiagnostics(arch.layout()),
+            DynamicTest.dynamicTest(counts + "; retired " + DcaRules.retired().keySet(), () -> {})),
+        sets);
   }
 
   /**

@@ -25,6 +25,16 @@ import java.util.function.Function;
  */
 public interface DcaRule {
 
+  enum Kind {
+    ENFORCED,
+    INFORMATIONAL
+  }
+
+  /** Whether this entry asserts policy or only reports information. */
+  default Kind kind() {
+    return Kind.ENFORCED;
+  }
+
   /** Stable identifier, e.g. {@code DCA-TAC-001}. */
   String id();
 
@@ -80,8 +90,17 @@ public interface DcaRule {
     return new Undescribed(id, title, rationale, Objects.requireNonNull(check), null);
   }
 
+  /** A diagnostic entry, counted separately from enforced rules. */
+  static Undescribed informational(
+      String id, String title, String rationale, Consumer<DcaArchitecture> diagnostic) {
+    Undescribed result = check(id, title, rationale, diagnostic);
+    result.kind = Kind.INFORMATIONAL;
+    return result;
+  }
+
   /** A rule whose mechanics are not yet described; not a {@code DcaRule} until they are. */
   final class Undescribed {
+    private Kind kind = Kind.ENFORCED;
     private final String id;
     private final String title;
     private final String rationale;
@@ -126,7 +145,8 @@ public interface DcaRule {
           selects,
           requireText(checks, "checks", rule.id),
           rule.check,
-          rule.archRule);
+          rule.archRule,
+          rule.kind);
     }
   }
 
@@ -139,6 +159,13 @@ public interface DcaRule {
 
   /** Default implementation used by the factories. */
   final class SimpleRule implements DcaRule {
+    private final Kind kind;
+
+    @Override
+    public Kind kind() {
+      return kind;
+    }
+
     private final String id;
     private final String title;
     private final String rationale;
@@ -154,7 +181,9 @@ public interface DcaRule {
         String selects,
         String checks,
         Consumer<DcaArchitecture> check,
-        Function<DcaArchitecture, ArchRule> archRule) {
+        Function<DcaArchitecture, ArchRule> archRule,
+        Kind kind) {
+      this.kind = kind;
       this.id = Objects.requireNonNull(id);
       this.title = Objects.requireNonNull(title);
       this.rationale = Objects.requireNonNull(rationale);

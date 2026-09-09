@@ -42,7 +42,7 @@ import java.util.WeakHashMap;
  *   <li>{@link #injectable()} — stereotypes that make a class a container-managed component (Spring
  *       {@code @Service}/{@code @Component}, CDI {@code @ApplicationScoped}, {@code @Singleton}).
  *       Forbidden on domain models, domain events, domain services, factories and specifications;
- *       required on use cases.
+ *       optional on use cases; configuration registration is equally valid.
  *   <li>{@link #webController()} — the stereotype of a server-rendering (MVC) controller. Selects
  *       the classes whose name must end with the configured controller suffix.
  *   <li>{@link #restController()} — the stereotype of a REST endpoint class. Selects the classes
@@ -71,6 +71,8 @@ import java.util.WeakHashMap;
  * @param eventListener in-process event listener
  * @param moduleDeclaration module declaration on {@code package-info}
  * @param publishedInterface published-package declaration on {@code package-info}
+ * @param injectionSite constructor, field or setter injection annotations
+ * @param persistenceMapping member-level persistence mapping annotations
  * @param persistenceEntity ORM mapping annotations of a persistent class
  */
 public record FrameworkAnnotations(
@@ -82,7 +84,9 @@ public record FrameworkAnnotations(
     List<String> eventListener,
     List<String> moduleDeclaration,
     List<String> publishedInterface,
-    List<String> persistenceEntity) {
+    List<String> persistenceEntity,
+    List<String> injectionSite,
+    List<String> persistenceMapping) {
 
   public FrameworkAnnotations {
     if (name == null || name.isBlank()) {
@@ -96,6 +100,33 @@ public record FrameworkAnnotations(
     moduleDeclaration = role(moduleDeclaration, "moduleDeclaration");
     publishedInterface = role(publishedInterface, "publishedInterface");
     persistenceEntity = role(persistenceEntity, "persistenceEntity");
+    injectionSite = role(injectionSite, "injectionSite");
+    persistenceMapping = role(persistenceMapping, "persistenceMapping");
+  }
+
+  /** Compatibility constructor for presets without member metadata roles. */
+  public FrameworkAnnotations(
+      String name,
+      List<String> injectable,
+      List<String> webController,
+      List<String> restController,
+      List<String> transactional,
+      List<String> eventListener,
+      List<String> moduleDeclaration,
+      List<String> publishedInterface,
+      List<String> persistenceEntity) {
+    this(
+        name,
+        injectable,
+        webController,
+        restController,
+        transactional,
+        eventListener,
+        moduleDeclaration,
+        publishedInterface,
+        persistenceEntity,
+        List.of(),
+        List.of());
   }
 
   private static List<String> role(List<String> names, String role) {
@@ -131,7 +162,21 @@ public record FrameworkAnnotations(
         List.of("org.springframework.context.event.EventListener"),
         List.of("org.springframework.modulith.ApplicationModule"),
         List.of("org.springframework.modulith.NamedInterface"),
-        List.of("jakarta.persistence.Entity", "jakarta.persistence.Table"));
+        List.of("jakarta.persistence.Entity", "jakarta.persistence.Table"),
+        List.of(
+            "org.springframework.beans.factory.annotation.Autowired",
+            "jakarta.inject.Inject",
+            "jakarta.annotation.Resource"),
+        List.of(
+            "jakarta.persistence.Id",
+            "jakarta.persistence.Column",
+            "jakarta.persistence.Embedded",
+            "jakarta.persistence.OneToMany",
+            "jakarta.persistence.ManyToOne",
+            "jakarta.persistence.OneToOne",
+            "jakarta.persistence.ManyToMany",
+            "jakarta.persistence.Transient",
+            "jakarta.persistence.Version"));
   }
 
   /**
@@ -152,7 +197,18 @@ public record FrameworkAnnotations(
         List.of("jakarta.enterprise.event.Observes"),
         List.of(),
         List.of(),
-        List.of("jakarta.persistence.Entity", "jakarta.persistence.Table"));
+        List.of("jakarta.persistence.Entity", "jakarta.persistence.Table"),
+        List.of("jakarta.inject.Inject"),
+        List.of(
+            "jakarta.persistence.Id",
+            "jakarta.persistence.Column",
+            "jakarta.persistence.Embedded",
+            "jakarta.persistence.OneToMany",
+            "jakarta.persistence.ManyToOne",
+            "jakarta.persistence.OneToOne",
+            "jakarta.persistence.ManyToMany",
+            "jakarta.persistence.Transient",
+            "jakarta.persistence.Version"));
   }
 
   /**
@@ -174,7 +230,18 @@ public record FrameworkAnnotations(
         List.of("jakarta.enterprise.event.Observes", "io.quarkus.vertx.ConsumeEvent"),
         List.of(),
         List.of(),
-        List.of("jakarta.persistence.Entity", "jakarta.persistence.Table"));
+        List.of("jakarta.persistence.Entity", "jakarta.persistence.Table"),
+        List.of("jakarta.inject.Inject"),
+        List.of(
+            "jakarta.persistence.Id",
+            "jakarta.persistence.Column",
+            "jakarta.persistence.Embedded",
+            "jakarta.persistence.OneToMany",
+            "jakarta.persistence.ManyToOne",
+            "jakarta.persistence.OneToOne",
+            "jakarta.persistence.ManyToMany",
+            "jakarta.persistence.Transient",
+            "jakarta.persistence.Version"));
   }
 
   /**
@@ -201,7 +268,21 @@ public record FrameworkAnnotations(
         List.of(
             "jakarta.persistence.Entity",
             "jakarta.persistence.Table",
-            "io.micronaut.data.annotation.MappedEntity"));
+            "io.micronaut.data.annotation.MappedEntity"),
+        List.of("jakarta.inject.Inject"),
+        List.of(
+            "jakarta.persistence.Id",
+            "jakarta.persistence.Column",
+            "jakarta.persistence.Embedded",
+            "jakarta.persistence.OneToMany",
+            "jakarta.persistence.ManyToOne",
+            "jakarta.persistence.OneToOne",
+            "jakarta.persistence.ManyToMany",
+            "jakarta.persistence.Transient",
+            "jakarta.persistence.Version",
+            "io.micronaut.data.annotation.Id",
+            "io.micronaut.data.annotation.MappedProperty",
+            "io.micronaut.data.annotation.Relation"));
   }
 
   /**
@@ -213,7 +294,7 @@ public record FrameworkAnnotations(
   public static FrameworkAnnotations none() {
     return new FrameworkAnnotations(
         "none", List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
-        List.of());
+        List.of(), List.of(), List.of());
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -348,7 +429,9 @@ public record FrameworkAnnotations(
         eventListener,
         moduleDeclaration,
         publishedInterface,
-        persistenceEntity);
+        persistenceEntity,
+        injectionSite,
+        persistenceMapping);
   }
 
   public FrameworkAnnotations withInjectable(String... annotationNames) {
@@ -361,7 +444,9 @@ public record FrameworkAnnotations(
         eventListener,
         moduleDeclaration,
         publishedInterface,
-        persistenceEntity);
+        persistenceEntity,
+        injectionSite,
+        persistenceMapping);
   }
 
   public FrameworkAnnotations withWebController(String... annotationNames) {
@@ -374,7 +459,9 @@ public record FrameworkAnnotations(
         eventListener,
         moduleDeclaration,
         publishedInterface,
-        persistenceEntity);
+        persistenceEntity,
+        injectionSite,
+        persistenceMapping);
   }
 
   public FrameworkAnnotations withRestController(String... annotationNames) {
@@ -387,7 +474,9 @@ public record FrameworkAnnotations(
         eventListener,
         moduleDeclaration,
         publishedInterface,
-        persistenceEntity);
+        persistenceEntity,
+        injectionSite,
+        persistenceMapping);
   }
 
   public FrameworkAnnotations withTransactional(String... annotationNames) {
@@ -400,7 +489,9 @@ public record FrameworkAnnotations(
         eventListener,
         moduleDeclaration,
         publishedInterface,
-        persistenceEntity);
+        persistenceEntity,
+        injectionSite,
+        persistenceMapping);
   }
 
   public FrameworkAnnotations withEventListener(String... annotationNames) {
@@ -413,7 +504,9 @@ public record FrameworkAnnotations(
         List.of(annotationNames),
         moduleDeclaration,
         publishedInterface,
-        persistenceEntity);
+        persistenceEntity,
+        injectionSite,
+        persistenceMapping);
   }
 
   public FrameworkAnnotations withModuleDeclaration(String... annotationNames) {
@@ -426,7 +519,9 @@ public record FrameworkAnnotations(
         eventListener,
         List.of(annotationNames),
         publishedInterface,
-        persistenceEntity);
+        persistenceEntity,
+        injectionSite,
+        persistenceMapping);
   }
 
   public FrameworkAnnotations withPublishedInterface(String... annotationNames) {
@@ -439,7 +534,9 @@ public record FrameworkAnnotations(
         eventListener,
         moduleDeclaration,
         List.of(annotationNames),
-        persistenceEntity);
+        persistenceEntity,
+        injectionSite,
+        persistenceMapping);
   }
 
   public FrameworkAnnotations withPersistenceEntity(String... annotationNames) {
@@ -452,10 +549,42 @@ public record FrameworkAnnotations(
         eventListener,
         moduleDeclaration,
         publishedInterface,
-        List.of(annotationNames));
+        List.of(annotationNames),
+        injectionSite,
+        persistenceMapping);
   }
 
   // ---------------------------------------------------------------------------------------------
+  public FrameworkAnnotations withInjectionSite(String... annotationNames) {
+    return new FrameworkAnnotations(
+        name,
+        injectable,
+        webController,
+        restController,
+        transactional,
+        eventListener,
+        moduleDeclaration,
+        publishedInterface,
+        persistenceEntity,
+        List.of(annotationNames),
+        persistenceMapping);
+  }
+
+  public FrameworkAnnotations withPersistenceMapping(String... annotationNames) {
+    return new FrameworkAnnotations(
+        name,
+        injectable,
+        webController,
+        restController,
+        transactional,
+        eventListener,
+        moduleDeclaration,
+        publishedInterface,
+        persistenceEntity,
+        injectionSite,
+        List.of(annotationNames));
+  }
+
   // Queries
   // ---------------------------------------------------------------------------------------------
 

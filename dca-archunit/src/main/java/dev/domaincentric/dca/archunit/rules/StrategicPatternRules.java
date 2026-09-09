@@ -59,7 +59,7 @@ public final class StrategicPatternRules implements DcaRuleSet {
 
   /** DCA-STR-001. */
   public static DcaRule displayDiscoveredBoundedContexts() {
-    return DcaRule.check(
+    return DcaRule.informational(
             "DCA-STR-001",
             "Diagnostic: Display discovered bounded contexts",
             "Making the discovered contexts visible shows which packages the strategic rules govern",
@@ -262,7 +262,6 @@ public final class StrategicPatternRules implements DcaRuleSet {
                 + " anyone consumes it, is not checked.");
   }
 
-  /** DCA-STR-006. */
   /**
    * DCA-STR-006. The allow-list is the package convention {@code api} / {@code events} of the
    * target module — DCA's in-process contract, a convention of the architecture and not of any
@@ -321,55 +320,44 @@ public final class StrategicPatternRules implements DcaRuleSet {
   public DcaRule integrationEventsResideInEventsPackages() {
     return DcaRule.of(
             "DCA-STR-007",
-            "Integration Events must be in events or adapter outgoing event packages",
-            "Integration Events must be in events/ packages (published named interface) or"
-                + " adapter.outgoing.event/ packages",
+            "Integration event contracts reside in the configured events segment",
+            "Integration contracts are published separately from translators and transport adapters",
             arch ->
                 classes()
                     .that()
                     .implement(IntegrationEvent.class)
                     .should()
-                    .resideInAnyPackage(
-                        ".." + layout.eventsSubpackage() + "..", outgoingEventAdapterPattern())
+                    .resideInAnyPackage(".." + layout.eventsSubpackage() + "..")
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes assignable to IntegrationEvent - directly or through a"
                 + " sub-interface - anywhere on the classpath under scan. Interfaces that extend"
                 + " IntegrationEvent are not selected.")
         .checking(
-            "Each resides in a package whose path contains the configured events segment"
-                + " (..events..) or in ..adapter.outgoing.event.. - the trailing event segment is"
-                + " fixed, not configurable. An integration event in a domain or application"
-                + " package is reported.");
-  }
-
-  private String outgoingEventAdapterPattern() {
-    return ".." + layout.adapterSubpackage() + "." + layout.outgoingSubpackage() + ".event..";
+            "Every integration-event contract resides in a package containing the configured events segment. Adapter outgoing event packages are not an alternative; move contracts to events or exclude STR-007 during migration. Translators and transport adapters stay separate.");
   }
 
   /** DCA-STR-008. */
   public static DcaRule integrationEventsAreRecords() {
     return DcaRule.of(
             "DCA-STR-008",
-            "Integration Events should be immutable records",
+            "Integration Events should have immutable shape",
             "Integration Events must be immutable to ensure event integrity across contexts (Event"
                 + " Sourcing best practice)",
             arch ->
                 classes()
                     .that()
                     .implement(IntegrationEvent.class)
-                    .should()
-                    .beRecords()
+                    .should(TypeInspection.haveImmutableShape())
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes assignable to IntegrationEvent - directly or through a"
                 + " sub-interface - anywhere on the classpath under scan.")
         .checking(
-            "The class is a record. A final class with final fields does not count - only the"
-                + " record form is accepted. The components' own immutability is not checked.");
+            "The class is final or a record with final inherited instance fields and no instance set*(x): void methods."
+                + " Referenced objects and collection contents are not inspected. Interfaces are excluded.");
   }
 
-  /** DCA-STR-009. */
   public static DcaRule antiCorruptionLayerComponentsResideInAclPackages() {
     return DcaRule.of(
             "DCA-STR-009",
@@ -398,7 +386,7 @@ public final class StrategicPatternRules implements DcaRuleSet {
 
   /** DCA-STR-010 — documentation only, never fails. */
   public static DcaRule eventListenersUseAntiCorruptionLayer() {
-    return DcaRule.check(
+    return DcaRule.informational(
             "DCA-STR-010",
             "Event Listeners consuming integration events should use Anti-Corruption Layer",
             "Consumed integration events are translated into the consuming context's own language"

@@ -38,8 +38,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
 
   private static final String REPOSITORY_SUFFIX = "Repository";
   private static final String STORE_SUFFIX = "Store";
-  private static final Set<String> REPOSITORY_METHOD_NAMES =
-      Set.of("findById", "save", "deleteById", "delete");
+  private static final Set<String> REPOSITORY_METHOD_NAMES = Set.of("save", "deleteById", "delete");
 
   private final DcaLayout layout;
   private final List<DcaRule> rules;
@@ -68,8 +67,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
             storeInterfacesExtendStoreMarker(),
             storeInterfacesResideInSharedOutputPorts(layout),
             storeImplementationsResideInOutgoingAdapters(layout),
-            storeInterfacesHaveNoRepositorySemantics(),
-            enrichedModelsAreValueRecords(layout));
+            storeInterfacesHaveNoRepositorySemantics());
   }
 
   @Override
@@ -123,8 +121,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
     return DcaRule.check(
             "DCA-TAC-002",
             "Aggregate Roots must not hold references to Repositories or other Output Ports",
-            "Aggregates are persistence-ignorant: repositories and services are passed as method"
-                + " parameters by the use case, never injected as fields",
+            "Aggregates are persistence-ignorant: use cases retrieve facts; external calculations belong"
+                + " in domain services over supplied snapshots. Review callback parameters manually; this field check cannot prove semantic responsibility",
             arch -> {
               List<String> violations = new ArrayList<>();
               for (JavaClass aggregate : concreteClassesAssignableTo(arch, AggregateRoot.class)) {
@@ -143,8 +141,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 }
               }
               fail(
-                  "Aggregates must not have injected repositories or output ports - pass dependencies"
-                      + " as method parameters.",
+                  "Aggregates must not have injected repositories or output ports; pass facts instead.",
                   violations);
             })
         .selecting(
@@ -168,8 +165,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
               for (JavaClass aggregate : concreteClassesAssignableTo(arch, AggregateRoot.class)) {
                 for (JavaField field : TypeInspection.instanceFields(aggregate)) {
                   for (JavaClass involved : TypeInspection.involvedTypes(field, aggregate)) {
-                    if (isConcreteAggregateRoot(involved)
-                        && !isSelfReference(aggregate, field, involved)) {
+                    if (isConcreteAggregateRoot(involved)) {
                       violations.add(
                           fieldDescription(aggregate, field, involved)
                               + " which is another aggregate root");
@@ -185,12 +181,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
             "Non-interface classes anywhere under scan assignable to AggregateRoot, "
                 + "abstract ones included.")
         .checking(
-            "No instance field - inherited ones included, walked through raw type, array "
-                + "component and generic type arguments, a generic base class's type parameters "
-                + "resolved as the aggregate binds them - involves a non-interface class "
-                + "assignable to AggregateRoot. A field whose own type is the inspected aggregate "
-                + "itself (a parent, a predecessor) is tolerated; a container of that same type "
-                + "is not. An interface type assignable to AggregateRoot is not reported.");
+            "No instance state, including inherited state, arrays and nested generic arguments, involves AggregateRoot. Same-type references and interfaces extending the marker are included. Interfaces that do not extend the marker are invisible; references by id are valid.");
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -240,30 +231,39 @@ public final class TacticalPatternRules implements DcaRuleSet {
             arch -> {
               List<String> violations = new ArrayList<>();
               for (JavaClass entity : nonRootEntities(arch)) {
-                if (entity.isRecord()) {
-                  continue;
+                String root = arch.moduleRootOf(entity.getPackageName());
+                for (var constructor : entity.getConstructors()) {
+                  for (var call : constructor.getCallsOfSelf()) {
+                    JavaClass caller = call.getOriginOwner();
+                    String domain =
+                        root == null ? "" : root + "." + arch.layout().domainSubpackage();
+                    boolean sameDomain =
+                        root != null
+                            && root.equals(arch.moduleRootOf(caller.getPackageName()))
+                            && (caller.getPackageName().equals(domain)
+                                || caller.getPackageName().startsWith(domain + "."));
+                    boolean role =
+                        caller.isAssignableTo(AggregateRoot.class)
+                            || caller.isAssignableTo(Entity.class)
+                            || caller.isAssignableTo(
+                                dev.domaincentric.dca.buildingblocks.ddd.tactical.Factory.class);
+                    if (!caller.equals(entity) && !(sameDomain && role)) {
+                      violations.add(
+                          caller.getName()
+                              + " constructs entity "
+                              + entity.getName()
+                              + " outside its domain construction boundary");
+                    }
+                  }
                 }
-                entity.getConstructors().stream()
-                    .filter(c -> c.getModifiers().contains(JavaModifier.PUBLIC))
-                    .forEach(
-                        c ->
-                            violations.add(
-                                entity.getName()
-                                    + " has public constructor - should be package-private or"
-                                    + " protected"));
               }
               fail(
-                  "Entities should not have public constructors (access only through aggregate root).\n"
-                      + "Note: Records are excluded from this rule.",
+                  "Entities are constructed by their own domain aggregate, entity or factory.",
                   violations);
             })
-        .selecting(
-            "Non-interface, non-record classes anywhere under scan assignable to Entity but "
-                + "not to AggregateRoot; abstract ones included.")
+        .selecting("Constructor calls to non-root Entity types, records included.")
         .checking(
-            "The class declares no public constructor; package-private, protected and "
-                + "private constructors pass. Records are skipped entirely, and aggregate roots "
-                + "are not selected.");
+            "The caller is the entity itself or an AggregateRoot, Entity or Factory in the same context domain layer. Same aggregate ownership is not decidable: another aggregate in that context passes and needs review. Reconstitution goes through an aggregate or factory; reflection is not inspected.");
   }
 
   public static DcaRule domainModelHasNoPublicSetters() {
@@ -324,12 +324,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
             "Non-interface classes anywhere under scan assignable to Entity but not to "
                 + "AggregateRoot; records and abstract classes included.")
         .checking(
-            "No instance field - inherited ones included, walked through raw type, array "
-                + "component and generic type arguments, a generic base class's type parameters "
-                + "resolved as the entity binds them - involves a non-interface class assignable "
-                + "to AggregateRoot. There is no self-reference exemption: a field typed as the "
-                + "entity's own aggregate root is reported. An interface type assignable to "
-                + "AggregateRoot is not reported.");
+            "No instance state, including inherited state, arrays and nested generic arguments, involves AggregateRoot. Same-type references and interfaces extending the marker are included. Interfaces that do not extend the marker are invisible; references by id are valid.");
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -367,11 +362,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
             "Non-interface classes anywhere under scan assignable to Value - records, enums "
                 + "and hand-written classes alike.")
         .checking(
-            "No instance field - inherited ones included, walked through raw type, array "
-                + "component and generic type arguments - involves a non-interface class "
-                + "assignable to AggregateRoot or to Entity. A type that is both is reported "
-                + "once, as an aggregate root; an interface type extending Entity is not "
-                + "reported.");
+            "No instance state, including inherited state, arrays and nested generic arguments, involves AggregateRoot or Entity. Same-type references and interfaces extending the marker are included. Interfaces that do not extend the marker are invisible; references by id are valid.");
   }
 
   public static DcaRule valueObjectClassesAreFinal(DcaLayout layout) {
@@ -530,7 +521,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
   public static DcaRule repositoryInterfacesResideInSharedOutputPorts(DcaLayout layout) {
     return DcaRule.of(
             "DCA-TAC-014",
-            "Repository interfaces must reside in the application layer's shared output-port package",
+            "Repository interfaces must reside in the application layer (local to a use case or shared)",
             "Repository interfaces are output ports in the application layer (Hexagonal Architecture)",
             arch ->
                 // areAssignableTo, not implement: ArchUnit's implement() matches non-interfaces
@@ -543,13 +534,13 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .and()
                     .doNotHaveSimpleName(REPOSITORY_SUFFIX)
                     .should()
-                    .resideInAnyPackage(arch.allSharedOutputPortPatterns())
+                    .resideInAnyPackage(arch.allApplicationPatterns())
                     .allowEmptyShould(true))
         .selecting(
             "Interfaces anywhere under scan assignable to Repository, whatever their name, "
                 + "the marker Repository itself excluded.")
         .checking(
-            "The interface resides in <module>.application.shared.. of some module root, "
+            "The interface resides in <module>.application.. of some module root, "
                 + "the shared kernel's included. Implementations are not selected; an empty "
                 + "selection passes.");
   }
@@ -712,7 +703,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
   public static DcaRule storeInterfacesResideInSharedOutputPorts(DcaLayout layout) {
     return DcaRule.of(
             "DCA-TAC-019",
-            "Store interfaces must reside in the application layer's shared output-port package",
+            "Store interfaces must reside in the application layer (local to a use case or shared)",
             "Store interfaces are output ports in the application layer (Hexagonal Architecture)",
             arch ->
                 classes()
@@ -723,13 +714,13 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .and()
                     .doNotHaveSimpleName(STORE_SUFFIX)
                     .should()
-                    .resideInAnyPackage(arch.allSharedOutputPortPatterns())
+                    .resideInAnyPackage(arch.allApplicationPatterns())
                     .allowEmptyShould(true))
         .selecting(
             "Interfaces anywhere under scan assignable to Store, whatever their name, the "
                 + "marker Store itself excluded.")
         .checking(
-            "The interface resides in <module>.application.shared.. of some module root, "
+            "The interface resides in <module>.application.. of some module root, "
                 + "the shared kernel's included. Implementations are not selected; an empty "
                 + "selection passes.");
   }
@@ -759,8 +750,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
   public static DcaRule storeInterfacesHaveNoRepositorySemantics() {
     return DcaRule.check(
             "DCA-TAC-021",
-            "Store interfaces must not declare findById or save methods",
-            "findById/save are Repository semantics; a Store that has them is a Repository wearing the"
+            "Store interfaces must not declare save or delete methods",
+            "save/delete are Repository semantics; a Store that has them is a Repository wearing the"
                 + " wrong name, and the stored object should then be an Aggregate Root",
             arch -> {
               List<String> violations = new ArrayList<>();
@@ -776,7 +767,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 }
               }
               fail(
-                  "Store interfaces use record/count/exists semantics, not findById/save."
+                  "Store interfaces use record/count/exists semantics, not save/delete."
                       + " Fix: rename to *Repository if the stored object is an Aggregate Root,"
                       + " otherwise rename the methods to record(...), count(...), exists(...).",
                   violations);
@@ -785,7 +776,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
             "Interfaces anywhere under scan assignable to Store, the marker Store itself "
                 + "excluded.")
         .checking(
-            "No method declared on the interface itself is named findById, save, deleteById "
+            "No method declared on the interface itself is named save, deleteById "
                 + "or delete - matched by name alone, parameters and return type disregarded. "
                 + "Inherited methods are not inspected, and no particular vocabulary (record, "
                 + "count, exists) is required.");
@@ -866,13 +857,11 @@ public final class TacticalPatternRules implements DcaRuleSet {
   }
 
   private static boolean isConcreteAggregateRoot(JavaClass type) {
-    return type.isAssignableTo(AggregateRoot.class) && !type.isInterface();
+    return type.isAssignableTo(AggregateRoot.class);
   }
 
   private static boolean isConcreteNonRootEntity(JavaClass type) {
-    return type.isAssignableTo(Entity.class)
-        && !type.isAssignableTo(AggregateRoot.class)
-        && !type.isInterface();
+    return type.isAssignableTo(Entity.class) && !type.isAssignableTo(AggregateRoot.class);
   }
 
   private static boolean isSetter(JavaMethod method) {
@@ -882,15 +871,6 @@ public final class TacticalPatternRules implements DcaRuleSet {
         && Character.isUpperCase(name.charAt(3))
         && method.getRawParameterTypes().size() == 1
         && method.getRawReturnType().getName().equals("void");
-  }
-
-  /**
-   * A field whose own type is the aggregate being inspected — a parent, a root, a predecessor — is
-   * a self-reference and tolerated. A container of that type is not: its elements are
-   * <em>other</em> instances of the aggregate, referenced by identity like any other aggregate.
-   */
-  private static boolean isSelfReference(JavaClass aggregate, JavaField field, JavaClass involved) {
-    return involved.equals(aggregate) && involved.equals(field.getRawType());
   }
 
   /**

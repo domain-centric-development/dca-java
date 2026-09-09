@@ -343,3 +343,11 @@ MIT — see [LICENSE](LICENSE).
 
 Contributions are accepted under the MIT licence, and the copyright holder may additionally publish
 them under other licences (for example a documentation licence for prose).
+
+## WP-39 parity update (2026-09-09)
+
+Java building-blocks 0.2.0 (unreleased) makes event registration protected, matching the existing .NET visibility.
+Factories delegate to aggregate creation. Both samples use Price, the six-field product-created v1 notification, ISO
+money bounds/rounding, snapshot checkout and supplied-fact domain services. Role snapshots and invalid default quantities
+are guarded. The independent shared specification has 45 vectors; final gate results are recorded in WP-39.
+The first specification commit/SHA pin remains pending under the explicit no-commit instruction. No release was made.
