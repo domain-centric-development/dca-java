@@ -76,10 +76,13 @@ public final class NamingRules implements DcaRuleSet {
   }
 
   public static DcaRule useCasesAreServices(DcaLayout layout) {
+    List<String> injectable = layout.frameworkAnnotations().injectable();
     return DcaRule.of(
             "DCA-NAM-002",
-            "Use case classes must be annotated with @Service",
-            "Use case classes must be Spring-managed beans",
+            "Use case classes must carry the injectable stereotype the container needs",
+            "Use cases are container-managed components: the incoming adapters receive them by"
+                + " injection, and the container's transaction and event plumbing only applies to"
+                + " managed beans",
             arch ->
                 classes()
                     .that()
@@ -88,16 +91,18 @@ public final class NamingRules implements DcaRuleSet {
                     .haveSimpleNameEndingWith(layout.useCaseSuffix())
                     .and()
                     .areNotInterfaces()
-                    .should()
-                    .beAnnotatedWith(layout.frameworkAnnotations().service())
+                    .and(AnnotationRoles.whenConfigured(injectable))
+                    .should(AnnotationRoles.beAnnotatedWithAny(injectable))
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes in <module>.application.. of every module root whose simple name"
-                + " ends with the configured use-case suffix.")
+                + " ends with the configured use-case suffix - provided the layout configures at"
+                + " least one injectable stereotype; with an empty role (a hand-wired application)"
+                + " nothing is selected.")
         .checking(
-            "The class is annotated with the configured @Service annotation. Records are selected"
-                + " like any other class; the marker interfaces are not consulted - only the suffix"
-                + " selects. An empty selection passes.");
+            "The class is directly annotated with one of the configured injectable stereotypes."
+                + " Records are selected like any other class; the marker interfaces are not"
+                + " consulted - only the suffix selects. An empty selection passes.");
   }
 
   public static DcaRule inputPortInterfacesEndWithInputPort(DcaLayout layout) {
@@ -163,24 +168,25 @@ public final class NamingRules implements DcaRuleSet {
     return DcaRule.of(
             "DCA-NAM-005",
             "Controller classes must end with '" + layout.controllerSuffix() + "'",
-            "@Controller annotated classes should follow naming conventions",
+            "Classes carrying the web-controller stereotype should follow naming conventions",
             arch ->
                 classes()
                     .that()
                     .resideInAnyPackage(arch.allIncomingAdapterPatterns())
-                    .and()
-                    .areAnnotatedWith(layout.frameworkAnnotations().controller())
+                    .and(
+                        AnnotationRoles.annotatedWithAny(
+                            layout.frameworkAnnotations().webController()))
                     .should()
                     .haveSimpleNameEndingWith(layout.controllerSuffix())
                     .allowEmptyShould(true))
         .selecting(
             "Classes in <module>.adapter.incoming.. of every module root that are directly"
-                + " annotated with the configured @Controller annotation.")
+                + " annotated with one of the configured web-controller stereotypes.")
         .checking(
             "The simple name ends with the configured controller suffix (default Controller). A"
-                + " class carrying only the REST-controller annotation is not selected here, and a"
+                + " class carrying only a REST-controller stereotype is not selected here, and a"
                 + " controller outside an incoming-adapter package is not checked. An empty"
-                + " selection passes.");
+                + " selection passes - which is always the case when the role is empty.");
   }
 
   public static DcaRule restControllersEndWithRestControllerSuffix(DcaLayout layout) {
@@ -189,26 +195,27 @@ public final class NamingRules implements DcaRuleSet {
             "REST Controllers must end with '"
                 + layout.restControllerSuffix()
                 + "' (REST best practice)",
-            "@RestController annotated classes should end with '"
+            "Classes carrying the REST-controller stereotype should end with '"
                 + layout.restControllerSuffix()
                 + "' following RESTful naming conventions",
             arch ->
                 classes()
                     .that()
                     .resideInAnyPackage(arch.allIncomingAdapterPatterns())
-                    .and()
-                    .areAnnotatedWith(layout.frameworkAnnotations().restController())
+                    .and(
+                        AnnotationRoles.annotatedWithAny(
+                            layout.frameworkAnnotations().restController()))
                     .should()
                     .haveSimpleNameEndingWith(layout.restControllerSuffix())
                     .allowEmptyShould(true))
         .selecting(
             "Classes in <module>.adapter.incoming.. of every module root that are directly"
-                + " annotated with the configured @RestController annotation.")
+                + " annotated with one of the configured REST-controller stereotypes.")
         .checking(
             "The simple name ends with the configured REST-controller suffix. Classes annotated"
-                + " with the plain @Controller annotation are not selected, and a REST controller"
+                + " only with a web-controller stereotype are not selected, and a REST controller"
                 + " outside an incoming-adapter package is not checked. An empty selection"
-                + " passes.");
+                + " passes - which is always the case when the role is empty.");
   }
 
   public static DcaRule dtosResideInAdapterLayer(DcaLayout layout) {

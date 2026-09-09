@@ -37,6 +37,12 @@ These hold for anyone working in any of the DCA repositories — human or agent 
 - **Rule texts are read by agents.** Every rule carries `title`, rationale, `selects()` and `checks()`; they flow
   verbatim into the catalog. Phrase them for an arbitrary domain and framework ("the configured injectable
   annotation", not "@Service"; "an owned aggregate", not "a cart"). Never cite the sample's ADRs.
+  `FrameworkNeutralityTest` enforces this mechanically for rule texts and the building-block javadoc — a framework or
+  shop word outside a "for example" sentence fails the build. Framework annotations are resolved through the roles of
+  `FrameworkAnnotations` (`injectable`, `transactional`, …; presets `spring`/`jakarta`/`quarkus`/`micronaut`/`none`),
+  never as literals in a rule. Presets are literal constructors (the catalog generator parses them) and providers
+  (`spi.FrameworkAnnotationsProvider`, `ServiceLoader`); `DcaLayout.forBasePackage` detects the preset from the test
+  class path — a new built-in preset needs a probe class file and a priority in `BuiltInFrameworkAnnotations`.
 - **New rule = new id, same id in `dca-dotnet`.** Port it there or list it as not applicable with a reason
   (`PORTING-LOG.md`, `planning/porting-status.md` in the monorepo). A new rule is a minor bump of `dca-archunit`.
 - **Markers are rare.** A new interface in `dca-building-blocks` needs a rule that selects on it and a second,

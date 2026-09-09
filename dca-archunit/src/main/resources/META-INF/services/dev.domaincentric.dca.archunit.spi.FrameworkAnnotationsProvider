@@ -1,0 +1,5 @@
+dev.domaincentric.dca.archunit.spi.BuiltInFrameworkAnnotations$Spring
+dev.domaincentric.dca.archunit.spi.BuiltInFrameworkAnnotations$Jakarta
+dev.domaincentric.dca.archunit.spi.BuiltInFrameworkAnnotations$Quarkus
+dev.domaincentric.dca.archunit.spi.BuiltInFrameworkAnnotations$Micronaut
+dev.domaincentric.dca.archunit.spi.BuiltInFrameworkAnnotations$None

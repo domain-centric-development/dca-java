@@ -9,15 +9,16 @@ import java.util.function.Supplier;
  * <p>An output port describes a capability the application needs from the outside world (store an
  * aggregate, look up a price, publish an event). A transaction is no such interaction: it defines
  * the execution semantics of several of them. The interface therefore lives beside the use cases
- * and does not extend {@code OutputPort}; the implementation is infrastructure (Spring: {@code
- * TransactionTemplate}).
+ * and does not extend {@code OutputPort}; the implementation is infrastructure - a thin wrapper
+ * around the platform's programmatic transaction API (Spring's {@code TransactionTemplate} is one
+ * implementation, JTA's {@code UserTransaction} another).
  *
- * <p>The default boundary is the use case itself ({@code @Transactional}): load, mutate, save,
- * publish — all inside one short transaction. That default breaks down as soon as the use case also
- * talks to the outside world (payment provider, remote catalog, mail gateway): a remote call inside
- * the transaction holds a database connection for the duration of the call, and under load the
- * connection pool runs dry; a rollback after a successful remote call cannot undo the remote effect
- * either.
+ * <p>The default boundary is the use case itself, declared with the framework's transactional
+ * annotation: load, mutate, save, publish — all inside one short transaction. That default breaks
+ * down as soon as the use case also talks to the outside world (payment provider, remote catalog,
+ * mail gateway): a remote call inside the transaction holds a database connection for the duration
+ * of the call, and under load the connection pool runs dry; a rollback after a successful remote
+ * call cannot undo the remote effect either.
  *
  * <p>{@code TransactionBoundary} lets the use case draw the boundary by hand — remote reads before,
  * the transactional core inside, remote effects after (preferably as a reaction to an integration
@@ -37,12 +38,12 @@ import java.util.function.Supplier;
  * <p>Domain events published inside {@link #inTransaction(Supplier)} see the same transaction as
  * the save; after-commit listeners fire when it commits.
  *
- * <p><b>Nesting.</b> A call inside a running transaction joins it (Spring's {@code REQUIRED}
- * propagation) — there is one commit, at the outermost boundary. A failure in an inner block marks
- * the shared transaction rollback-only even when the outer block catches the exception: the
- * outermost {@code inTransaction} then rolls back and throws instead of committing half of the
- * work. Implementations must preserve this; an in-memory implementation emulates it with a
- * rollback-only flag.
+ * <p><b>Nesting.</b> A call inside a running transaction joins it (the "required" propagation every
+ * transaction manager offers) — there is one commit, at the outermost boundary. A failure in an
+ * inner block marks the shared transaction rollback-only even when the outer block catches the
+ * exception: the outermost {@code inTransaction} then rolls back and throws instead of committing
+ * half of the work. Implementations must preserve this; an in-memory implementation emulates it
+ * with a rollback-only flag.
  *
  * <p><b>Rules of thumb:</b>
  *

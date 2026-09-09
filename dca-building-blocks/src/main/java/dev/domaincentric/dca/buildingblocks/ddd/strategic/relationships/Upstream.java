@@ -67,8 +67,9 @@ import java.lang.annotation.Target;
 public @interface Upstream {
 
   /**
-   * Module name of the upstream bounded context (Spring Modulith module name, e.g. {@code
-   * "product"}).
+   * Name of the upstream bounded context as the rules and the module system derive it: the
+   * context's package name relative to the base package (e.g. {@code "product"}, {@code
+   * "sales.order"}).
    */
   String context();
 

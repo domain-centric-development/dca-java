@@ -11,17 +11,17 @@ package dev.domaincentric.dca.buildingblocks.ddd.tactical;
  *
  * <ul>
  *   <li>Stateless (only final fields for dependencies)
- *   <li>Named after activities or actions (e.g., PricingService, CartTotalCalculator)
+ *   <li>Named after activities or actions (e.g., TariffCalculator, RouteOptimizer)
  *   <li>Express domain concepts in the Ubiquitous Language
- *   <li>Should NOT have Spring annotations (@Service, @Component)
+ *   <li>Carries no container stereotype - the domain does not know the container
  *   <li>Instantiated by Application Services
  * </ul>
  *
  * <p><b>Examples:</b>
  *
  * <ul>
- *   <li>Calculating cart totals with complex tax rules (involves multiple items)
- *   <li>Applying pricing rules and discounts (domain logic not belonging to a single entity)
+ *   <li>Calculating a total across several items under complex tax rules
+ *   <li>Applying tariff and discount rules (domain logic not belonging to a single entity)
  *   <li>Validating business constraints that span multiple aggregates
  * </ul>
  *

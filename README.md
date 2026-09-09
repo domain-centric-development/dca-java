@@ -21,9 +21,14 @@ dependencies {
     implementation("dev.domaincentric:dca-building-blocks:0.1.2")
     implementation("dev.domaincentric:dca-spring:0.1.0")
     testImplementation("dev.domaincentric:dca-archunit:0.3.0")
-    testImplementation("dev.domaincentric:dca-archunit-spring-modulith:0.1.0")
+    testImplementation("dev.domaincentric:dca-archunit-spring-modulith:0.1.0")   // Spring Modulith projects only
 }
 ```
+
+A Spring project without Modulith drops the last line: the module verification is all that artifact
+holds, and it needs `spring-modulith-core` on the test class path. Every other framework — Jakarta EE,
+Quarkus, Micronaut, hand-wired — uses `dca-building-blocks` + `dca-archunit` with the matching
+`FrameworkAnnotations` preset and no satellite at all.
 
 Both target Java 17+ — built with a Java 21 toolchain at `--release 17`, and the test suite runs on a
 Java 17 runtime as well (`./gradlew test -PjavaToolchain=17`, part of CI). Versions are independent;
@@ -107,8 +112,27 @@ DcaLayout.forBasePackage("com.acme.shop")
     .withUseCaseSuffix("ApplicationService")
     .withControllerSuffix("Page")
     .allowingInDomain("org.jmolecules..")     // extra third-party packages allowed in the domain
-    .withFrameworkAnnotations(FrameworkAnnotations.spring());   // or your own FQNs
+    .withFrameworkAnnotations(FrameworkAnnotations.jakarta());  // only if detection is wrong for you
 ```
+
+The rules never name a framework — they resolve *roles* (`injectable`, `webController`, `restController`,
+`transactional`, `eventListener`, `moduleDeclaration`, `publishedInterface`, `persistenceEntity`) through
+`FrameworkAnnotations`. Usually you write nothing: `DcaLayout.forBasePackage` **detects** the framework on the
+test class path and picks the preset (`spring`, `jakarta`, `quarkus`, `micronaut`; Spring when nothing is found),
+and the report's first line says which and why — `framework annotations: quarkus (detected; also jakarta)`,
+`spring (default)`, or `spring (default; undecided: micronaut, quarkus)` on a mixed class path where nothing is
+chosen. To choose by hand: `dca.framework=micronaut` in `dca-archunit.properties`, or in code a preset
+adjusted to your platform (`FrameworkAnnotations.jakarta().withRestController("com.acme.platform.Endpoint")`);
+`none()` leaves every role empty for a hand-wired application. Explicit beats configured beats detected.
+
+**Shipping a preset of your own.** A framework the library does not know — or your company platform — adds its
+preset in a library of its own, without a change here: one class implementing
+`dev.domaincentric.dca.archunit.spi.FrameworkAnnotationsProvider` (`name()`, `annotations()`, optionally
+`detect(ClassLoader)` probing one class file and `priority()`), one line in
+`META-INF/services/dev.domaincentric.dca.archunit.spi.FrameworkAnnotationsProvider`, and a dependency on
+`dca-archunit` only. It is then detected, selectable by name and reported like a built-in
+(`acme (detected)`). Presets are data; rules that need framework classes at test time stay in satellite artifacts
+such as `dca-archunit-spring-modulith`.
 
 ### 4. Runtime adapters — `dca-spring`
 

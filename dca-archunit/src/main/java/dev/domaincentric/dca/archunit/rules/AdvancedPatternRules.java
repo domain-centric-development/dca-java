@@ -13,6 +13,7 @@ import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
 import dev.domaincentric.dca.archunit.DcaRuleViolation;
+import dev.domaincentric.dca.archunit.FrameworkAnnotations;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.DomainEvent;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.DomainService;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.Factory;
@@ -149,30 +150,29 @@ public final class AdvancedPatternRules implements DcaRuleSet {
   }
 
   public DcaRule domainEventsHaveNoFrameworkAnnotations() {
+    FrameworkAnnotations annotations = layout.frameworkAnnotations();
     return DcaRule.of(
             "DCA-ADV-004",
-            "Domain Events must not have Spring annotations",
-            "Domain events must be framework-independent POJOs",
+            "Domain Events must not carry container annotations",
+            "Domain events are framework-independent plain objects - neither managed components nor"
+                + " listeners",
             arch ->
                 noClasses()
                     .that()
                     .resideInAnyPackage(arch.allDomainPatterns())
                     .and()
                     .implement(DomainEvent.class)
-                    .should()
-                    .beAnnotatedWith(layout.frameworkAnnotations().component())
-                    .orShould()
-                    .beAnnotatedWith(layout.frameworkAnnotations().service())
-                    .orShould()
-                    .beAnnotatedWith(layout.frameworkAnnotations().eventListener())
+                    .should(
+                        AnnotationRoles.beAnnotatedWithAny(
+                            annotations.injectable(), annotations.eventListener()))
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes in <module>.domain.. of every module root that are assignable to"
                 + " DomainEvent.")
         .checking(
-            "None carries the configured component, service or event-listener annotation directly on the"
-                + " class. Only these three annotations are checked - others, and meta-annotations, are not."
-                + " An empty selection passes.");
+            "None carries one of the configured injectable stereotypes or event-listener annotations"
+                + " directly on the class. Only the configured annotations are checked - others, and"
+                + " meta-annotations, are not. An empty selection passes, and so do empty roles.");
   }
 
   public DcaRule integrationEventsAreAnnotatedWithIntegrationEventType() {
@@ -339,26 +339,25 @@ public final class AdvancedPatternRules implements DcaRuleSet {
   }
 
   public DcaRule domainServicesHaveNoFrameworkAnnotations() {
+    FrameworkAnnotations annotations = layout.frameworkAnnotations();
     return DcaRule.of(
             "DCA-ADV-011",
-            "Domain Services must not have Spring annotations",
-            "Domain services should be framework-independent",
+            "Domain Services must not carry container annotations",
+            "Domain services are framework-independent - the application layer instantiates or"
+                + " wires them, the domain does not know the container",
             arch ->
                 noClasses()
                     .that()
                     .implement(DomainService.class)
-                    .should()
-                    .beAnnotatedWith(layout.frameworkAnnotations().service())
-                    .orShould()
-                    .beAnnotatedWith(layout.frameworkAnnotations().component())
+                    .should(AnnotationRoles.beAnnotatedWithAny(annotations.injectable()))
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes anywhere on the classpath under scan that are assignable to"
                 + " DomainService.")
         .checking(
-            "None carries the configured service or component annotation directly on the class. Only these"
-                + " two annotations are checked - others, and meta-annotations, are not. An empty selection"
-                + " passes.");
+            "None carries one of the configured injectable stereotypes directly on the class. Only"
+                + " the configured annotations are checked - others, and meta-annotations, are not."
+                + " An empty selection passes, and so does an empty role.");
   }
 
   public DcaRule domainServicesAreStateless() {
@@ -425,28 +424,26 @@ public final class AdvancedPatternRules implements DcaRuleSet {
   }
 
   public DcaRule factoriesHaveNoFrameworkAnnotations() {
+    FrameworkAnnotations annotations = layout.frameworkAnnotations();
     return DcaRule.of(
             "DCA-ADV-015",
-            "Factories must not have Spring annotations",
-            "Factories should be framework-independent",
+            "Factories must not carry container annotations",
+            "Factories are framework-independent domain objects",
             arch ->
                 noClasses()
                     .that()
                     .implement(Factory.class)
                     .and()
                     .resideInAnyPackage(arch.allDomainPatterns())
-                    .should()
-                    .beAnnotatedWith(layout.frameworkAnnotations().component())
-                    .orShould()
-                    .beAnnotatedWith(layout.frameworkAnnotations().service())
+                    .should(AnnotationRoles.beAnnotatedWithAny(annotations.injectable()))
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes in <module>.domain.. of every module root that are assignable to"
                 + " Factory.")
         .checking(
-            "None carries the configured component or service annotation directly on the class. Only these"
-                + " two annotations are checked - others, and meta-annotations, are not. An empty selection"
-                + " passes.");
+            "None carries one of the configured injectable stereotypes directly on the class. Only"
+                + " the configured annotations are checked - others, and meta-annotations, are not."
+                + " An empty selection passes, and so does an empty role.");
   }
 
   public DcaRule factoriesAreStateless() {
@@ -500,28 +497,26 @@ public final class AdvancedPatternRules implements DcaRuleSet {
   }
 
   public DcaRule specificationsHaveNoFrameworkAnnotations() {
+    FrameworkAnnotations annotations = layout.frameworkAnnotations();
     return DcaRule.of(
             "DCA-ADV-018",
-            "Specifications must not have Spring annotations",
-            "Specifications should be framework-independent value objects",
+            "Specifications must not carry container annotations",
+            "Specifications are framework-independent value objects",
             arch ->
                 noClasses()
                     .that()
                     .haveSimpleNameEndingWith("Specification")
                     .and()
                     .resideInAnyPackage(arch.allDomainPatterns())
-                    .should()
-                    .beAnnotatedWith(layout.frameworkAnnotations().component())
-                    .orShould()
-                    .beAnnotatedWith(layout.frameworkAnnotations().service())
+                    .should(AnnotationRoles.beAnnotatedWithAny(annotations.injectable()))
                     .allowEmptyShould(true))
         .selecting(
             "Classes in <module>.domain.. of every module root whose simple name ends with Specification -"
                 + " interfaces included.")
         .checking(
-            "None carries the configured component or service annotation directly on the class. Only these"
-                + " two annotations are checked - others, and meta-annotations, are not. An empty selection"
-                + " passes.");
+            "None carries one of the configured injectable stereotypes directly on the class. Only"
+                + " the configured annotations are checked - others, and meta-annotations, are not."
+                + " An empty selection passes, and so does an empty role.");
   }
 
   // ============================================================================

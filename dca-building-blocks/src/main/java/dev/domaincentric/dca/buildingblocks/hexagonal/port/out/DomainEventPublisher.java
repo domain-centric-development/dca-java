@@ -32,7 +32,7 @@ import dev.domaincentric.dca.buildingblocks.ddd.tactical.DomainEvent;
  *   <li>Easy to swap implementations or mock for testing
  * </ul>
  *
- * <p><b>Order of operations — save, dispatch, then clear.</b> The use case calls {@code
+ * <p><b>Sequence of operations — save, dispatch, then clear.</b> The use case calls {@code
  * publishAndClearEvents} after {@code save}, inside the same transaction, so an event is never
  * dispatched for state that was not persisted. The implementation dispatches the collected events
  * first and clears the aggregate <em>afterwards</em>: clearing is the acknowledgement that every
@@ -49,8 +49,8 @@ public interface DomainEventPublisher extends OutputPort {
   /**
    * Publishes a single domain event.
    *
-   * <p>The event will be published to the underlying event infrastructure (e.g., Spring's
-   * ApplicationEventPublisher, message broker, etc.).
+   * <p>The event is handed to the underlying event infrastructure - the container's in-process
+   * event bus, a message broker, or whatever the adapter wraps.
    *
    * @param event the domain event to publish
    * @throws IllegalArgumentException if event is null

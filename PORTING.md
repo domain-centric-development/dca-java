@@ -23,7 +23,7 @@ path no longer exists — `PORTING-LOG.md` records what each Groovy rule became.
 | `allIncomingAdapterPatterns()` / `allOutgoingAdapterPatterns()` | same names on `arch` |
 | `allDomainPatternsWithSharedKernel()` / `allDomainModelPatternsWithSharedKernel()` | same names on `arch` |
 | `INFRASTRUCTURE_IMPLEMENTATION` | `arch.infrastructureImplementation()` |
-| Spring annotation classes (`Service`, `Component`, `Controller`, `RestController`, `Transactional`, `EventListener`, Modulith `ApplicationModule`) | **by name** — `layout.frameworkAnnotations().service()` etc. with ArchUnit's `annotatedWith(String fqn)` / `isAnnotatedWith(String)`. The library has **no** Spring dependency. |
+| Spring annotation classes (`Service`, `Component`, `Controller`, `RestController`, `Transactional`, `EventListener`, Modulith `ApplicationModule`/`NamedInterface`, JPA `Entity`/`Table`) | **by role and name** — `layout.frameworkAnnotations().injectable()` etc. are lists of FQNs per role (`injectable`, `webController`, `restController`, `transactional`, `eventListener`, `moduleDeclaration`, `publishedInterface`, `persistenceEntity`), matched through `AnnotationRoles` (`annotatedWithAny`, `beAnnotatedWithAny`, `isMetaAnnotatedWithAny`). Presets `spring()` (default), `jakarta()`, `quarkus()`, `micronaut()`, `none()`; an empty role selects nothing. The library has **no** framework dependency, and `FrameworkNeutralityTest` fails the build if a rule text or a building-block javadoc names a framework or the shop outside an example. |
 | `org.springframework.modulith.core.ApplicationModules` (Modulith verification) | **not ported** — stays in the sample (`SpringModulithVerificationTest`). |
 
 ## Rule shape

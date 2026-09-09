@@ -20,7 +20,7 @@ package dev.domaincentric.dca.buildingblocks.ddd.tactical;
  *   <li>Immutable value objects
  *   <li>Combinable (AND, OR, NOT operations)
  *   <li>Express business rules in the Ubiquitous Language
- *   <li>Should NOT have Spring annotations
+ *   <li>Carries no container stereotype - a specification is a value object
  *   <li>Part of the domain model
  * </ul>
  *

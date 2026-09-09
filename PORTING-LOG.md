@@ -276,3 +276,44 @@ Two rules moved towards the .NET reading: `DCA-ADV-012`/`DCA-ADV-016` check inhe
 `Implementation`. Everything else in `TODO.md` #47 was either fixed on the .NET side or recorded as a deliberate
 difference.
 
+
+## Framework-neutral vocabulary (WP-30, 2026-09-09)
+
+`FrameworkAnnotations` moved from Spring stereotype names (`service`, `component`, `controller`, …, one FQN each) to
+*roles* holding lists of FQNs — `injectable`, `webController`, `restController`, `transactional`, `eventListener`,
+`moduleDeclaration`, `publishedInterface`, `persistenceEntity` — with presets `spring()` (default), `jakarta()`,
+`quarkus()`, `micronaut()`, `none()`. `AnnotationRoles` (rules package) turns a role into ArchUnit predicates and
+conditions; an empty role matches nothing, so a rule that forbids it has nothing to forbid and a rule that requires it
+selects nothing. Nine rule texts lost their Spring vocabulary (`DCA-ONI-003`, `DCA-MAP-006`, `DCA-ADV-004/011/015/018`,
+`DCA-USE-012/013`, `DCA-NAM-002`; `DCA-NAM-005/006` and `DCA-LAY-004` followed), `DCA-ONI-003` reads JPA's
+`@Entity`/`@Table` from the `persistenceEntity` role instead of hard-coding them, the renderer reads
+`@NamedInterface` from `publishedInterface`. Fixtures `fixtures/frameworks/{jakarta,micronaut,none,bad}` with
+name-only shims under `jakarta.*` and `io.micronaut.*`; the full catalog runs green per preset, and the `bad` tree
+proves that only the matching preset sees CDI/JPA/JAX-RS violations. `FrameworkNeutralityTest` guards rule texts and
+the building-block javadoc against framework and shop vocabulary outside example sentences (the javadoc lost eleven
+Spring mentions and three shop examples in prose). Rule count unchanged (114); self-tests 367 → 391.
+
+.NET twin: `FrameworkTypes` gained `Name`, `None()` and `IsSet`; `HexagonalRules.IsController`,
+`NamingRules.IsMvcController/IsApiController` and `DCA-LAY-004` treat an empty role as "matches nothing". The four
+`NotApplicable` reasons and the XML docs no longer name Spring; `FrameworkNeutralityTests` runs the same guard over
+rule texts, n/a reasons and the building-block XML docs. No second .NET web-framework preset — nothing worth one today
+(`planning/porting-status.md`).
+
+## Preset SPI and class-path detection (WP-31, 2026-09-09)
+
+`FrameworkAnnotationsProvider` (SPI, `ServiceLoader`) with the five built-ins as providers in
+`BuiltInFrameworkAnnotations`; each probes one class file with `getResource` and carries a priority (quarkus 20,
+micronaut 20, spring 10, jakarta 5, none never). `FrameworkAnnotations.detect(ClassLoader)` (cached per loader,
+`Detection` record with `describe()`), `preset(name)`, `providers(loader)`. `DcaLayout.forBasePackage` detects;
+`FrameworkAnnotationsOrigin` (`DETECTED`/`DEFAULT`/`CONFIGURED`/`EXPLICIT`) and `frameworkAnnotationsReport()` feed
+the report node and `toString()`; `withFrameworkPreset(name)` selects by name. `DcaArchitectureTest.effectiveLayout()`
+applies `dca.framework=<name>` from `dca-archunit.properties` unless the layout is explicit. Tests simulate class
+paths with a loader that answers `getResource` for chosen class files (`FrameworkDetectionTest`); a test-only
+third-party provider (`AcmePlatformAnnotations`, registered from `src/test/resources`) proves the round trip. The
+library's own test class path carries only name-only shims, so its fixtures resolve to `spring (default)` — behaviour
+unchanged. Self-tests 391 → 398. .NET: no discovery — one web framework; `FrameworkTypes.Name` keeps the shape ready.
+
+Review follow-up (same day): equal-priority detection is undecided (falls back to `spring (default; undecided: …)`);
+`DCA-MAP-006` and the renderer read every configured, loadable module/published-interface annotation a package carries
+(second-module-system fixture `frameworks/modules`, shims `org.example.modules.*`); the deprecated `of(...)` keeps
+`@NamedInterface`; the catalog generator embeds `AnnotationRoles`. Self-tests 398 → 403.

@@ -4,6 +4,23 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+Documentation-only (WP-30): the javadoc that flows into the knowledge catalog no longer names a framework or the
+shop. Binary-compatible with 0.1.2.
+
+### Changed
+
+- `DomainEvent`, `DomainService`, `Factory`, `Specification`, `Repository`: "Should NOT have Spring annotations"
+  became "carries no container stereotype / no framework annotations" — the rule is about the container, whichever
+  it is.
+- `TransactionBoundary` explains the concept first and names Spring's `TransactionTemplate` and JTA's
+  `UserTransaction` as two implementations; the default boundary is "the framework's transactional annotation",
+  nesting is "the required propagation every transaction manager offers".
+- `Upstream.context()` / `Partnership.context()`: "module name (Spring Modulith module name)" became "the context's
+  package name relative to the base package" — which is what the rules derive; `ExternalUpstream` says "context
+  name".
+- Examples in prose use neutral domains (`ContractId`, `TariffCalculator`, `ShipmentDispatched`); code snippets keep
+  their illustrative shop examples. `DomainEventPublisher`: "Sequence of operations".
+
 ## [0.1.2] - 2026-09-08
 
 Documentation-only release: no type, signature or behaviour changed; the javadoc that ships in the

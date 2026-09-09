@@ -38,7 +38,7 @@ import java.lang.annotation.Target;
  *   <li>Only packages annotated with {@link
  *       dev.domaincentric.dca.buildingblocks.ddd.strategic.BoundedContext BoundedContext} may
  *       declare {@code @ExternalUpstream}
- *   <li>{@code name} must not be blank and must not collide with an internal context's module name
+ *   <li>{@code name} must not be blank and must not collide with an internal context's name
  *   <li>{@code (name, interaction)} must be unique per declaring context
  *   <li>{@code ANTI_CORRUPTION_LAYER}: types from {@link #contractPackages()} appear only in the
  *       adapter matching the interaction (outgoing for {@code OUTBOUND}, incoming for {@code

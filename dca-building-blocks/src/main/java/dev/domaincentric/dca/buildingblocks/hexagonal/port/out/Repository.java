@@ -28,7 +28,7 @@ import java.util.Optional;
  *   <li>Implementation resides in an outgoing adapter (e.g., {@code
  *       product.adapter.outgoing.persistence.InMemoryProductRepository})
  *   <li>Methods use ubiquitous language (e.g., {@code findBySku()}, {@code findByCategory()})
- *   <li>Should NOT have Spring annotations in the interface
+ *   <li>Carries no framework annotations - the interface is plain Java
  *   <li>Collections should be immutable when returned
  * </ul>
  *

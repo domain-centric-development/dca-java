@@ -44,8 +44,8 @@ import java.lang.annotation.Target;
 public @interface Partnership {
 
   /**
-   * Module name of the partner bounded context (Spring Modulith module name, e.g. {@code
-   * "checkout"}).
+   * Name of the partner bounded context as the rules and the module system derive it: the context's
+   * package name relative to the base package (e.g. {@code "checkout"}).
    */
   String context();
 

@@ -4,9 +4,9 @@ package dev.domaincentric.dca.buildingblocks.ddd.tactical;
  * Marker interface for typed identifiers of Entities and Aggregate Roots.
  *
  * <p>An identifier is a Value Object whose only job is to name one Entity for its whole life.
- * Giving every Entity its own identifier type ({@code ProductId}, {@code OrderId}) instead of a
- * bare {@code UUID} or {@code String} lets the compiler reject a cart id passed where a product id
- * is expected, and lets a Repository's signature say which aggregate it manages.
+ * Giving every Entity its own identifier type ({@code ContractId}, {@code ShipmentId}) instead of a
+ * bare {@code UUID} or {@code String} lets the compiler reject one aggregate's id passed where
+ * another's is expected, and lets a Repository's signature say which aggregate it manages.
  *
  * <p><b>Characteristics:</b>
  *

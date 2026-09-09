@@ -13,9 +13,9 @@ import java.util.UUID;
  *
  * <ul>
  *   <li>Immutable (final classes or records)
- *   <li>Named in the past tense (e.g., ProductCreated, CartCleared, PriceChanged)
+ *   <li>Named in the past tense (e.g., ContractSigned, ShipmentDispatched, PriceChanged)
  *   <li>Include timestamp, unique ID, and event-specific data
- *   <li>Should NOT have Spring annotations (@Component, @EventListener)
+ *   <li>Carries no container stereotype and no listener annotation - it is data, not a bean
  *   <li>Part of the Ubiquitous Language
  *   <li>Internal to a bounded context — no versioning needed
  * </ul>

@@ -6,6 +6,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
+import dev.domaincentric.dca.archunit.FrameworkAnnotations;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -97,29 +98,27 @@ public final class OnionRules implements DcaRuleSet {
   }
 
   public DcaRule domainModelsMustNotHaveFrameworkAnnotations() {
+    FrameworkAnnotations annotations = layout.frameworkAnnotations();
     return DcaRule.of(
             "DCA-ONI-003",
-            "Domain Models must not have Spring/JPA annotations",
-            "Domain models must be framework-independent (no Spring or JPA annotations)",
+            "Domain Models must not carry container or persistence annotations",
+            "Domain models are framework-independent: no injectable stereotype makes them a managed"
+                + " component, no mapping annotation ties them to a persistence framework - the"
+                + " outgoing adapter maps them",
             arch ->
                 noClasses()
                     .that()
                     .resideInAnyPackage(arch.allDomainModelPatterns())
-                    .should()
-                    .beAnnotatedWith(layout.frameworkAnnotations().component())
-                    .orShould()
-                    .beAnnotatedWith(layout.frameworkAnnotations().service())
-                    .orShould()
-                    .beAnnotatedWith("jakarta.persistence.Entity")
-                    .orShould()
-                    .beAnnotatedWith("jakarta.persistence.Table")
+                    .should(
+                        AnnotationRoles.beAnnotatedWithAny(
+                            annotations.injectable(), annotations.persistenceEntity()))
                     .allowEmptyShould(true))
         .selecting("Classes in <module>.domain.model.. of every module root.")
         .checking(
-            "None carries the configured component or service stereotype annotation,"
-                + " jakarta.persistence.Entity or jakarta.persistence.Table directly on the class."
-                + " Only these four annotations are checked; other framework annotations, and"
-                + " classes elsewhere in the domain layer (domain.service, domain.event), are"
-                + " not.");
+            "None carries one of the configured injectable stereotypes or persistence-entity"
+                + " annotations directly on the class. Only the configured annotations are checked;"
+                + " other framework annotations, meta-annotations, and classes elsewhere in the"
+                + " domain layer (domain.service, domain.event) are not. With both roles empty the"
+                + " rule has nothing to forbid and passes.");
   }
 }

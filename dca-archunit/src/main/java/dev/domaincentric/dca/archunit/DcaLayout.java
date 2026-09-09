@@ -78,6 +78,20 @@ public final class DcaLayout {
   private final String restControllerSuffix;
   private final List<String> thirdPartyPackagesAllowedInDomain;
   private final FrameworkAnnotations frameworkAnnotations;
+  private final FrameworkAnnotationsOrigin frameworkAnnotationsOrigin;
+  private final List<String> frameworkCandidates;
+
+  /** How the layout came by its {@link FrameworkAnnotations} — shown in the report. */
+  public enum FrameworkAnnotationsOrigin {
+    /** A provider recognised its framework on the test class path. */
+    DETECTED,
+    /** Nothing was detected; {@link FrameworkAnnotations#spring()} stands in. */
+    DEFAULT,
+    /** Selected by name, e.g. {@code dca.framework=quarkus} in the properties file. */
+    CONFIGURED,
+    /** Passed to {@link #withFrameworkAnnotations(FrameworkAnnotations)} in code. */
+    EXPLICIT
+  }
 
   private DcaLayout(Settings settings) {
     this.basePackage = requirePackage(settings.basePackage, "basePackage");
@@ -107,9 +121,17 @@ public final class DcaLayout {
                 settings.thirdPartyPackagesAllowedInDomain, "thirdPartyPackagesAllowedInDomain"));
     this.frameworkAnnotations =
         Objects.requireNonNull(settings.frameworkAnnotations, "frameworkAnnotations");
+    this.frameworkAnnotationsOrigin =
+        Objects.requireNonNull(settings.frameworkAnnotationsOrigin, "frameworkAnnotationsOrigin");
+    this.frameworkCandidates = List.copyOf(settings.frameworkCandidates);
   }
 
-  /** The DCA default layout for the given base package. */
+  /**
+   * The DCA default layout for the given base package. The framework annotations are those of the
+   * framework found on the test class path ({@link FrameworkAnnotations#detect()}); Spring's when
+   * nothing is found. {@link #withFrameworkAnnotations(FrameworkAnnotations)} or {@link
+   * #withFrameworkPreset(String)} override the choice.
+   */
   public static DcaLayout forBasePackage(String basePackage) {
     Settings defaults = new Settings();
     defaults.basePackage = basePackage;
@@ -126,7 +148,13 @@ public final class DcaLayout {
     defaults.controllerSuffix = "Controller";
     defaults.restControllerSuffix = "Resource";
     defaults.thirdPartyPackagesAllowedInDomain = DEFAULT_THIRD_PARTY_ALLOWED_IN_DOMAIN;
-    defaults.frameworkAnnotations = FrameworkAnnotations.spring();
+    FrameworkAnnotations.Detection detection = FrameworkAnnotations.detect();
+    defaults.frameworkAnnotations = detection.annotations();
+    defaults.frameworkAnnotationsOrigin =
+        detection.detected()
+            ? FrameworkAnnotationsOrigin.DETECTED
+            : FrameworkAnnotationsOrigin.DEFAULT;
+    defaults.frameworkCandidates = detection.candidates();
     return new DcaLayout(defaults);
   }
 
@@ -270,9 +298,47 @@ public final class DcaLayout {
     return withThirdPartyPackagesAllowedInDomain(merged);
   }
 
-  /** Fully qualified names of the framework annotations the rules look for. Defaults to Spring. */
+  /**
+   * The framework annotations the rules look for, by role — a preset such as {@link
+   * FrameworkAnnotations#jakarta()} or an adjusted one. Overrides whatever {@link
+   * #forBasePackage(String)} detected; the report shows the preset as {@code (explicit)}.
+   */
   public DcaLayout withFrameworkAnnotations(FrameworkAnnotations value) {
-    return copy(settings -> settings.frameworkAnnotations = value);
+    return copy(
+        settings -> {
+          settings.frameworkAnnotations = value;
+          settings.frameworkAnnotationsOrigin = FrameworkAnnotationsOrigin.EXPLICIT;
+          settings.frameworkCandidates = List.of();
+        });
+  }
+
+  /**
+   * The preset registered under the given name — built-in ({@code spring}, {@code jakarta}, {@code
+   * quarkus}, {@code micronaut}, {@code none}) or contributed by a library through {@code
+   * FrameworkAnnotationsProvider}. This is what {@code dca.framework=<name>} in {@code
+   * dca-archunit.properties} applies; an unknown name fails, a typo must not fall back silently.
+   */
+  public DcaLayout withFrameworkPreset(String name) {
+    FrameworkAnnotations preset =
+        FrameworkAnnotations.preset(name)
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        "No framework preset named '"
+                            + name
+                            + "' - known: "
+                            + FrameworkAnnotations.providers(
+                                    Thread.currentThread().getContextClassLoader())
+                                .stream()
+                                .map(p -> p.name())
+                                .sorted()
+                                .toList()));
+    return copy(
+        settings -> {
+          settings.frameworkAnnotations = preset;
+          settings.frameworkAnnotationsOrigin = FrameworkAnnotationsOrigin.CONFIGURED;
+          settings.frameworkCandidates = List.of();
+        });
   }
 
   /** This layout with one setting changed; validation runs in the constructor as always. */
@@ -293,6 +359,8 @@ public final class DcaLayout {
     settings.restControllerSuffix = restControllerSuffix;
     settings.thirdPartyPackagesAllowedInDomain = thirdPartyPackagesAllowedInDomain;
     settings.frameworkAnnotations = frameworkAnnotations;
+    settings.frameworkAnnotationsOrigin = frameworkAnnotationsOrigin;
+    settings.frameworkCandidates = frameworkCandidates;
     change.accept(settings);
     return new DcaLayout(settings);
   }
@@ -314,6 +382,8 @@ public final class DcaLayout {
     String restControllerSuffix;
     List<String> thirdPartyPackagesAllowedInDomain;
     FrameworkAnnotations frameworkAnnotations;
+    FrameworkAnnotationsOrigin frameworkAnnotationsOrigin;
+    List<String> frameworkCandidates = List.of();
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -387,6 +457,34 @@ public final class DcaLayout {
 
   public FrameworkAnnotations frameworkAnnotations() {
     return frameworkAnnotations;
+  }
+
+  /** How the layout came by its framework annotations. */
+  public FrameworkAnnotationsOrigin frameworkAnnotationsOrigin() {
+    return frameworkAnnotationsOrigin;
+  }
+
+  /**
+   * One line for the report: {@code spring (detected)}, {@code quarkus (detected; also jakarta)},
+   * {@code spring (default)}, {@code acme (configured)}, {@code jakarta (explicit)}.
+   */
+  public String frameworkAnnotationsReport() {
+    String name = frameworkAnnotations.name();
+    return switch (frameworkAnnotationsOrigin) {
+      case DETECTED ->
+          frameworkCandidates.size() > 1
+              ? name
+                  + " (detected; also "
+                  + String.join(", ", frameworkCandidates.subList(1, frameworkCandidates.size()))
+                  + ")"
+              : name + " (detected)";
+      case DEFAULT ->
+          frameworkCandidates.isEmpty()
+              ? name + " (default)"
+              : name + " (default; undecided: " + String.join(", ", frameworkCandidates) + ")";
+      case CONFIGURED -> name + " (configured)";
+      case EXPLICIT -> name + " (explicit)";
+    };
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -509,6 +607,10 @@ public final class DcaLayout {
 
   @Override
   public String toString() {
-    return "DcaLayout[" + basePackage + "]";
+    return "DcaLayout["
+        + basePackage
+        + ", frameworkAnnotations="
+        + frameworkAnnotationsReport()
+        + "]";
   }
 }

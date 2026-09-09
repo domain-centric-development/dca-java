@@ -4,6 +4,71 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+Framework-neutral vocabulary (WP-30). Minor bump: the old accessors stay as deprecated delegates; three accessors change
+their return type (see *Changed*).
+
+### Added
+
+- `FrameworkAnnotations` presets `jakarta()`, `quarkus()`, `micronaut()` and `none()` next to `spring()`, each a set of
+  *roles* (`injectable`, `webController`, `restController`, `transactional`, `eventListener`, `moduleDeclaration`,
+  `publishedInterface`, `persistenceEntity`) holding zero or more fully qualified annotation names. `with*(String...)`
+  adjusts one role, `named(String)` renames an adjusted set, `describe(role, whenEmpty)` renders a role for messages.
+  A rule that forbids a role treats every listed annotation as forbidden, a rule that requires one accepts any of
+  them; an empty role selects nothing and passes (`DCA-NAM-002`, `DCA-NAM-005/006`, `DCA-LAY-004`, `DCA-USE-013`,
+  `DCA-MAP-006`) or has nothing to forbid (`DCA-ONI-003`, `DCA-ADV-004/011/015/018`); `DCA-USE-012` then counts only
+  the explicit `TransactionBoundary`. Fixtures per preset (`fixtures/frameworks/*`) run the full catalog green.
+  `spring()` lists JTA's `jakarta.transaction.Transactional` next to Spring's own in the transactional role — Spring
+  honours both, so a use case annotated with either satisfies `DCA-USE-012` and is governed by `DCA-LAY-004`/`USE-013`.
+- `DcaArchitectureTest` reports the preset in use and how it was chosen as a first, always-passing test
+  (`layout / framework annotations: spring (detected)`, `quarkus (detected; also jakarta)`, `spring (default)`,
+  `acme (configured)`, `jakarta (explicit)`), so a Jakarta or hand-wired project sees which vocabulary the rules
+  resolved and a wrong default is visible instead of silently selecting nothing.
+- **Preset SPI and detection (WP-31).** `dev.domaincentric.dca.archunit.spi.FrameworkAnnotationsProvider`
+  (`name()`, `annotations()`, `detect(ClassLoader)`, `priority()`), discovered with `ServiceLoader`; the five
+  built-ins are providers (`BuiltInFrameworkAnnotations`), a third-party library adds one class and one
+  `META-INF/services` line. `FrameworkAnnotations.detect()` asks every provider whether its framework is on the test
+  class path (a `getResource` probe on one class file, nothing is loaded) and takes the highest priority — Quarkus
+  outranks the Jakarta preset it builds on; two frameworks of *equal* priority (Quarkus and Micronaut on one class
+  path) decide nothing: the result is `spring (default; undecided: micronaut, quarkus)` and the project names its
+  preset; `FrameworkAnnotations.preset(name)` looks a preset up by name;
+  `DcaLayout.withFrameworkPreset(name)` applies it and fails on an unknown name; `dca.framework=<name>` in
+  `dca-archunit.properties` does the same for `DcaArchitectureTest` unless the layout set its annotations
+  explicitly in code. `DcaLayout.frameworkAnnotationsOrigin()` / `frameworkAnnotationsReport()` expose the choice.
+- **`DcaLayout.forBasePackage` now detects.** The default preset is the detected one, Spring when nothing is found
+  (`spring (default)`). A Spring project sees no change; a Quarkus or Micronaut project no longer has to name its
+  preset.
+- `FrameworkNeutralityTest`: fails the build when a rule's title, rationale, `selects` or `checks` — or a
+  building-block javadoc sentence — names a framework (`Spring`, `Modulith`, `JPA`, `Jakarta`, `@Service`,
+  `@Transactional`, …) or shop vocabulary (`cart`, `checkout`, `product`, `Order`, `inventory`, `pricing`, `customer`)
+  outside a sentence marked as an example ("for example", "e.g.", "such as").
+
+### Changed
+
+- **Rule texts speak roles, not Spring.** `DCA-ONI-003` "Domain Models must not carry container or persistence
+  annotations" (reads the `persistenceEntity` role instead of hard-coding JPA), `DCA-ADV-004/011/015/018` "… must not
+  carry container annotations", `DCA-NAM-002` "Use case classes must carry the injectable stereotype the container
+  needs", `DCA-NAM-005/006` select by the configured web-/REST-controller stereotypes, `DCA-USE-012/013` and
+  `DCA-LAY-004` speak of "the configured transactional annotation(s)", `DCA-MAP-006` "Upstream declarations and the
+  module declaration's allowed dependencies must agree" (Spring Modulith named as the example of a module system).
+  Ids unchanged; `rules.json` / `RULES.md` regenerated. Violation messages render the configured annotation
+  (`without @Atomic`), not Spring's.
+- `ContextMapRenderer` reads the published-interface annotation from the `publishedInterface` role instead of a
+  Spring Modulith constant; every configured and loadable annotation counts, a channel is published when the package
+  carries any of them under the channel's name; without a configured and loadable one, class presence stands alone
+  (as before). `DCA-MAP-006` likewise reads `allowedDependencies` from every configured module declaration a package
+  actually carries, not only from the first loadable one.
+- The deprecated `FrameworkAnnotations.of(...)` keeps both roles 0.3 hard-coded — JPA `@Entity`/`@Table` and Spring
+  Modulith `@NamedInterface` — so a context map rendered through the old factory does not change.
+- `DcaLayout.toString()` names the preset (`DcaLayout[com.acme, frameworkAnnotations=spring]`).
+- **Custom-rule authors:** `FrameworkAnnotations.restController()`, `transactional()` and `eventListener()` now
+  return `List<String>` (the role) instead of a single `String`. `service()`, `component()`, `controller()`,
+  `applicationModule()`, `hasApplicationModule()` and the seven-argument `of(...)` remain as deprecated delegates
+  onto the roles and go with 1.0.
+
+### Fixed
+
+- `DcaArchitecture.contextName` javadoc no longer explains itself through Spring Modulith internals.
+
 ## [0.3.0] - 2026-09-08
 
 Depends on `dca-building-blocks` 0.1.2.

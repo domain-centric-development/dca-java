@@ -21,7 +21,7 @@ package dev.domaincentric.dca.buildingblocks.ddd.tactical;
  * <ul>
  *   <li>Stateless or with minimal state
  *   <li>Return fully formed, valid objects
- *   <li>Should NOT have Spring annotations (@Component, @Service)
+ *   <li>Carries no container stereotype - a factory is a domain object
  *   <li>Part of the domain model
  * </ul>
  *

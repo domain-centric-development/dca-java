@@ -121,7 +121,7 @@ public final class LayeredRules implements DcaRuleSet {
             "Transaction boundaries belong to the application layer",
             rationale,
             arch -> {
-              String transactional = layout.frameworkAnnotations().transactional();
+              List<String> transactional = layout.frameworkAnnotations().transactional();
               List<String> allowedPatterns =
                   new ArrayList<>(List.of(arch.allApplicationPatterns()));
               allowedPatterns.add(
@@ -130,8 +130,7 @@ public final class LayeredRules implements DcaRuleSet {
               CollectedViolations violations = CollectedViolations.withoutHeader();
               violations.addAll(
                   methods()
-                      .that()
-                      .areAnnotatedWith(transactional)
+                      .that(AnnotationRoles.annotatedWithAny(transactional))
                       .should()
                       .beDeclaredInClassesThat()
                       .resideInAnyPackage(allowed)
@@ -140,8 +139,7 @@ public final class LayeredRules implements DcaRuleSet {
                   rationale);
               violations.addAll(
                   classes()
-                      .that()
-                      .areAnnotatedWith(transactional)
+                      .that(AnnotationRoles.annotatedWithAny(transactional))
                       .should()
                       .resideInAnyPackage(allowed)
                       .allowEmptyShould(true),
@@ -150,8 +148,9 @@ public final class LayeredRules implements DcaRuleSet {
               violations.throwIfAny();
             })
         .selecting(
-            "Methods and classes under scan that carry the configured transactional annotation"
-                + " directly (meta-annotations do not count).")
+            "Methods and classes under scan that carry one of the configured transactional"
+                + " annotations directly (meta-annotations do not count); with an empty role nothing"
+                + " is selected.")
         .checking(
             "Each annotated method is declared in, and each annotated class resides in, an"
                 + " application package of some module root (<module>.application..) or an outgoing"

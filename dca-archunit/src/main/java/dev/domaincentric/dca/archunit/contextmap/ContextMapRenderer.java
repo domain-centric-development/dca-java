@@ -36,9 +36,6 @@ import java.util.TreeSet;
  */
 public final class ContextMapRenderer {
 
-  private static final String NAMED_INTERFACE_ANNOTATION =
-      "org.springframework.modulith.NamedInterface";
-
   private final DcaArchitecture arch;
   private boolean includeExternalSystems = true;
   private boolean includePlanned = true;
@@ -347,9 +344,10 @@ public final class ContextMapRenderer {
 
   /**
    * Published interfaces ("api", "events") of a context. Published means declared: the channel
-   * package carries classes AND its package-info declares {@code @NamedInterface} with the channel
-   * name — a package that merely happens to be called "api" is not a published contract. Without
-   * Spring Modulith on the classpath, class presence stands alone.
+   * package carries classes AND its package-info declares the layout's published-interface
+   * annotation with the channel name — a package that merely happens to be called "api" is not a
+   * published contract. Without a configured and loadable published-interface annotation, class
+   * presence stands alone.
    */
   private List<String> publishedInterfaces(String contextPackage) {
     List<String> published = new ArrayList<>();
@@ -371,26 +369,41 @@ public final class ContextMapRenderer {
     return published;
   }
 
+  /**
+   * Whether the channel package declares itself published under the channel's name through any of
+   * the layout's published-interface annotations that are on the class path. Without a configured
+   * and loadable annotation there is nothing to declare with, and class presence stands alone.
+   */
   @SuppressWarnings("unchecked")
   private boolean declaredAsNamedInterface(String channelPackage, String channel) {
-    Class<? extends Annotation> namedInterface;
-    try {
-      // Loaded reflectively so the renderer works unchanged in non-Modulith projects.
-      namedInterface = (Class<? extends Annotation>) Class.forName(NAMED_INTERFACE_ANNOTATION);
-    } catch (ClassNotFoundException ignored) {
+    List<Class<? extends Annotation>> declarations = new ArrayList<>();
+    for (String name : arch.layout().frameworkAnnotations().publishedInterface()) {
+      try {
+        // Loaded reflectively so the renderer works unchanged without the module system.
+        declarations.add((Class<? extends Annotation>) Class.forName(name));
+      } catch (ClassNotFoundException ignored) {
+        // not on the class path - a declaration the project does not use
+      }
+    }
+    if (declarations.isEmpty()) {
       return true;
     }
-    Optional<? extends Annotation> annotation =
-        arch.packageAnnotation(channelPackage, namedInterface);
-    if (annotation.isEmpty()) {
-      return false;
+    for (Class<? extends Annotation> declaration : declarations) {
+      Optional<? extends Annotation> annotation =
+          arch.packageAnnotation(channelPackage, declaration);
+      if (annotation.isEmpty()) {
+        continue;
+      }
+      // Raw reflection sees the attribute that was actually written; a framework's alias bridging
+      // between value() and name() only applies through its own annotation utilities.
+      List<String> names = new ArrayList<>();
+      names.addAll(stringArrayAttribute(annotation.get(), "value"));
+      names.addAll(stringArrayAttribute(annotation.get(), "name"));
+      if (names.contains(channel)) {
+        return true;
+      }
     }
-    // Raw reflection sees the attribute that was actually written; the framework's alias bridging
-    // between value() and name() only applies through its own annotation utilities.
-    List<String> names = new ArrayList<>();
-    names.addAll(stringArrayAttribute(annotation.get(), "value"));
-    names.addAll(stringArrayAttribute(annotation.get(), "name"));
-    return names.contains(channel);
+    return false;
   }
 
   private static List<String> stringArrayAttribute(Annotation annotation, String attribute) {
