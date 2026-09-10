@@ -361,8 +361,7 @@ public final class UseCaseRules implements DcaRuleSet {
                     .and()
                     .areNotInterfaces()
                     .should(
-                        beTransactionalWhenMutating(
-                            layout.frameworkAnnotations().transactional()))
+                        beTransactionalWhenMutating(layout.frameworkAnnotations().transactional()))
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes in <module>.application.. that implement InputPort or whose simple name ends with the configured use-case suffix.")
@@ -738,9 +737,9 @@ public final class UseCaseRules implements DcaRuleSet {
     };
   }
 
-  private static ArchCondition<JavaClass> beTransactionalWhenMutating(
-      List<String> transactional) {
-    return new ArchCondition<>("be transactional when saving an aggregate or publishing domain events") {
+  private static ArchCondition<JavaClass> beTransactionalWhenMutating(List<String> transactional) {
+    return new ArchCondition<>(
+        "be transactional when saving an aggregate or publishing domain events") {
       @Override
       public void check(JavaClass item, ConditionEvents events) {
         IntraClassCalls calls = new IntraClassCalls(item);
