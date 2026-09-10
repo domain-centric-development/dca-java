@@ -20,7 +20,9 @@ Before 1.0 a minor version may add and tighten rules; what can turn a green 0.3.
 - Three ids are retired and cannot be selected any more (`onlyIds` fails with the replacement): `DCA-TAC-022`
   (→ `DCA-TAC-014`), `DCA-MAP-003` (renderer disambiguation replaced the rule), `DCA-ADV-003` (→ `DCA-ADV-001`).
 - Custom-rule authors: `FrameworkAnnotations.restController()`, `transactional()` and `eventListener()` return
-  `List<String>`; the Spring-named accessors are deprecated delegates.
+  `List<String>`; the Spring-named accessors are deprecated delegates. `UseCaseRules.publishingUseCasesAreTransactional(layout)`
+  is renamed to `mutatingUseCasesAreTransactional(layout)` — the only removed public method; a rule set that built the
+  catalog by hand has to follow (`DcaRules.all(layout)` and the set classes are unaffected).
 
 Relaxed at the same time (a red 0.3.0 build may turn green): `DCA-HEX-005` allows global and own-module infrastructure in
 outgoing adapters; `DCA-NAM-002` is informational (configuration wiring is as valid as a stereotype); `Manager` is a
