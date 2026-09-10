@@ -42,4 +42,30 @@ class HexagonalRulesTest {
   void outgoingAdapterMayReuseOwnAndGlobalInfrastructure() {
     Fixtures.rule(INFRASTRUCTURE, "DCA-HEX-005").check(Fixtures.arch(INFRASTRUCTURE));
   }
+
+  @Test
+  @DisplayName("DCA-HEX-005 names the foreign infrastructure client and survives unrelated ignores")
+  void outgoingAdapterDependingOnForeignInfrastructureIsReportedByName() {
+    String bad = FIXTURES + ".bad";
+    var violation = Fixtures.violation(bad, "DCA-HEX-005");
+    assertTrue(
+        violation.violations().stream()
+            .anyMatch(
+                v ->
+                    v.contains("ForeignInfrastructureAdapter")
+                        && v.contains("infrastructure.Client")),
+        violation.getMessage());
+    // An ignore pattern that matches nothing must not swallow the first (or any) violation.
+    var rule = Fixtures.rule(bad, "DCA-HEX-005");
+    var selection =
+        dev.domaincentric.dca.archunit.DcaRuleSelection.all()
+            .ignoringViolationsMatching(rule.id(), ".*Unrelated.*");
+    var outcome =
+        dev.domaincentric.dca.archunit.DcaRuleExecution.execute(
+            rule, Fixtures.arch(bad), selection);
+    assertTrue(
+        outcome.status() == dev.domaincentric.dca.archunit.DcaRuleOutcome.Status.FAILED
+            && outcome.toString().contains("ForeignInfrastructureAdapter"),
+        outcome.toString());
+  }
 }

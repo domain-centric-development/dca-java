@@ -14,4 +14,11 @@ public final class Shapes {
   }
 
   public record RecordCommand(int amount) {}
+
+  /** A business method whose name merely starts with set is no setter. */
+  public record SettleCommand(int amount) {
+    public void settle(int payment) {}
+
+    public void setup(int value) {}
+  }
 }

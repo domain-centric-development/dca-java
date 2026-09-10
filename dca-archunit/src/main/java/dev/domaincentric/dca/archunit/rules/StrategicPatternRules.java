@@ -354,7 +354,7 @@ public final class StrategicPatternRules implements DcaRuleSet {
             "Non-interface classes assignable to IntegrationEvent - directly or through a"
                 + " sub-interface - anywhere on the classpath under scan.")
         .checking(
-            "The class is final or a record with final inherited instance fields and no instance set*(x): void methods."
+            "The class is final or a record with final inherited instance fields and no instance setter methods - a name heuristic: set followed by an upper-case letter, with parameters, returning void (settle(x) is not a setter)."
                 + " Referenced objects and collection contents are not inspected. Interfaces are excluded.");
   }
 

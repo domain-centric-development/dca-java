@@ -88,7 +88,7 @@ public final class UseCaseRules implements DcaRuleSet {
         .selecting(
             "Concrete non-nested application operations selected by InputPort marker or configured use-case suffix, with loadable runtime classes.")
         .checking(
-            "Every effective public instance method, declared or inherited, matches a method of an implemented InputPort interface after generic substitution. Unrelated-interface methods and getters/setters are not exempt. Constructors, Object signatures, static and compiler-generated bridge/synthetic methods are excluded.");
+            "Every effective public instance method, declared or inherited, matches a method of an implemented InputPort interface after generic substitution. Unrelated-interface methods and getters/setters are not exempt. A use case selected by suffix only, without an InputPort interface, has no permitted operation and is reported in full - implement the input port. Constructors, Object signatures, static and compiler-generated bridge/synthetic methods are excluded.");
   }
 
   @Override
@@ -168,7 +168,7 @@ public final class UseCaseRules implements DcaRuleSet {
         .selecting(
             "Non-interface classes, including records, in <module>.application.. whose simple name ends with Command.")
         .checking(
-            "The type is final or a record with final inherited instance fields and no instance set*(x): void methods. Referenced objects and collection contents are not inspected.");
+            "The type is final or a record with final inherited instance fields and no instance setter methods - a name heuristic: set followed by an upper-case letter, with parameters, returning void (settle(x) is not a setter). Referenced objects and collection contents are not inspected.");
   }
 
   public static DcaRule queriesAreImmutable(DcaLayout layout) {
@@ -180,7 +180,7 @@ public final class UseCaseRules implements DcaRuleSet {
         .selecting(
             "Non-interface classes, including records, in <module>.application.. whose simple name ends with Query.")
         .checking(
-            "The type is final or a record with final inherited instance fields and no instance set*(x): void methods. Referenced objects and collection contents are not inspected.");
+            "The type is final or a record with final inherited instance fields and no instance setter methods - a name heuristic: set followed by an upper-case letter, with parameters, returning void (settle(x) is not a setter). Referenced objects and collection contents are not inspected.");
   }
 
   public static DcaRule resultsResideInApplication(DcaLayout layout) {
@@ -215,7 +215,7 @@ public final class UseCaseRules implements DcaRuleSet {
         .selecting(
             "Non-interface classes, including records, in <module>.application.. whose simple name ends with Result.")
         .checking(
-            "The type is final or a record with final inherited instance fields and no instance set*(x): void methods. Referenced objects and collection contents are not inspected.");
+            "The type is final or a record with final inherited instance fields and no instance setter methods - a name heuristic: set followed by an upper-case letter, with parameters, returning void (settle(x) is not a setter). Referenced objects and collection contents are not inspected.");
   }
 
   public static DcaRule responsesResideInIncomingAdapters(DcaLayout layout) {
@@ -246,7 +246,10 @@ public final class UseCaseRules implements DcaRuleSet {
             "A saved aggregate must not keep its events: unpublished, they are lost, and stored on the"
                 + " instance they may later be published out of context. Publishing belongs after the"
                 + " save, in the use case that owns the unit of work - unless the aggregate is proven never to register an"
-                + " event. Checked per entry path, following calls within the use case class: every"
+                + " event: its whole hierarchy is under scan and no code unit of it, of a helper it calls, or of any other"
+                + " scanned class registering on that aggregate (a nested class it never calls) calls registerEvent;"
+                + " a helper in another top-level class cannot reach the protected method; an unresolved type argument keeps the"
+                + " requirement. Checked per entry path, following calls within the use case class: every"
                 + " entry point that reaches a save - a method callable from outside the class, or one"
                 + " nothing in the class calls - must also reach a publication; a wrapper that publishes"
                 + " does not cover a direct call of the public method it wraps, and a helper two methods"
@@ -780,7 +783,7 @@ public final class UseCaseRules implements DcaRuleSet {
               events.add(
                   SimpleConditionEvent.violated(
                       item,
-                      item.getSimpleName()
+                      item.getName()
                           + "."
                           + pathName(entry, unit)
                           + " saves an aggregate without publishing its domain events - no"

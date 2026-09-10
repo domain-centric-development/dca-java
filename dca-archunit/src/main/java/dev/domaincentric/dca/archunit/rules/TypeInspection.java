@@ -72,6 +72,13 @@ final class TypeInspection {
         .toList();
   }
 
+  /**
+   * Setter by name: {@code set} followed by an upper-case letter ({@code setName}, not {@code
+   * settle}).
+   */
+  private static final java.util.regex.Pattern SETTER_NAME =
+      java.util.regex.Pattern.compile("set\\p{Upper}.*");
+
   /** Shallow immutable state, including inherited state; referenced contents are not inspected. */
   static boolean isImmutableShape(JavaClass type) {
     return (type.isRecord() || type.getModifiers().contains(JavaModifier.FINAL))
@@ -81,7 +88,7 @@ final class TypeInspection {
             .noneMatch(
                 m ->
                     !m.getModifiers().contains(JavaModifier.STATIC)
-                        && m.getName().startsWith("set")
+                        && SETTER_NAME.matcher(m.getName()).matches()
                         && !m.getRawParameterTypes().isEmpty()
                         && m.getRawReturnType().getName().equals("void"));
   }

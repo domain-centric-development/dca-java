@@ -53,8 +53,14 @@ class OperationPolicyTest {
   void effectivePublicSurfaceIncludesInheritedAndUnrelatedMethods() {
     String message = Fixtures.failure(ROOT + "surfacebad", "DCA-USE-017").getMessage();
     for (String name :
-        new String[] {"ExtraUseCase", "InheritedUseCase", "UnrelatedUseCase", "getX", "setX"})
-      assertTrue(message.contains(name), message);
+        new String[] {
+          "ExtraUseCase",
+          "InheritedUseCase",
+          "UnrelatedUseCase",
+          "getX",
+          "setX",
+          "SuffixOnlyUseCase"
+        }) assertTrue(message.contains(name), message);
     Fixtures.rule(ROOT + "surfacegood", "DCA-USE-017").check(Fixtures.arch(ROOT + "surfacegood"));
   }
 

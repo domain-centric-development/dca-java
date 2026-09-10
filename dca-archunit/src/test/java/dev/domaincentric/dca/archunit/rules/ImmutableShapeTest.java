@@ -17,7 +17,9 @@ class ImmutableShapeTest {
     }
     Fixtures.rule(root + "good", "DCA-HEX-003").check(Fixtures.arch(root + "good"));
     assertTrue(Fixtures.failure(root + "bad", "DCA-HEX-003").getMessage().contains("Endpoint"));
-    assertTrue(
-        Fixtures.failure(root + "bad", "DCA-USE-004").getMessage().contains("RecordCommand"));
+    String commands = Fixtures.failure(root + "bad", "DCA-USE-004").getMessage();
+    assertTrue(commands.contains("RecordCommand"), commands);
+    assertTrue(commands.contains("NamedCommand"), commands);
+    // The good fixture's SettleCommand (settle/setup) passed above: the heuristic needs set<Upper>.
   }
 }

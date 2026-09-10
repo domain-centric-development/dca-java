@@ -161,7 +161,10 @@ public final class HexagonalRules implements DcaRuleSet {
             "Outgoing adapters must not use another module's infrastructure",
             "Technical infrastructure reuse preserves module isolation",
             arch -> {
-              List<String> violations = new ArrayList<>();
+              CollectedViolations violations =
+                  CollectedViolations.withHeader(
+                      "Outgoing adapters must not use another module's infrastructure\nbecause"
+                          + " technical infrastructure reuse preserves module isolation");
               for (var adapter : arch.classes()) {
                 if (!com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage(
                         arch.allOutgoingAdapterPatterns())
@@ -185,7 +188,7 @@ public final class HexagonalRules implements DcaRuleSet {
                     violations.add(dependency.getDescription());
                 }
               }
-              if (!violations.isEmpty()) throw new AssertionError(String.join("\n", violations));
+              violations.throwIfAny();
             })
         .selecting("Classes in every module's outgoing adapter package.")
         .checking(

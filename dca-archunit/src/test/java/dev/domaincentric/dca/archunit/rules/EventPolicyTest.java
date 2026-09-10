@@ -13,6 +13,16 @@ class EventPolicyTest {
   void eventFreeSaveIsExemptButRecordedAndUnresolvedRemainRequired() {
     String message = Fixtures.failure(ROOT, "DCA-USE-009").getMessage();
     assertFalse(message.contains("application.free"), message);
+    // Reported by name: the aggregate that registers, the unresolvable type argument, and the
+    // aggregate a nested class it never calls registers on (outside the hierarchy; another
+    // top-level
+    // class cannot reach the protected method).
+    for (String required :
+        new String[] {
+          "application.recording.SaveUseCase",
+          "application.unresolved.SaveUseCase",
+          "application.external.SaveUseCase"
+        }) assertTrue(message.contains(required), required + " missing in\n" + message);
     // Violation messages name the simple class: use isolated imports to distinguish equal suffixes.
     var classes =
         new ClassFileImporter()

@@ -350,4 +350,4 @@ Java building-blocks 0.2.0 (unreleased) makes event registration protected, matc
 Factories delegate to aggregate creation. Both samples use Price, the six-field product-created v1 notification, ISO
 money bounds/rounding, snapshot checkout and supplied-fact domain services. Role snapshots and invalid default quantities
 are guarded. The independent shared specification has 45 vectors; final gate results are recorded in WP-39.
-The first specification commit/SHA pin remains pending under the explicit no-commit instruction. No release was made.
+Both samples pin the specification's first review commit. No release was made.

@@ -395,7 +395,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
   public static DcaRule valueObjectFieldsAreFinal() {
     return DcaRule.check(
             "DCA-TAC-010",
-            "Value Object fields must be final (deep immutability)",
+            "Value Object fields must be final (shallow immutability)",
             "Records have implicitly final fields and enums are immutable by design; a hand-written"
                 + " value class must make every instance field final itself",
             arch -> {
@@ -414,7 +414,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 }
               }
               fail(
-                  "Value Object fields must be final for deep immutability (Vernon's DDD).",
+                  "Value Object fields must be final for shallow immutability (Vernon's DDD).",
                   violations);
             })
         .selecting(

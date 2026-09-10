@@ -95,8 +95,8 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             "Non-interface classes anywhere on the classpath under scan that are assignable to DomainEvent"
                 + " - directly or through a supertype.")
         .checking(
-            "The class is final or a record with final inherited instance fields and no instance set*(x): void methods."
-                + " Referenced objects and collection contents are not inspected. Interfaces are excluded.");
+            "The class is final or a record with final inherited instance fields and no instance setter methods - a name heuristic: set followed by an upper-case letter, with parameters, returning void (settle(x) is not a setter)."
+                + " Referenced objects and collection contents are not inspected. Interfaces are excluded; an enum implementing DomainEvent is final by construction and passes.");
   }
 
   public DcaRule domainEventsResideInDomain() {

@@ -4,6 +4,17 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+- Review follow-up (2026-09-10): `DCA-USE-017` reports every public method of a use case that is selected by suffix only
+  and implements no `InputPort` — intentional for `0.3.0` consumers that relied on the suffix fallback; migration: implement
+  the input port. Setter detection of the immutable-shape rules (`DCA-USE-004/005/007`, `DCA-ADV-001`, `DCA-STR-008`) is a
+  name heuristic and now requires `set` followed by an upper-case letter (`settle(x)` is no setter); `DCA-ADV-001` accepts an
+  enum implementing `DomainEvent` (final by construction, reported before `0.4.0`). `DCA-HEX-005` and the domain-metadata
+  rules report through the shared violation collector, so a configured ignore pattern filters single violations instead of
+  dropping the first line. `DCA-USE-009`'s event-free exemption also inspects registrations from classes outside the aggregate
+  hierarchy (a same-package helper). Retired identities referenced by a selection are reported one by one with reason and
+  replacement (`DcaRuleSelection.retirementNotices()`); `onlyIds`/`dca.rules.ids` with a retired id fail with the replacement,
+  exclusions and severities keep loading.
+
 - WP-33: allow domain Manager terms, outgoing Response models, use-case-local ports and Store lookup by key. Operation containers normalize marker-or-suffix discovery; entity construction checks caller roles and context, with aggregate-ownership limits documented. TAC-022 retirement remains in the WP-37 registry batch.
 
 - WP-32: shallow immutable state on classes and records, including inherited fields and setters. Same-type and marker-interface aggregate references are rejected, wrapper traversal is covered, and controllers are selected by configured roles or suffixes.

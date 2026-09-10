@@ -23,6 +23,28 @@ class RetirementTest {
   }
 
   @Test
+  void referencedRetiredIdsAreReportedAndCannotBeSelected() {
+    var retiredId = DcaRules.retired().keySet().iterator().next();
+    var selection = DcaRuleSelection.all().excluding(retiredId, "legacy configuration");
+    assertEquals(java.util.Set.of(retiredId), selection.referencedRetiredIds());
+    assertTrue(
+        selection.retirementNotices().get(0).startsWith(retiredId + " is retired since"),
+        selection.retirementNotices().toString());
+    assertTrue(DcaRuleSelection.all().referencedRetiredIds().isEmpty());
+    var properties = new java.util.Properties();
+    properties.setProperty("dca.rules.warn", retiredId);
+    assertEquals(
+        java.util.Set.of(retiredId),
+        DcaRuleSelection.fromProperties(properties).referencedRetiredIds());
+    var rejected =
+        assertThrows(
+            IllegalArgumentException.class, () -> DcaRuleSelection.all().onlyIds(retiredId));
+    assertTrue(rejected.getMessage().contains("replacement"), rejected.getMessage());
+    properties.setProperty("dca.rules.ids", retiredId);
+    assertThrows(IllegalArgumentException.class, () -> DcaRuleSelection.fromProperties(properties));
+  }
+
+  @Test
   void informationalEntriesHaveExplicitKind() {
     var layout = DcaLayout.forBasePackage("example");
     assertEquals(

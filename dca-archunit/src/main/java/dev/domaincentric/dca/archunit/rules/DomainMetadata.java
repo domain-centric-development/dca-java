@@ -61,8 +61,8 @@ final class DomainMetadata {
           .forEach(ctor -> inspect(ctor, ctor.getFullName(), violations, roles.injectionSite()));
     }
     if (!violations.isEmpty())
-      throw new AssertionError(
-          id + ": prohibited domain metadata\n" + String.join("\n", violations));
+      throw new dev.domaincentric.dca.archunit.DcaRuleViolation(
+          id + ": prohibited domain metadata", violations);
   }
 
   @SafeVarargs

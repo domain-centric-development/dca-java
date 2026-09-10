@@ -23,10 +23,33 @@ final class EventFreeAggregate {
     arch.classes().forEach(c -> scanned.put(c.getName(), c));
     JavaClass current = scanned.get(concrete.getName());
     if (current == null) return false;
+    Set<String> hierarchy = new HashSet<>();
     while (current != null && !platform(current.getName())) {
       if (!scanned.containsKey(current.getName())
           || !noRegistration(current, scanned, new HashSet<>())) return false;
+      hierarchy.add(current.getName());
       current = current.getRawSuperclass().orElse(null);
+    }
+    return noExternalRegistration(hierarchy, scanned);
+  }
+
+  /**
+   * A class outside the aggregate's hierarchy that registers an event on it (a same-package helper
+   * reaching the protected method) is invisible from the aggregate's own code units, so every
+   * scanned class is inspected: a registration whose target is the aggregate or one of its
+   * supertypes disables the exemption.
+   */
+  private static boolean noExternalRegistration(
+      Set<String> hierarchy, Map<String, JavaClass> scanned) {
+    for (JavaClass type : scanned.values()) {
+      if (hierarchy.contains(type.getName())) continue;
+      for (var unit : type.getCodeUnits())
+        for (var call : unit.getCallsFromSelf()) {
+          var owner = call.getTargetOwner();
+          if (call.getTarget().getName().equals("registerEvent")
+              && owner.isAssignableTo(AggregateRoot.class)
+              && (hierarchy.contains(owner.getName()) || platform(owner.getName()))) return false;
+        }
     }
     return true;
   }

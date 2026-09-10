@@ -16,4 +16,8 @@ public final class Shapes {
   public record RecordCommand(int amount) {
     public void setAmount(int amount) {}
   }
+
+  public record NamedCommand(int amount) {
+    public void setName(String name) {}
+  }
 }
