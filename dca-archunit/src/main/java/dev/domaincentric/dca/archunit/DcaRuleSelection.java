@@ -53,13 +53,14 @@ public final class DcaRuleSelection {
   public static final String DEFAULT_RESOURCE = "dca-archunit.properties";
 
   private static final DcaRuleSelection ALL =
-      new DcaRuleSelection(null, null, Map.of(), Set.of(), null);
+      new DcaRuleSelection(null, null, Map.of(), Set.of(), null, Set.of());
 
   private final Set<String> includedSets; // null = every set
   private final Set<String> includedIds; // null = every rule
   private final Map<String, RuleSettings> settings;
   private final Set<String> frozenIds;
   private final Path freezeStore;
+  private final Set<String> referencedRetiredIds;
 
   private DcaRuleSelection(
       Set<String> includedSets,
@@ -67,11 +68,48 @@ public final class DcaRuleSelection {
       Map<String, RuleSettings> settings,
       Set<String> frozenIds,
       Path freezeStore) {
+    this(includedSets, includedIds, settings, frozenIds, freezeStore, Set.of());
+  }
+
+  private DcaRuleSelection(
+      Set<String> includedSets,
+      Set<String> includedIds,
+      Map<String, RuleSettings> settings,
+      Set<String> frozenIds,
+      Path freezeStore,
+      Set<String> referencedRetiredIds) {
     this.includedSets = includedSets == null ? null : Set.copyOf(includedSets);
     this.includedIds = includedIds == null ? null : Set.copyOf(includedIds);
     this.settings = Map.copyOf(settings);
     this.frozenIds = Set.copyOf(frozenIds);
     this.freezeStore = freezeStore;
+    this.referencedRetiredIds = Set.copyOf(referencedRetiredIds);
+  }
+
+  /**
+   * Retired rule identities this selection refers to in an exclusion or severity entry — a
+   * configuration written for an earlier release keeps loading, and the run names each of them with
+   * reason and replacement instead of silently dropping the entry.
+   */
+  public Set<String> referencedRetiredIds() {
+    return referencedRetiredIds;
+  }
+
+  /** One notice per referenced retired identity, for the test report. */
+  public List<String> retirementNotices() {
+    List<String> notices = new ArrayList<>();
+    for (String id : referencedRetiredIds) {
+      DcaRules.RetiredRule retired = DcaRules.retired().get(id);
+      notices.add(
+          id
+              + " is retired since "
+              + retired.since()
+              + ": "
+              + retired.reason()
+              + "; replacement: "
+              + retired.replacement());
+    }
+    return notices;
   }
 
   /** Every rule of every set, all at {@link DcaSeverity#ERROR}. */
@@ -87,14 +125,16 @@ public final class DcaRuleSelection {
   public DcaRuleSelection onlySets(String... ruleSetNames) {
     Set<String> names = new LinkedHashSet<>(List.of(ruleSetNames));
     names.forEach(DcaRuleSelection::requireKnownSet);
-    return new DcaRuleSelection(names, includedIds, settings, frozenIds, freezeStore);
+    return new DcaRuleSelection(
+        names, includedIds, settings, frozenIds, freezeStore, referencedRetiredIds);
   }
 
   /** Restricts the run to the given rule identifiers. */
   public DcaRuleSelection onlyIds(String... ruleIds) {
     Set<String> ids = new LinkedHashSet<>(List.of(ruleIds));
-    ids.forEach(DcaRuleSelection::requireKnownId);
-    return new DcaRuleSelection(includedSets, ids, settings, frozenIds, freezeStore);
+    ids.forEach(DcaRuleSelection::requireActiveId);
+    return new DcaRuleSelection(
+        includedSets, ids, settings, frozenIds, freezeStore, referencedRetiredIds);
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -140,7 +180,11 @@ public final class DcaRuleSelection {
     Map<String, RuleSettings> merged = new LinkedHashMap<>(settings);
     RuleSettings current = merged.getOrDefault(ruleId, RuleSettings.enforced());
     merged.put(ruleId, new RuleSettings(severity, reason, current.ignoredViolationPatterns()));
-    return new DcaRuleSelection(includedSets, includedIds, merged, frozenIds, freezeStore);
+    Set<String> retired = new LinkedHashSet<>(referencedRetiredIds);
+    if (DcaRules.retired().containsKey(ruleId)) {
+      retired.add(ruleId);
+    }
+    return new DcaRuleSelection(includedSets, includedIds, merged, frozenIds, freezeStore, retired);
   }
 
   private DcaRuleSelection withSeverityForSet(
@@ -174,7 +218,8 @@ public final class DcaRuleSelection {
     List<String> patterns = new ArrayList<>(current.ignoredViolationPatterns());
     patterns.add(regex);
     merged.put(ruleId, new RuleSettings(current.severity(), current.reason(), patterns));
-    return new DcaRuleSelection(includedSets, includedIds, merged, frozenIds, freezeStore);
+    return new DcaRuleSelection(
+        includedSets, includedIds, merged, frozenIds, freezeStore, referencedRetiredIds);
   }
 
   /**
@@ -189,13 +234,19 @@ public final class DcaRuleSelection {
       requireKnownId(id);
       ids.add(id);
     }
-    return new DcaRuleSelection(includedSets, includedIds, settings, ids, freezeStore);
+    return new DcaRuleSelection(
+        includedSets, includedIds, settings, ids, freezeStore, referencedRetiredIds);
   }
 
   /** Directory holding the frozen baselines. Default: ArchUnit's own {@code archunit_store}. */
   public DcaRuleSelection withFreezeStore(Path directory) {
     return new DcaRuleSelection(
-        includedSets, includedIds, settings, frozenIds, Objects.requireNonNull(directory));
+        includedSets,
+        includedIds,
+        settings,
+        frozenIds,
+        Objects.requireNonNull(directory),
+        referencedRetiredIds);
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -419,10 +470,24 @@ public final class DcaRuleSelection {
   }
 
   private static void requireKnownId(String ruleId) {
-    if (!DcaRules.allIds().contains(ruleId)) {
+    if (!DcaRules.allIds().contains(ruleId) && !DcaRules.retired().containsKey(ruleId)) {
       throw new IllegalArgumentException(
           "Unknown rule id: " + ruleId + ". See RULES.md for the catalog.");
     }
+  }
+
+  /** Scope entries need an active rule: a retired id would silently select nothing. */
+  private static void requireActiveId(String ruleId) {
+    DcaRules.RetiredRule retired = DcaRules.retired().get(ruleId);
+    if (retired != null) {
+      throw new IllegalArgumentException(
+          ruleId
+              + " is retired since "
+              + retired.since()
+              + " and cannot be selected; replacement: "
+              + retired.replacement());
+    }
+    requireKnownId(ruleId);
   }
 
   private static void requireKnownSet(String ruleSetName) {
@@ -438,6 +503,9 @@ public final class DcaRuleSelection {
   @Override
   public String toString() {
     List<String> parts = new ArrayList<>();
+    if (!referencedRetiredIds.isEmpty()) {
+      parts.add("retired " + referencedRetiredIds);
+    }
     parts.add(includedSets == null ? "all sets" : "sets " + includedSets);
     if (includedIds != null) {
       parts.add("ids " + includedIds);

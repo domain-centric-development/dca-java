@@ -46,7 +46,7 @@ public final class LayeredRules implements DcaRuleSet {
    * enforced by {@link HexagonalRules} instead. This rule never fails.
    */
   public DcaRule layeredArchitectureDiagnostic() {
-    return DcaRule.check(
+    return DcaRule.informational(
             "DCA-LAY-001",
             "Diagnostic: The rules of the Layered Architecture should be followed",
             "Traditional layering (application accessed only by incoming adapters) contradicts Ports"
@@ -163,7 +163,7 @@ public final class LayeredRules implements DcaRuleSet {
   public DcaRule outputPortMarkersMustBeInterfaces() {
     return DcaRule.of(
             "DCA-LAY-005",
-            "The shared kernel's output-port markers must all be interfaces",
+            "No implementation is placed into the building-blocks output-port package",
             "port.out contains outbound port interfaces (Repository, OutputPort, DomainEventPublisher)"
                 + " shared across all bounded contexts. These must be interfaces to ensure the"
                 + " application layer remains framework-independent and follows the Dependency"

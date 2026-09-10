@@ -6,6 +6,8 @@ import dev.domaincentric.dca.archunit.fixtures.infrastructure.sharedkernel.infra
 /** DCA-HEX-005 for CartWiring; the shared kernel's Lifecycle annotation is allowed. */
 @Lifecycle
 public final class CartStorage {
+  private final dev.domaincentric.dca.archunit.fixtures.infrastructure.infrastructure.Wiring
+      global = new dev.domaincentric.dca.archunit.fixtures.infrastructure.infrastructure.Wiring();
   private final CartWiring wiring = new CartWiring();
 
   public String describe() {

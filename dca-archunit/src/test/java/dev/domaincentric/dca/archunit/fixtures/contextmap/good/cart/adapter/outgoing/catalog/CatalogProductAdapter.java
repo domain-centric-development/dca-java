@@ -4,6 +4,7 @@ import dev.domaincentric.dca.archunit.fixtures.contextmap.good.catalog.api.Catal
 import dev.domaincentric.dca.archunit.fixtures.contextmap.good.catalog.api.ProductInfo;
 
 public final class CatalogProductAdapter {
+  private dev.domaincentric.dca.archunit.fixtures.contextmap.good.cart.domain.model.Cart localModel;
   private final CatalogApi catalogApi;
 
   public CatalogProductAdapter(CatalogApi catalogApi) {

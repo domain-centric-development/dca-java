@@ -167,6 +167,17 @@ class UseCaseRulesTest {
     }
 
     @Test
+    @DisplayName("a save or delete without a boundary is reported even when nothing is published")
+    void saveOrDeleteWithoutBoundaryIsReported() {
+      String tx = Fixtures.failure(TRANSACTIONS, "DCA-USE-012").getMessage();
+      assertTrue(tx.contains("SaveNoBoundaryUseCase.execute saves an aggregate without"), tx);
+      assertTrue(tx.contains("SaveNoBoundaryUseCase.remove deletes an aggregate without"), tx);
+      assertFalse(
+          tx.contains("SaveWithoutPublishUseCase"),
+          "a class-level annotation covers the save that publishes nothing: " + tx);
+    }
+
+    @Test
     @DisplayName("a publication in an unconnected method does not cover the saving method")
     void publicationInUnconnectedMethodDoesNotCount() {
       String message = Fixtures.failure(TRANSACTIONS, "DCA-USE-009").getMessage();

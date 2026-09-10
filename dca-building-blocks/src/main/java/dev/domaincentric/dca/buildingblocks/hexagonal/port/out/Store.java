@@ -9,8 +9,8 @@ package dev.domaincentric.dca.buildingblocks.hexagonal.port.out;
  * <ul>
  *   <li>Use {@link Repository} for <b>Aggregate Roots</b> with identity and lifecycle (findById,
  *       save, delete).
- *   <li>Use {@link Store} for <b>Value Objects, Events, or operational data</b> without
- *       identity-based access (record, count, exists).
+ *   <li>Use {@link Store} for <b>Value Objects, Events, or operational data</b> without aggregate
+ *       lifecycle (record, count, exists, lookup by key).
  * </ul>
  *
  * <p><b>Examples of Stores:</b>
@@ -24,7 +24,8 @@ package dev.domaincentric.dca.buildingblocks.hexagonal.port.out;
  * <p><b>Rules of thumb:</b>
  *
  * <ol>
- *   <li>Need {@code findById()}? → {@link Repository} (object has identity)
+ *   <li>Lookup by key ({@code findById()}) is allowed on a Store; aggregate lifecycle requires a
+ *       Repository
  *   <li>Need {@code record()} or {@code count()}? → {@link Store} (object is recorded, not managed)
  *   <li>In doubt: if the stored object is a {@code Value} or a record, it's almost always a Store.
  * </ol>

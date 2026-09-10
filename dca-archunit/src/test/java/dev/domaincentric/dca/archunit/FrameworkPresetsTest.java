@@ -87,7 +87,8 @@ class FrameworkPresetsTest {
               AssertionError error =
                   assertThrows(
                       AssertionError.class, () -> rule(spring, "DCA-ONI-003").check(spring));
-              assertTrue(error.getMessage().contains("@Entity"), error.getMessage());
+              assertTrue(
+                  error.getMessage().contains("jakarta.persistence.Entity"), error.getMessage());
               assertTrue(
                   !error.getMessage().contains("ApplicationScoped"),
                   "CDI's scope is not a Spring stereotype: " + error.getMessage());
@@ -96,13 +97,8 @@ class FrameworkPresetsTest {
             "DCA-ONI-003 has nothing to forbid under none()",
             () -> assertDoesNotThrow(() -> rule(none, "DCA-ONI-003").check(none))),
         DynamicTest.dynamicTest(
-            "DCA-NAM-002 requires a CDI scope under jakarta()",
-            () -> {
-              AssertionError error =
-                  assertThrows(
-                      AssertionError.class, () -> rule(jakarta, "DCA-NAM-002").check(jakarta));
-              assertTrue(error.getMessage().contains("IssueInvoiceUseCase"), error.getMessage());
-            }),
+            "DCA-NAM-002 accepts configuration wiring under jakarta()",
+            () -> assertDoesNotThrow(() -> rule(jakarta, "DCA-NAM-002").check(jakarta))),
         DynamicTest.dynamicTest(
             "DCA-NAM-002 selects nothing under none()",
             () -> assertDoesNotThrow(() -> rule(none, "DCA-NAM-002").check(none))),

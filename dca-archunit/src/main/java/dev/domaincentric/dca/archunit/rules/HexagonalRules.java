@@ -114,6 +114,10 @@ public final class HexagonalRules implements DcaRuleSet {
                     .haveSimpleNameEndingWith(layout.controllerSuffix())
                     .or()
                     .haveSimpleNameEndingWith(layout.restControllerSuffix())
+                    .or(
+                        AnnotationRoles.annotatedWithAny(
+                            layout.frameworkAnnotations().webController(),
+                            layout.frameworkAnnotations().restController()))
                     .should()
                     .dependOnClassesThat()
                     .areAssignableTo(Repository.class)
@@ -121,7 +125,7 @@ public final class HexagonalRules implements DcaRuleSet {
         .selecting(
             "Classes anywhere on the classpath under scan whose simple name ends with the"
                 + " configured controller suffix or with the configured REST-controller suffix."
-                + " Selected by name, not by annotation, and not restricted to adapter packages.")
+                + " Also selected by configured web-controller or REST-controller role annotation; not restricted to adapter packages.")
         .checking(
             "No dependency on a class assignable to Repository - the port interface or an"
                 + " implementation. Other output ports (Store, event publishers) are not checked; a"
@@ -152,31 +156,49 @@ public final class HexagonalRules implements DcaRuleSet {
   }
 
   public DcaRule outgoingAdaptersMustNotUseInfrastructureImplementations() {
-    return DcaRule.of(
+    return DcaRule.check(
             "DCA-HEX-005",
-            "Outgoing Adapters must only use outbound ports (not infrastructure implementations)",
-            "Outgoing adapters should only use outbound ports declared as interfaces (port.out), not"
-                + " infrastructure implementation details",
-            arch ->
-                noClasses()
-                    .that()
-                    .resideInAnyPackage(arch.allOutgoingAdapterPatterns())
-                    .should()
-                    .dependOnClassesThat(arch.infrastructureImplementation())
-                    .allowEmptyShould(true))
-        .selecting("Classes in <module>.adapter.outgoing.. of every module root.")
+            "Outgoing adapters must not use another module's infrastructure",
+            "Technical infrastructure reuse preserves module isolation",
+            arch -> {
+              CollectedViolations violations =
+                  CollectedViolations.withHeader(
+                      "Outgoing adapters must not use another module's infrastructure\nbecause"
+                          + " technical infrastructure reuse preserves module isolation");
+              for (var adapter : arch.classes()) {
+                if (!com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage(
+                        arch.allOutgoingAdapterPatterns())
+                    .test(adapter)) continue;
+                String owner = arch.moduleRootOf(adapter.getPackageName());
+                for (var dependency : adapter.getDirectDependenciesFromSelf()) {
+                  var target = dependency.getTargetClass();
+                  String targetOwner =
+                      arch.isolatedModuleRoots().stream()
+                          .filter(
+                              root ->
+                                  target.getPackageName().equals(layout.infrastructurePackage(root))
+                                      || target
+                                          .getPackageName()
+                                          .startsWith(layout.infrastructurePackage(root) + "."))
+                          .findFirst()
+                          .orElse(layout.basePackage());
+                  if (arch.infrastructureImplementation().test(target)
+                      && !java.util.Objects.equals(owner, targetOwner)
+                      && !layout.basePackage().equals(targetOwner))
+                    violations.add(dependency.getDescription());
+                }
+              }
+              violations.throwIfAny();
+            })
+        .selecting("Classes in every module's outgoing adapter package.")
         .checking(
-            "No dependency on a class in an infrastructure package: the global"
-                + " base.infrastructure or an isolated module's own <module>.infrastructure, the"
-                + " package itself or any sub-package with an exact segment boundary. The shared"
-                + " kernel's infrastructure package does not count as an infrastructure"
-                + " implementation. An empty selection passes.");
+            "Dependencies on global infrastructure and the adapter's own module infrastructure pass; infrastructure of another module fails. Module boundaries use exact package segments.");
   }
 
   public DcaRule adaptersMustNotCommunicateDirectly() {
     return DcaRule.of(
             "DCA-HEX-006",
-            "Port adapters (incoming and outgoing) must not communicate directly with each other"
+            "Incoming port adapters must not depend directly on outgoing port adapters"
                 + " within the same context",
             "Port adapters should communicate through application services, not directly (event"
                 + " consumers are the exception)",
@@ -206,7 +228,7 @@ public final class HexagonalRules implements DcaRuleSet {
             "Incoming adapters must only access their own bounded context (except event consumers and"
                 + " Open Host Services)",
             "Incoming adapters must only orchestrate use cases from their own bounded context - use"
-                + " domain events for cross-context integration",
+                + " integration events or the published api for cross-context integration",
             arch -> {
               // Structural, over every module that owns a DCA layer - declared as a bounded context
               // or
@@ -231,7 +253,7 @@ public final class HexagonalRules implements DcaRuleSet {
                             "Incoming adapters in module '"
                                 + arch.contextName(module)
                                 + "' must only orchestrate use cases from their own module - use"
-                                + " domain events for cross-context integration"));
+                                + " integration events or the published api for cross-context integration"));
               }
               CollectedViolations.check(perModule, arch.classes());
             })
@@ -251,7 +273,7 @@ public final class HexagonalRules implements DcaRuleSet {
   public DcaRule repositoryClassesResideInOutgoingAdapter() {
     return DcaRule.of(
             "DCA-HEX-008",
-            "Classes named *Repository must reside in the outgoing adapter package",
+            "Classes named *Repository must reside in the outgoing adapter package (name-based discovery of unmarked repositories)",
             "Repository implementations are secondary adapters (outgoing ports)",
             arch ->
                 classes()

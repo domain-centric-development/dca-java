@@ -4,10 +4,23 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
-Documentation-only (WP-30): the javadoc that flows into the knowledge catalog no longer names a framework or the
-shop. Binary-compatible with 0.1.2.
+## [0.2.0] - 2026-09-10
 
-### Changed
+**Migration from 0.1.2.** `BaseAggregateRoot.registerEvent` is `protected`: an aggregate registers its own events, in the
+method that produces the fact (`Product.create(...)` raises `ProductCreated`); a factory or use case that used to call
+`aggregate.registerEvent(...)` from outside no longer compiles — move the call into the aggregate's creation or
+behaviour method and let the factory delegate. Everything else in this release is documentation.
+
+### Changed — breaking
+
+- `BaseAggregateRoot.registerEvent` is `protected` (was public). The aggregate owns its event registration; nothing
+  outside its hierarchy can add an event to it. Same visibility as the .NET twin. `dca-archunit` 0.4.0 relies on this:
+  `DCA-USE-009`'s event-free exemption can prove "never registers an event" only because no foreign helper can reach
+  the method.
+
+### Changed — documentation (framework- and shop-neutral javadoc)
+
+The javadoc flows verbatim into the knowledge catalog and is guarded by `dca-archunit`'s `FrameworkNeutralityTest`.
 
 - `DomainEvent`, `DomainService`, `Factory`, `Specification`, `Repository`: "Should NOT have Spring annotations"
   became "carries no container stereotype / no framework annotations" — the rule is about the container, whichever

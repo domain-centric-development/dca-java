@@ -22,7 +22,7 @@ class TacticalPatternRulesTest {
   void ruleSetHasStableShape() {
     TacticalPatternRules set = new TacticalPatternRules(DcaLayout.forBasePackage(GOOD));
     assertEquals("tactical", set.name());
-    assertEquals(22, set.rules().size());
+    assertEquals(21, set.rules().size());
     Fixtures.assertIdsAreSequential(set, "TAC");
   }
 
@@ -35,6 +35,27 @@ class TacticalPatternRulesTest {
   @TestFactory
   Stream<DynamicTest> badFixtureFails() {
     return Fixtures.badFixtureFails(TacticalPatternRules::new, BAD);
+  }
+
+  @Test
+  void markerInterfacesAndSuppliersCannotHideIdentities() {
+    assertReported(
+        Fixtures.violation(BAD, "DCA-TAC-003").violations(),
+        ".Order",
+        "linkedOrder",
+        "OrderReference");
+    assertReported(
+        Fixtures.violation(BAD, "DCA-TAC-003").violations(), ".Order", "suppliedOrder", "Order");
+    assertReported(
+        Fixtures.violation(BAD, "DCA-TAC-007").violations(),
+        ".Shipment",
+        "linkedOrder",
+        "OrderReference");
+    assertReported(
+        Fixtures.violation(BAD, "DCA-TAC-008").violations(),
+        ".ReferenceValue",
+        "order",
+        "OrderReference");
   }
 
   private static void assertReported(List<String> violations, String owner, String... fragments) {
@@ -70,21 +91,19 @@ class TacticalPatternRulesTest {
   }
 
   /**
-   * A container of the aggregate's own type holds <em>other</em> instances of that aggregate. Only
-   * the direct field of the own type (a self-reference) is tolerated; a container never is.
+   * A container of the aggregate's own type holds <em>other</em> instances of that aggregate.
+   * Direct references and containers are both rejected.
    */
   @Test
-  @DisplayName("DCA-TAC-003 rejects containers of the own aggregate type, tolerates a direct field")
+  @DisplayName("DCA-TAC-003 rejects containers of the own aggregate type, rejects a direct field")
   void containersOfTheOwnAggregateTypeAreReported() {
     List<String> violations = Fixtures.violation(BAD, "DCA-TAC-003").violations();
     for (String container : List.of("children", "parent", "siblings", "byName", "tree")) {
       assertReported(violations, ".Category", "'" + container + "'", "containing", "Category");
     }
-    assertTrue(
-        violations.stream().noneMatch(v -> v.contains("'root'")),
-        "the direct self-reference is tolerated: " + violations);
+    assertReported(violations, ".Category", "'root'", "of type", "Category");
     assertReported(violations, ".Order", "'customer'", "of type", "Customer");
-    // the good fixture's Category holds a Category parent and List<CategoryId> - see
+    // the good fixture's Category holds a CategoryId parent and List<CategoryId> - see
     // goodFixturePasses
   }
 

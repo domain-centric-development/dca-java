@@ -36,7 +36,20 @@ public final class RuleCatalog {
             + out.resolve("rules.json")
             + " ("
             + DcaRules.all(PLACEHOLDER_LAYOUT).size()
-            + " rules)");
+            + " entries; "
+            + counts()
+            + ")");
+  }
+
+  private static String counts() {
+    var all = DcaRules.all(PLACEHOLDER_LAYOUT);
+    long info = all.stream().filter(r -> r.kind() == DcaRule.Kind.INFORMATIONAL).count();
+    return (all.size() - info)
+        + " enforced, "
+        + info
+        + " informational, "
+        + DcaRules.retired().size()
+        + " retired, 0 n/a";
   }
 
   /** The catalog as markdown. */
@@ -49,6 +62,7 @@ public final class RuleCatalog {
         .append(" rules in ")
         .append(sets.size())
         .append(" sets.\n\n");
+    sb.append(counts()).append("\n\n");
     for (DcaRuleSet set : sets) {
       sb.append("## `").append(set.name()).append("`\n\n");
       sb.append(
@@ -58,6 +72,7 @@ public final class RuleCatalog {
             .append(rule.id())
             .append("` | ")
             .append(escapeCell(rule.title()))
+            .append(rule.kind() == DcaRule.Kind.INFORMATIONAL ? " (informational)" : "")
             .append(" | ")
             .append(escapeCell(rule.rationale()))
             .append(" | ")
@@ -68,6 +83,20 @@ public final class RuleCatalog {
       }
       sb.append('\n');
     }
+    sb.append("## Retired identities\n\n");
+    DcaRules.retired().entrySet().stream()
+        .sorted(java.util.Map.Entry.comparingByKey())
+        .forEach(
+            e ->
+                sb.append("- `")
+                    .append(e.getKey())
+                    .append("` — ")
+                    .append(e.getValue().reason())
+                    .append("; replacement: ")
+                    .append(e.getValue().replacement())
+                    .append("; since ")
+                    .append(e.getValue().since())
+                    .append('\n'));
     return sb.toString();
   }
 
@@ -76,7 +105,7 @@ public final class RuleCatalog {
    * …]}.
    */
   public static String json() {
-    StringBuilder sb = new StringBuilder("[\n");
+    StringBuilder sb = new StringBuilder("{\n\"rules\": [\n");
     boolean first = true;
     for (DcaRuleSet set : DcaRules.ruleSets(PLACEHOLDER_LAYOUT)) {
       for (DcaRule rule : set.rules()) {
@@ -96,10 +125,28 @@ public final class RuleCatalog {
             .append(quote(rule.selects()))
             .append(", \"checks\": ")
             .append(quote(rule.checks()))
+            .append(", \"status\": ")
+            .append(quote(rule.kind().name().toLowerCase(java.util.Locale.ROOT)))
             .append('}');
       }
     }
-    return sb.append("\n]\n").toString();
+    sb.append("\n],\n\"retired\": [\n");
+    boolean firstRetired = true;
+    for (var entry : new java.util.TreeMap<>(DcaRules.retired()).entrySet()) {
+      if (!firstRetired) sb.append(",\n");
+      firstRetired = false;
+      var value = entry.getValue();
+      sb.append("{\"id\": ")
+          .append(quote(entry.getKey()))
+          .append(", \"reason\": ")
+          .append(quote(value.reason()))
+          .append(", \"replacement\": ")
+          .append(quote(value.replacement()))
+          .append(", \"since\": ")
+          .append(quote(value.since()))
+          .append('}');
+    }
+    return sb.append("\n]\n}\n").toString();
   }
 
   private static String escapeCell(String s) {

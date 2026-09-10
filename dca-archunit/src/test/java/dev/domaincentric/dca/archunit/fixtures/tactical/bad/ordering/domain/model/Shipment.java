@@ -7,6 +7,8 @@ import dev.domaincentric.dca.buildingblocks.ddd.tactical.Entity;
  * setter), DCA-TAC-007 (field of aggregate-root type, and an array of aggregate roots).
  */
 public final class Shipment extends TrackedEntity implements Entity<Shipment, ShipmentId> {
+  private final OrderReference linkedOrder = null;
+  private final java.util.function.Supplier<Order> suppliedOrder = () -> null;
   private final String id;
   private final Order order;
   private final Customer[] recipients = new Customer[0];

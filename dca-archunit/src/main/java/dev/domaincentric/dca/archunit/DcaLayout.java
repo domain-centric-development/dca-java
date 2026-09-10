@@ -74,6 +74,7 @@ public final class DcaLayout {
   private final String apiSubpackage;
   private final String eventsSubpackage;
   private final String useCaseSuffix;
+  private final List<String> operationContainers;
   private final String controllerSuffix;
   private final String restControllerSuffix;
   private final List<String> thirdPartyPackagesAllowedInDomain;
@@ -111,6 +112,7 @@ public final class DcaLayout {
       throw new IllegalArgumentException(
           "apiSubpackage and eventsSubpackage must differ, both are '" + apiSubpackage + "'");
     }
+    this.operationContainers = List.copyOf(settings.operationContainers);
     this.useCaseSuffix = requireSuffix(settings.useCaseSuffix, "useCaseSuffix");
     this.controllerSuffix = requireSuffix(settings.controllerSuffix, "controllerSuffix");
     this.restControllerSuffix =
@@ -263,6 +265,21 @@ public final class DcaLayout {
     return copy(settings -> settings.eventsSubpackage = value);
   }
 
+  /** Organisational package segments ignored when measuring operation depth; empty by default. */
+  public DcaLayout withOperationContainers(String... names) {
+    for (String name : names) {
+      if (name == null || !name.matches("[a-zA-Z_][a-zA-Z0-9_]*") || name.equals("shared")) {
+        throw new IllegalArgumentException("Invalid operation container: " + name);
+      }
+    }
+    return copy(settings -> settings.operationContainers = List.of(names));
+  }
+
+  /** Configured organisational segments, not domain features or operation names. */
+  public List<String> operationContainers() {
+    return operationContainers;
+  }
+
   /** Suffix of use-case implementations, e.g. {@code "UseCase"} or {@code "ApplicationService"}. */
   public DcaLayout withUseCaseSuffix(String value) {
     return copy(settings -> settings.useCaseSuffix = value);
@@ -355,6 +372,7 @@ public final class DcaLayout {
     settings.apiSubpackage = apiSubpackage;
     settings.eventsSubpackage = eventsSubpackage;
     settings.useCaseSuffix = useCaseSuffix;
+    settings.operationContainers = operationContainers;
     settings.controllerSuffix = controllerSuffix;
     settings.restControllerSuffix = restControllerSuffix;
     settings.thirdPartyPackagesAllowedInDomain = thirdPartyPackagesAllowedInDomain;
@@ -378,6 +396,7 @@ public final class DcaLayout {
     String apiSubpackage;
     String eventsSubpackage;
     String useCaseSuffix;
+    List<String> operationContainers = List.of();
     String controllerSuffix;
     String restControllerSuffix;
     List<String> thirdPartyPackagesAllowedInDomain;

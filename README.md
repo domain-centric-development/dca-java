@@ -18,9 +18,9 @@ of them is optional except the building blocks:
 
 ```kotlin
 dependencies {
-    implementation("dev.domaincentric:dca-building-blocks:0.1.2")
+    implementation("dev.domaincentric:dca-building-blocks:0.2.0")
     implementation("dev.domaincentric:dca-spring:0.1.0")
-    testImplementation("dev.domaincentric:dca-archunit:0.3.0")
+    testImplementation("dev.domaincentric:dca-archunit:0.4.0")
     testImplementation("dev.domaincentric:dca-archunit-spring-modulith:0.1.0")   // Spring Modulith projects only
 }
 ```
@@ -41,7 +41,7 @@ see [Versioning](#versioning).
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("dev.domaincentric:dca-building-blocks:0.1.2")
+    implementation("dev.domaincentric:dca-building-blocks:0.2.0")
 }
 ```
 
@@ -80,7 +80,7 @@ dev.domaincentric.dca.buildingblocks
 
 ```kotlin
 dependencies {
-    testImplementation("dev.domaincentric:dca-archunit:0.3.0")
+    testImplementation("dev.domaincentric:dca-archunit:0.4.0")
     testImplementation("org.junit.jupiter:junit-jupiter")
 }
 ```
@@ -136,8 +136,9 @@ such as `dca-archunit-spring-modulith`.
 
 ### 4. Runtime adapters — `dca-spring`
 
-`DCA-USE-009` demands that a use case publishes the saved aggregate's events, `DCA-USE-012` that it
-does so inside a transaction — because Spring's after-commit relays (`@TransactionalEventListener`,
+`DCA-USE-009` demands that a use case publishes the saved aggregate's events, `DCA-USE-012` that every
+save, delete and publication runs inside a transaction — a repository may write one aggregate as several
+statements, and Spring's after-commit relays (`@TransactionalEventListener`,
 `@ApplicationModuleListener`) are skipped **silently** without one. `dca-building-blocks` ships the
 ports; `dca-spring` ships the two implementations every project used to copy:
 
@@ -343,3 +344,11 @@ MIT — see [LICENSE](LICENSE).
 
 Contributions are accepted under the MIT licence, and the copyright holder may additionally publish
 them under other licences (for example a documentation licence for prose).
+
+## WP-39 parity update (2026-09-09)
+
+Java building-blocks 0.2.0 makes event registration protected, matching the existing .NET visibility.
+Factories delegate to aggregate creation. Both samples use Price, the six-field product-created v1 notification, ISO
+money bounds/rounding, snapshot checkout and supplied-fact domain services. Role snapshots and invalid default quantities
+are guarded. The independent shared specification has 45 vectors; final gate results are recorded in WP-39.
+The specification stays unpublished and is an opt-in local check of both samples (not part of their builds).

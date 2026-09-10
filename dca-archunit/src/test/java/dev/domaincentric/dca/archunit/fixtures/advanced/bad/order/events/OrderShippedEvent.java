@@ -6,5 +6,5 @@ import java.time.Instant;
 import java.util.UUID;
 
 @IntegrationEventType(name = "order.shipped", version = 2)
-public record OrderShippedEvent(UUID eventId, Instant occurredOn, int version)
+public record OrderShippedEvent(UUID eventId, Instant occurredOn, int schemaVersion)
     implements IntegrationEvent {}

@@ -1,6 +1,5 @@
 package dev.domaincentric.dca.archunit.rules;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.domaincentric.dca.archunit.Fixtures;
@@ -40,12 +39,33 @@ class HexagonalRulesTest {
   }
 
   @Test
-  @DisplayName("DCA-HEX-005 sees a module's own infrastructure package")
-  void outgoingAdapterDependingOnModuleInfrastructureIsReported() {
-    String message = Fixtures.failure(INFRASTRUCTURE, "DCA-HEX-005").getMessage();
-    assertTrue(message.contains("CartStorage") && message.contains("CartWiring"), message);
-    assertFalse(
-        message.contains("Lifecycle"),
-        "the shared kernel's infrastructure is shared support, not a module's detail: " + message);
+  void outgoingAdapterMayReuseOwnAndGlobalInfrastructure() {
+    Fixtures.rule(INFRASTRUCTURE, "DCA-HEX-005").check(Fixtures.arch(INFRASTRUCTURE));
+  }
+
+  @Test
+  @DisplayName("DCA-HEX-005 names the foreign infrastructure client and survives unrelated ignores")
+  void outgoingAdapterDependingOnForeignInfrastructureIsReportedByName() {
+    String bad = FIXTURES + ".bad";
+    var violation = Fixtures.violation(bad, "DCA-HEX-005");
+    assertTrue(
+        violation.violations().stream()
+            .anyMatch(
+                v ->
+                    v.contains("ForeignInfrastructureAdapter")
+                        && v.contains("infrastructure.Client")),
+        violation.getMessage());
+    // An ignore pattern that matches nothing must not swallow the first (or any) violation.
+    var rule = Fixtures.rule(bad, "DCA-HEX-005");
+    var selection =
+        dev.domaincentric.dca.archunit.DcaRuleSelection.all()
+            .ignoringViolationsMatching(rule.id(), ".*Unrelated.*");
+    var outcome =
+        dev.domaincentric.dca.archunit.DcaRuleExecution.execute(
+            rule, Fixtures.arch(bad), selection);
+    assertTrue(
+        outcome.status() == dev.domaincentric.dca.archunit.DcaRuleOutcome.Status.FAILED
+            && outcome.toString().contains("ForeignInfrastructureAdapter"),
+        outcome.toString());
   }
 }
