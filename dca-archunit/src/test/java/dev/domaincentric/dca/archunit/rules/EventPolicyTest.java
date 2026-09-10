@@ -53,7 +53,20 @@ class EventPolicyTest {
 
   @Test
   void publicationAfterEmptyBoundaryIsAKnownStaticPass() {
-    var arch = Fixtures.arch(ROOT);
-    Fixtures.rule(ROOT, "DCA-USE-012").check(arch);
+    var layout = DcaLayout.forBasePackage(ROOT);
+    var classes =
+        new ClassFileImporter()
+            .importPackages(ROOT + ".module.domain", ROOT + ".module.application.afterempty");
+    Fixtures.rule(ROOT, "DCA-USE-012").check(DcaArchitecture.of(layout, classes));
+  }
+
+  @Test
+  void eventFreeSaveStillNeedsATransactionBoundary() {
+    // DCA-USE-009 exempts the event-free save from publishing; DCA-USE-012 still wants the unit of
+    // work drawn - a repository may write the aggregate as several statements.
+    String message = Fixtures.failure(ROOT, "DCA-USE-012").getMessage();
+    assertTrue(message.contains("SaveUseCase.execute saves an aggregate without"), message);
+    assertFalse(message.contains("BoundedSaveUseCase"), message);
+    assertFalse(message.contains("AfterEmptyUseCase"), message);
   }
 }

@@ -4,6 +4,13 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+- `DCA-USE-012` (2026-09-10) anchors on `Repository.save` and `Repository.deleteById` as well as on the `DomainEventPublisher`:
+  a use case that writes an aggregate draws the unit of work even when it publishes nothing (the repository may write one
+  aggregate as several statements). Until now the boundary was demanded only indirectly, through `DCA-USE-009`'s publish
+  requirement, and `DCA-USE-009`'s event-free exemption (WP-36) had removed that path. Violations name the effect
+  (`saves an aggregate`, `deletes an aggregate`, `publishes domain events`). Migration for `0.3.0` consumers: annotate or
+  wrap every saving use case — both reference implementations already did.
+
 - Review follow-up (2026-09-10): `DCA-USE-017` reports every public method of a use case that is selected by suffix only
   and implements no `InputPort` — intentional for `0.3.0` consumers that relied on the suffix fallback; migration: implement
   the input port. Setter detection of the immutable-shape rules (`DCA-USE-004/005/007`, `DCA-ADV-001`, `DCA-STR-008`) is a

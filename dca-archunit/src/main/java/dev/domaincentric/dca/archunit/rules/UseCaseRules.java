@@ -59,7 +59,7 @@ public final class UseCaseRules implements DcaRuleSet {
             useCasesPublishDomainEventsAfterSaving(layout),
             noDtosInDomain(layout),
             noDtosInApplication(layout),
-            publishingUseCasesAreTransactional(layout),
+            mutatingUseCasesAreTransactional(layout),
             transactionalUseCasesDoNotCallRemotePorts(layout),
             useCasePackagesUseOneDepth(layout),
             resultsMustNotExposeAggregatesOrEntities(layout),
@@ -326,24 +326,30 @@ public final class UseCaseRules implements DcaRuleSet {
         .allowEmptyShould(true);
   }
 
-  public static DcaRule publishingUseCasesAreTransactional(DcaLayout layout) {
+  public static DcaRule mutatingUseCasesAreTransactional(DcaLayout layout) {
     return DcaRule.of(
             "DCA-USE-012",
-            "Use cases that publish domain events must have a transaction boundary",
-            "Integration events are relayed after commit by the framework's after-commit listeners,"
-                + " and their publication is registered in the publishing transaction. Without an"
-                + " active transaction the after-commit listeners are skipped silently and nothing is"
-                + " registered: the use case succeeds, the other contexts never hear of it. The use"
-                + " case that publishes owns the boundary - either declarative transaction metadata"
-                + " (the configured transactional annotation on the class or the executing method) or"
-                + " an explicit TransactionBoundary.inTransaction(...) around save and publish. Checked"
+            "Use cases that save an aggregate or publish domain events must have a transaction boundary",
+            "The use case owns the unit of work. Saving an aggregate is one business fact, yet the"
+                + " repository may write it as several statements - an aggregate of entities and value"
+                + " objects often spans several tables - and a repository adapter draws no boundary of"
+                + " its own; without one, a failure between the statements leaves half an aggregate"
+                + " behind. Publishing adds a second effect that must fall with the save: integration"
+                + " events are relayed after commit by the framework's after-commit listeners, and their"
+                + " publication is registered in the publishing transaction. Without an active"
+                + " transaction the after-commit listeners are skipped silently and nothing is"
+                + " registered: the use case succeeds, the other contexts never hear of it. The boundary"
+                + " is either declarative transaction metadata (the configured transactional annotation"
+                + " on the class or the executing method) or an explicit"
+                + " TransactionBoundary.inTransaction(...) around load, mutate, save and publish. Checked"
                 + " per entry path, following calls within the class: from every entry point - a"
                 + " method callable from outside the class, or one nothing in the class calls - no route"
-                + " down to the publishing method may be free of an annotation or a boundary; a covered"
-                + " caller does not cover another route to the same helper, and a boundary on one route"
-                + " does not cover a second route. Whether the publication sits inside the block"
-                + " handed to inTransaction(...) is not visible in ArchUnit's call model, which folds a"
-                + " lambda's body into the enclosing method; that placement stays a review check",
+                + " down to the saving, deleting or publishing method may be free of an annotation or a"
+                + " boundary; a covered caller does not cover another route to the same helper, and a"
+                + " boundary on one route does not cover a second route. Whether the save or the"
+                + " publication sits inside the block handed to inTransaction(...) is not visible in"
+                + " ArchUnit's call model, which folds a lambda's body into the enclosing method; that"
+                + " placement stays a review check",
             arch ->
                 classes()
                     .that()
@@ -355,19 +361,22 @@ public final class UseCaseRules implements DcaRuleSet {
                     .and()
                     .areNotInterfaces()
                     .should(
-                        beTransactionalWhenPublishing(
+                        beTransactionalWhenMutating(
                             layout.frameworkAnnotations().transactional()))
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes in <module>.application.. that implement InputPort or whose simple name ends with the configured use-case suffix.")
         .checking(
-            "For every method that calls a DomainEventPublisher, every route from each entry point"
-                + " down to it is covered: the class carries one of the configured transactional"
-                + " annotations, or every uncovered unit on the route is either annotated or calls"
-                + " TransactionBoundary.inTransaction. A covered caller does not cover a second route"
-                + " to the same helper. With an empty transactional role only the explicit boundary"
-                + " counts. Whether the publish call sits inside the inTransaction block is not"
-                + " checked - ArchUnit folds a lambda into its enclosing method.");
+            "For every method that calls Repository.save, Repository.deleteById or a"
+                + " DomainEventPublisher, every route from each entry point down to it is covered: the"
+                + " class carries one of the configured transactional annotations, or every uncovered"
+                + " unit on the route is either annotated or calls TransactionBoundary.inTransaction."
+                + " A covered caller does not cover a second route to the same helper. With an empty"
+                + " transactional role only the explicit boundary counts. A use case that neither"
+                + " saves, deletes nor publishes (a query, a Store write) is selected but has nothing"
+                + " to check and passes. Whether the save or publish call sits inside the"
+                + " inTransaction block is not checked - ArchUnit folds a lambda into its enclosing"
+                + " method.");
   }
 
   public static DcaRule transactionalUseCasesDoNotCallRemotePorts(DcaLayout layout) {
@@ -729,14 +738,15 @@ public final class UseCaseRules implements DcaRuleSet {
     };
   }
 
-  private static ArchCondition<JavaClass> beTransactionalWhenPublishing(
+  private static ArchCondition<JavaClass> beTransactionalWhenMutating(
       List<String> transactional) {
-    return new ArchCondition<>("be transactional when publishing domain events") {
+    return new ArchCondition<>("be transactional when saving an aggregate or publishing domain events") {
       @Override
       public void check(JavaClass item, ConditionEvents events) {
         IntraClassCalls calls = new IntraClassCalls(item);
         for (JavaCodeUnit unit : item.getCodeUnits()) {
-          if (!calls(unit, DomainEventPublisher.class)) {
+          String effect = transactionalEffectOf(unit);
+          if (effect == null) {
             continue;
           }
           for (JavaCodeUnit entry : calls.entryPointsOf(unit)) {
@@ -749,16 +759,41 @@ public final class UseCaseRules implements DcaRuleSet {
                     item.getSimpleName()
                         + "."
                         + pathName(entry, unit)
-                        + " publishes domain events without "
+                        + " "
+                        + effect
+                        + " without "
                         + FrameworkAnnotations.describe(
                             transactional, "declarative transaction metadata (none configured)")
                         + " on the class or on a method of that path, and without"
-                        + " TransactionBoundary.inTransaction(...) on it - after-commit"
-                        + " listeners are skipped"));
+                        + " TransactionBoundary.inTransaction(...) on it"));
           }
         }
       }
     };
+  }
+
+  /**
+   * The effect of a code unit that needs a transaction, worded for the violation, or {@code null}
+   * when the unit neither writes through a Repository nor publishes domain events.
+   */
+  private static String transactionalEffectOf(JavaCodeUnit unit) {
+    boolean saves = calls(unit, Repository.class, "save");
+    boolean deletes = calls(unit, Repository.class, "deleteById");
+    boolean publishes = calls(unit, DomainEventPublisher.class);
+    if (!saves && !deletes && !publishes) {
+      return null;
+    }
+    List<String> effects = new ArrayList<>();
+    if (saves) {
+      effects.add("saves an aggregate");
+    }
+    if (deletes) {
+      effects.add("deletes an aggregate");
+    }
+    if (publishes) {
+      effects.add("publishes domain events");
+    }
+    return String.join(" and ", effects);
   }
 
   private static ArchCondition<JavaClass> publishAfterSaving(DcaArchitecture arch) {

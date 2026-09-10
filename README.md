@@ -136,8 +136,9 @@ such as `dca-archunit-spring-modulith`.
 
 ### 4. Runtime adapters — `dca-spring`
 
-`DCA-USE-009` demands that a use case publishes the saved aggregate's events, `DCA-USE-012` that it
-does so inside a transaction — because Spring's after-commit relays (`@TransactionalEventListener`,
+`DCA-USE-009` demands that a use case publishes the saved aggregate's events, `DCA-USE-012` that every
+save, delete and publication runs inside a transaction — a repository may write one aggregate as several
+statements, and Spring's after-commit relays (`@TransactionalEventListener`,
 `@ApplicationModuleListener`) are skipped **silently** without one. `dca-building-blocks` ships the
 ports; `dca-spring` ships the two implementations every project used to copy:
 
