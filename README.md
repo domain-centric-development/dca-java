@@ -3,7 +3,7 @@
 Java libraries for **Domain-Centric Architecture (DCA)** — a synthesis of Domain-Driven Design,
 Hexagonal Architecture and Clean Architecture.
 
-*Written with AI assistance — drafted mainly by Claude, reviewed and directed by the author since
+*Written with AI assistance — drafted mainly by Claude, reviewed and directed by Christoph Bloemer since
 2025. The architecture rules in this repository's build are part of how that work is verified.*
 
 | Artifact | What it is | Dependencies |
@@ -337,6 +337,10 @@ everything is green and then carries the jars and the catalog under `/out`.
 
 Releases are published from a maintainer machine (`./scripts/release.sh <artifact> <version>`),
 then tagged; the signing key never enters CI — [RELEASING.md](RELEASING.md).
+
+## Author
+
+**Christoph Bloemer** — [@chbloemer](https://github.com/chbloemer)
 
 ## License
 
