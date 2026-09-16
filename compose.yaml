@@ -1,10 +1,15 @@
 # docker compose run --rm build      → ./gradlew build (compiles, tests, javadoc)
 # docker compose run --rm catalog    → renders rules.json / RULES.md into the checkout
 # docker compose run --rm gradle <task>  → any Gradle task, dependencies cached in a volume
-# docker compose build               → CI-style check: the image builds only if everything is green
+# docker compose --profile ci build  → CI-style check: the image builds only if everything is green
+#
+# The tool services sit in the `tools` profile and the image in `ci`: `docker compose up` and
+# `docker compose build` start and build nothing on their own, and `run --rm <tool>` pulls only the
+# JDK image. Each tool service is spelled out in full — podman-compose 1.6 cannot resolve `extends`.
 services:
   gradle:
     image: docker.io/library/eclipse-temurin:21-jdk
+    profiles: [tools]
     working_dir: /workspace
     volumes:
       - .:/workspace
@@ -13,11 +18,23 @@ services:
     command: ["build"]
 
   build:
-    extends: gradle
+    image: docker.io/library/eclipse-temurin:21-jdk
+    profiles: [tools]
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - gradle-cache:/root/.gradle
+    entrypoint: ["./gradlew", "--no-daemon"]
     command: ["build"]
 
   catalog:
-    extends: gradle
+    image: docker.io/library/eclipse-temurin:21-jdk
+    profiles: [tools]
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - gradle-cache:/root/.gradle
+    entrypoint: ["./gradlew", "--no-daemon"]
     command: [":dca-archunit:rulesCatalog"]
 
   check:

@@ -332,8 +332,11 @@ what `publishToMavenLocal` produced — POM, module metadata and packaged licens
 
 Without a local JDK, the same through Docker (Podman works too): `docker compose run --rm build`
 runs the build with a cached dependency volume, `docker compose run --rm catalog` renders
-`rules.json`/`RULES.md`, and `docker build .` is the CI-style gate — the image only builds when
-everything is green and then carries the jars and the catalog under `/out`.
+`rules.json`/`RULES.md`, and `docker build .` (or `docker compose --profile ci build`) is the CI-style
+gate — the image only builds when everything is green and then carries the jars and the catalog under
+`/out`. The tool services (`gradle`, `build`, `catalog`) live in the `tools` profile, so `docker compose
+up` and `docker compose build` do nothing on their own; podman-compose does not activate a profile on
+`run`, so there it is `podman-compose --profile tools run --rm build`.
 
 Releases are published from a maintainer machine (`./scripts/release.sh <artifact> <version>`),
 then tagged; the signing key never enters CI — [RELEASING.md](RELEASING.md).
