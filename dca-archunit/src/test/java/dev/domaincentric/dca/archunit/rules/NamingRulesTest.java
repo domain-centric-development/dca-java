@@ -1,5 +1,8 @@
 package dev.domaincentric.dca.archunit.rules;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.Fixtures;
 import java.util.stream.Stream;
@@ -25,5 +28,21 @@ class NamingRulesTest {
   @TestFactory
   Stream<DynamicTest> badFixtureFails() {
     return Fixtures.badFixtureFails(NamingRules::new, FIXTURES + ".bad", "DCA-NAM-002");
+  }
+
+  /** DCA-NAM-002 lists unannotated use cases but, like DCA-NAM-001, never a record. */
+  @Test
+  void theDiagnosticExcludesRecords() {
+    var out = System.out;
+    var captured = new java.io.ByteArrayOutputStream();
+    System.setOut(new java.io.PrintStream(captured));
+    try {
+      Fixtures.rule(FIXTURES + ".bad", "DCA-NAM-002").check(Fixtures.arch(FIXTURES + ".bad"));
+    } finally {
+      System.setOut(out);
+    }
+    String printed = captured.toString();
+    assertTrue(printed.contains("CancelOrderUseCase"), printed);
+    assertFalse(printed.contains("ShipOrderUseCase"), printed);
   }
 }

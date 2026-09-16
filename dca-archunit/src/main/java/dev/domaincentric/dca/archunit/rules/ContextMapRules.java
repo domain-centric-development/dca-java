@@ -329,6 +329,20 @@ public final class ContextMapRules implements DcaRuleSet {
               for (String pkg : arch.boundedContextPackages()) {
                 String source = arch.contextName(pkg);
                 Set<String> declared = declaredEdges(arch, pkg);
+                if (!declared.isEmpty()
+                    && !carriesModuleDeclaration(arch, pkg, moduleAnnotations)) {
+                  violations.add(
+                      "Context '"
+                          + source
+                          + "': module declaration missing on '"
+                          + source
+                          + "', allowed dependencies unknown - it declares @Upstream edges "
+                          + new TreeSet<>(declared)
+                          + " but its package-info carries none of the configured module"
+                          + " declaration annotations; declare the module there so both sides can"
+                          + " be compared");
+                  continue;
+                }
                 Set<String> allowed = new LinkedHashSet<>();
                 for (String entry : allowedDependencies(arch, pkg, moduleAnnotations)) {
                   String normalized = entry.replaceAll("\\s*::\\s*", " :: ").trim();
@@ -361,9 +375,12 @@ public final class ContextMapRules implements DcaRuleSet {
             "The set of declared edges 'context :: channel' equals the set of"
                 + " allowedDependencies entries of the form 'module :: named-interface' whose"
                 + " module is a bounded context, whitespace around '::' normalized. Entries"
-                + " without '::' and entries naming a non-context module are ignored; a context"
-                + " whose package-info carries no module annotation contributes an empty set,"
-                + " so its @Upstream declarations are reported as unmatched.");
+                + " without '::' and entries naming a non-context module are ignored. A context"
+                + " that declares @Upstream edges but whose package-info carries none of the"
+                + " configured module declaration annotations is reported once, as a missing"
+                + " module declaration with unknown allowed dependencies - its edges are not"
+                + " compared; a context without @Upstream declarations and without a module"
+                + " declaration has nothing to compare and passes.");
   }
 
   /**
@@ -383,6 +400,13 @@ public final class ContextMapRules implements DcaRuleSet {
       }
     }
     return types;
+  }
+
+  /** Whether the package carries at least one of the configured module declarations. */
+  private static boolean carriesModuleDeclaration(
+      DcaArchitecture arch, String pkg, List<Class<? extends Annotation>> moduleAnnotations) {
+    return moduleAnnotations.stream()
+        .anyMatch(annotation -> arch.packageAnnotation(pkg, annotation).isPresent());
   }
 
   /**
@@ -501,6 +525,7 @@ public final class ContextMapRules implements DcaRuleSet {
                 for (Upstream u : arch.packageAnnotations(pkg, Upstream.class)) {
                   String targetPkg = packagesByName.get(u.context());
                   if (u.translation() != Upstream.Translation.ANTI_CORRUPTION_LAYER
+                      || u.status() != Upstream.Status.IMPLEMENTED
                       || targetPkg == null) {
                     continue;
                   }
@@ -570,11 +595,11 @@ public final class ContextMapRules implements DcaRuleSet {
               violations.throwIfAny();
             })
         .selecting(
-            "Every @Upstream declaration with translation() ANTI_CORRUPTION_LAYER on the"
-                + " package-info of every package carrying @BoundedContext whose context()"
-                + " names an existing bounded context, reading via(). status() is not"
-                + " consulted, so PLANNED declarations are checked too; declarations towards an"
-                + " unknown context are skipped.")
+            "Every @Upstream declaration with translation() ANTI_CORRUPTION_LAYER and status()"
+                + " IMPLEMENTED on the package-info of every package carrying @BoundedContext whose"
+                + " context() names an existing bounded context, reading via(). PLANNED"
+                + " declarations and declarations towards an unknown context are skipped, as in"
+                + " DCA-MAP-007.")
         .checking(
             "No class below the declaring context's package outside the matching adapter"
                 + " depends on a class in the target context's channel sub-package or below:"
@@ -597,7 +622,9 @@ public final class ContextMapRules implements DcaRuleSet {
                 String source = arch.contextName(pkg);
                 for (Upstream u : arch.packageAnnotations(pkg, Upstream.class)) {
                   String targetPkg = packagesByName.get(u.context());
-                  if (u.translation() != Upstream.Translation.CONFORMIST || targetPkg == null) {
+                  if (u.translation() != Upstream.Translation.CONFORMIST
+                      || u.status() != Upstream.Status.IMPLEMENTED
+                      || targetPkg == null) {
                     continue;
                   }
                   for (Upstream.Consumes channel : u.via()) {
@@ -624,11 +651,10 @@ public final class ContextMapRules implements DcaRuleSet {
               violations.throwIfAny();
             })
         .selecting(
-            "Every @Upstream declaration with translation() CONFORMIST on the"
-                + " package-info of every package carrying @BoundedContext whose context()"
-                + " names an existing bounded context, reading via(). status() is not"
-                + " consulted, so PLANNED declarations are checked too; declarations towards an"
-                + " unknown context are skipped.")
+            "Every @Upstream declaration with translation() CONFORMIST and status() IMPLEMENTED"
+                + " on the package-info of every package carrying @BoundedContext whose context()"
+                + " names an existing bounded context, reading via(). PLANNED declarations and"
+                + " declarations towards an unknown context are skipped, as in DCA-MAP-007.")
         .checking(
             "No class in the declaring context's domain layer (<context>.domain..)"
                 + " depends on a class in the target context's channel sub-package (api or"
@@ -650,7 +676,8 @@ public final class ContextMapRules implements DcaRuleSet {
               for (String pkg : arch.boundedContextPackages()) {
                 String source = arch.contextName(pkg);
                 for (ExternalUpstream e : arch.packageAnnotations(pkg, ExternalUpstream.class)) {
-                  if (e.contractPackages().length == 0) {
+                  if (e.contractPackages().length == 0
+                      || e.status() != Upstream.Status.IMPLEMENTED) {
                     continue;
                   }
                   if (e.translation() == Upstream.Translation.ANTI_CORRUPTION_LAYER) {
@@ -701,11 +728,12 @@ public final class ContextMapRules implements DcaRuleSet {
               violations.throwIfAny();
             })
         .selecting(
-            "Every @ExternalUpstream declaration on the package-info of every package"
-                + " carrying @BoundedContext whose contractPackages() is not empty, reading"
-                + " translation() and interaction(). status() is not consulted. A declaration"
-                + " without contractPackages() (wire-level contract, no vendor SDK) is skipped"
-                + " - it only documents the relationship.")
+            "Every @ExternalUpstream declaration with status() IMPLEMENTED on the package-info"
+                + " of every package carrying @BoundedContext whose contractPackages() is not"
+                + " empty, reading translation() and interaction(). PLANNED declarations are"
+                + " skipped, as in DCA-MAP-007. A declaration without contractPackages()"
+                + " (wire-level contract, no vendor SDK) is skipped too - it only documents the"
+                + " relationship.")
         .checking(
             "With ANTI_CORRUPTION_LAYER, no class below the declaring context's package"
                 + " outside the matching adapter - <context>.adapter.outgoing.. for OUTBOUND,"

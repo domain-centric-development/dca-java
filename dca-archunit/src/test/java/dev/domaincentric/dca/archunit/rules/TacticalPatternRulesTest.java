@@ -17,6 +17,7 @@ class TacticalPatternRulesTest {
 
   private static final String GOOD = Fixtures.ROOT + ".tactical.good";
   private static final String BAD = Fixtures.ROOT + ".tactical.bad";
+  private static final String STATICS = Fixtures.ROOT + ".tactical.statics";
 
   @Test
   void ruleSetHasStableShape() {
@@ -35,6 +36,14 @@ class TacticalPatternRulesTest {
   @TestFactory
   Stream<DynamicTest> badFixtureFails() {
     return Fixtures.badFixtureFails(TacticalPatternRules::new, BAD);
+  }
+
+  @Test
+  @DisplayName("DCA-TAC-002 and DCA-TAC-003 inspect instance fields only")
+  void staticFieldsCarryNoAggregateState() {
+    var arch = Fixtures.arch(STATICS);
+    Fixtures.rule(STATICS, "DCA-TAC-002").check(arch);
+    Fixtures.rule(STATICS, "DCA-TAC-003").check(arch);
   }
 
   @Test

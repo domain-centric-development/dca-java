@@ -126,7 +126,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
             arch -> {
               List<String> violations = new ArrayList<>();
               for (JavaClass aggregate : concreteClassesAssignableTo(arch, AggregateRoot.class)) {
-                for (JavaField field : aggregate.getAllFields()) {
+                for (JavaField field : TypeInspection.instanceFields(aggregate)) {
                   JavaClass fieldType = field.getRawType();
                   if (fieldType.isAssignableTo(Repository.class)
                       || fieldType.isAssignableTo(OutputPort.class)) {
@@ -148,8 +148,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
             "Non-interface classes anywhere under scan assignable to AggregateRoot, "
                 + "abstract ones included.")
         .checking(
-            "No field of the class - inherited and static ones included - has a raw type "
-                + "assignable to Repository or to any other OutputPort. Only the raw type is "
+            "No instance field of the class - inherited ones included, static ones excluded - "
+                + "has a raw type assignable to Repository or to any other OutputPort. Only the raw type is "
                 + "inspected; a port hidden in a generic type argument is not seen. A port passed "
                 + "as a method parameter is not a field and passes.");
   }
@@ -181,7 +181,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
             "Non-interface classes anywhere under scan assignable to AggregateRoot, "
                 + "abstract ones included.")
         .checking(
-            "No instance state, including inherited state, arrays and nested generic arguments, involves AggregateRoot. Same-type references and interfaces extending the marker are included. Interfaces that do not extend the marker are invisible; references by id are valid.");
+            "No instance field - inherited ones included, static ones excluded - involves AggregateRoot through its type, arrays or nested generic arguments. Same-type references and interfaces extending the marker are included. Interfaces that do not extend the marker are invisible; references by id are valid.");
   }
 
   // ---------------------------------------------------------------------------------------------

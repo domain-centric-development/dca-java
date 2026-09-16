@@ -1,6 +1,7 @@
 package dev.domaincentric.dca.archunit.rules;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.Fixtures;
@@ -25,6 +26,22 @@ class CycleRulesTest {
   @TestFactory
   Stream<DynamicTest> goodFixturePasses() {
     return Fixtures.goodFixturePasses(CycleRules::new, GOOD);
+  }
+
+  /**
+   * The domain-model segment is read from the layout: with it renamed, the bad fixture's
+   * domain.model packages are no longer sliced and the cycle between them is not seen.
+   */
+  @Test
+  void theDomainModelSegmentComesFromTheLayout() {
+    var arch = Fixtures.arch(BAD);
+    assertThrows(
+        AssertionError.class,
+        () -> CycleRules.domainPackagesFreeOfCycles(arch.layout()).check(arch));
+    var renamed =
+        dev.domaincentric.dca.archunit.DcaArchitecture.of(
+            arch.layout().withModelSubpackage("entities"), arch.classes());
+    CycleRules.domainPackagesFreeOfCycles(renamed.layout()).check(renamed);
   }
 
   /** Every cycle rule has a negative fixture. */

@@ -1,5 +1,7 @@
 package dev.domaincentric.dca.archunit.rules;
 
+import static com.tngtech.archunit.base.DescribedPredicate.not;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
@@ -55,9 +57,12 @@ public final class HexagonalRules implements DcaRuleSet {
     return rules;
   }
 
-  /** Pattern of event consumers, which may depend on other contexts' integration events. */
+  /**
+   * Pattern of event consumers - the incoming adapters that react to other modules' integration
+   * events; every segment comes from the layout.
+   */
   private String eventConsumerPattern() {
-    return ".." + layout.adapterSubpackage() + "." + layout.incomingSubpackage() + ".event..";
+    return layout.incomingEventAdapterPattern();
   }
 
   public DcaRule domainMustNotAccessAdapters() {
@@ -214,7 +219,8 @@ public final class HexagonalRules implements DcaRuleSet {
                     .allowEmptyShould(true))
         .selecting(
             "Classes in <module>.adapter.incoming.. of every module root, excluding those"
-                + " below an adapter.incoming.event package (event consumers).")
+                + " below the configured event-consumer sub-package (adapter.incoming.event by"
+                + " default).")
         .checking(
             "No dependency on a class in <module>.adapter.outgoing.. of any module root. The"
                 + " reverse direction (an outgoing adapter using an incoming one) and dependencies"
@@ -231,14 +237,17 @@ public final class HexagonalRules implements DcaRuleSet {
                 + " integration events or the published api for cross-context integration",
             arch -> {
               // Structural, over every module that owns a DCA layer - declared as a bounded context
-              // or
-              // not - so an undeclared module can neither reach out nor be reached into.
+              // or not - so an undeclared module can neither reach out nor be reached into. The
+              // allow-list is the same package convention DCA-STR-006 applies to outgoing adapters:
+              // another module's published api and events packages are open, everything else in it
+              // is internal.
               List<ArchRule> perModule = new ArrayList<>();
               for (String module : arch.isolatedModuleRoots()) {
                 String[] otherModules = arch.moduleRootPatternsExcluding(module);
                 if (otherModules.length == 0) {
                   continue;
                 }
+                String[] published = arch.publishedPackagePatternsExcluding(module);
                 perModule.add(
                     noClasses()
                         .that()
@@ -246,8 +255,9 @@ public final class HexagonalRules implements DcaRuleSet {
                         .and()
                         .resideOutsideOfPackage(eventConsumerPattern())
                         .should()
-                        .dependOnClassesThat()
-                        .resideInAnyPackage(otherModules)
+                        .dependOnClassesThat(
+                            resideInAnyPackage(otherModules)
+                                .and(not(resideInAnyPackage(published))))
                         .allowEmptyShould(true)
                         .because(
                             "Incoming adapters in module '"
@@ -260,14 +270,17 @@ public final class HexagonalRules implements DcaRuleSet {
         .selecting(
             "Per isolated module root - every module root except the shared kernel, declared"
                 + " a bounded context or not: classes in <module>.adapter.incoming.., excluding"
-                + " those below an adapter.incoming.event package (event consumers). A module that"
-                + " is the only isolated module is skipped.")
+                + " those below the configured event-consumer sub-package (adapter.incoming.event"
+                + " by default). A module that is the only isolated module is skipped.")
         .checking(
-            "No dependency on any class in another isolated module root (<other>..), its"
-                + " published api and events packages included. Dependencies on the shared kernel"
-                + " and on packages outside every module root are not checked. Findings of all"
-                + " modules are collected and reported together; a module without incoming adapters"
-                + " passes.");
+            "No dependency on a class in another isolated module root (<other>..) unless that"
+                + " class lives in the other module's published packages <other>.api.. or"
+                + " <other>.events.. (segment names from the layout) - the same allow-list"
+                + " DCA-STR-006 applies to outgoing adapters. The other module's domain,"
+                + " application, adapter and infrastructure packages are internal and reported."
+                + " Event consumers are exempt entirely. Dependencies on the shared kernel and on"
+                + " packages outside every module root are not checked. Findings of all modules are"
+                + " collected and reported together; a module without incoming adapters passes.");
   }
 
   public DcaRule repositoryClassesResideInOutgoingAdapter() {

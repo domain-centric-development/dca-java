@@ -4,6 +4,25 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+**What can turn a green build red:**
+
+- `DCA-HEX-007` now follows its title: an incoming adapter may depend on another module's published `api`/`events`
+  packages (the allow-list `DCA-STR-006` grants outgoing adapters); only the other module's internals are reported.
+  Event consumers stay exempt. A build that was green stays green; a build that excluded HEX-007 because of a
+  published-api dependency can enable it again.
+- `DCA-MAP-008`, `DCA-MAP-009` and `DCA-MAP-010` skip declarations with `status = PLANNED`, as `DCA-MAP-007` does;
+  `DCA-MAP-011` keeps counting a PLANNED declaration as declared.
+- `DCA-MAP-006` reports a context that declares `@Upstream` edges but carries no configured module declaration once,
+  as "module declaration missing on '<context>', allowed dependencies unknown", instead of listing every edge as
+  unmatched.
+- `DCA-TAC-002` inspects instance fields only (inherited ones included, static ones excluded), as `DCA-TAC-003`
+  always did; both `checks` texts say so.
+- `DCA-NAM-002` no longer lists records, as `DCA-NAM-001` never selected them.
+- `DCA-CYC-001..004`: the `checks` texts state the limit - slices are per module root, a cycle inside one module's
+  layer is not detected there, `DCA-CYC-005` covers the application layer per operation. No code change.
+- Two more layout segments: `withModelSubpackage` (default `model`) and `withIncomingEventSubpackage` (default
+  `event`). `DCA-CYC-001` and the domain-model patterns read the first, the event-consumer exemption of `DCA-HEX-006`
+  and `DCA-HEX-007` the second; neither is hard-coded any more.
 - `DCA-ONI-002`: the in-code comment describes what the rule allows today - the domain packages of every module root
   plus the building-blocks tactical and output-port packages; no behaviour change.
 - `DCA-STR-007`: a test proves that a renamed events segment (`withEventsSubpackage`) is honoured; the rule has read

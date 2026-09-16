@@ -75,6 +75,18 @@ class DcaLayoutTest {
   }
 
   @Test
+  void modelAndEventConsumerSegmentsAreLayoutSettings() {
+    assertEquals("model", DEFAULTS.modelSubpackage());
+    assertEquals("event", DEFAULTS.incomingEventSubpackage());
+    DcaLayout layout =
+        DEFAULTS.withModelSubpackage("entities").withIncomingEventSubpackage("listener");
+    assertEquals("com.acme.cart.domain.entities..", layout.domainModelPattern("com.acme.cart"));
+    assertEquals("..adapter.incoming.listener..", layout.incomingEventAdapterPattern());
+    assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withModelSubpackage("a.b"));
+    assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withIncomingEventSubpackage(""));
+  }
+
+  @Test
   void publishedSegmentsMustDiffer() {
     assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withEventsSubpackage("api"));
   }

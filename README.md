@@ -109,6 +109,8 @@ DcaLayout.forBasePackage("com.acme.shop")
     .withIncomingSubpackage("in")            // adapter/in instead of adapter/incoming
     .withOutgoingSubpackage("out")
     .withApiSubpackage("contract")            // published sync contract (default: api); events: withEventsSubpackage
+    .withModelSubpackage("entities")          // domain/entities instead of domain/model
+    .withIncomingEventSubpackage("listener")  // event consumers under adapter/incoming/listener (default: event)
     .withUseCaseSuffix("ApplicationService")
     .withControllerSuffix("Page")
     .allowingInDomain("org.jmolecules..")     // extra third-party packages allowed in the domain

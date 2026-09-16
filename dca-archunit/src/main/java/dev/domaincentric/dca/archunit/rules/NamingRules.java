@@ -85,6 +85,7 @@ public final class NamingRules implements DcaRuleSet {
               if (injectable.isEmpty()) return;
               for (var type : arch.classes()) {
                 if (!type.isInterface()
+                    && !type.isRecord()
                     && !type.isNestedClass()
                     && com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage(
                             arch.allApplicationPatterns())
@@ -101,7 +102,7 @@ public final class NamingRules implements DcaRuleSet {
               }
             })
         .selecting(
-            "Concrete non-nested application operations selected by InputPort marker or use-case suffix when the injectable role is configured.")
+            "Concrete non-nested, non-record application classes selected by InputPort marker or use-case suffix when the injectable role is configured - records are excluded, as in DCA-NAM-001.")
         .checking(
             "Informational diagnostic only: lists operations without a direct or composed injectable stereotype and never fails. Configuration registration is equally valid; this does not prove wiring.");
   }

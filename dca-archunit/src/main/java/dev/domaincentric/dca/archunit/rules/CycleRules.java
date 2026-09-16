@@ -51,22 +51,22 @@ public final class CycleRules implements DcaRuleSet {
                 + " Principle)",
             arch ->
                 slices()
-                    .assignedFrom(
-                        moduleLayerSlices(
-                            arch, root -> root + "." + layout.domainSubpackage() + ".model"))
+                    .assignedFrom(moduleLayerSlices(arch, layout::domainModelPackage))
                     .should()
                     .beFreeOfCycles()
                     .allowEmptyShould(true))
         .selecting(
             "One slice per module root, holding the classes in <module>.domain.model.. of that"
-                + " module. A module root is the shortest package prefix whose next segment is a"
-                + " layer segment, so modules are found at any depth; classes outside every module"
-                + " or outside domain.model are ignored.")
+                + " module (segment names from the layout). A module root is the shortest package"
+                + " prefix whose next segment is a layer segment, so modules are found at any depth;"
+                + " classes outside every module or outside the domain-model package are ignored.")
         .checking(
             "The slices form no dependency cycle - no two modules' domain models depend on each"
-                + " other, directly or via further modules' domain models. Cycles between classes"
-                + " inside one module's domain model do not count, and dependencies into other"
-                + " layers do not count. Fewer than two slices pass.");
+                + " other, directly or via further modules' domain models. Slices are per module"
+                + " root, so a cycle between classes inside one module's domain model is not"
+                + " detected here, and dependencies into other layers do not count. DCA-CYC-005"
+                + " covers the application layer per operation; no rule slices the domain model"
+                + " within a module. Fewer than two slices pass.");
   }
 
   public static DcaRule applicationLayerFreeOfCycles(DcaLayout layout) {
@@ -87,9 +87,10 @@ public final class CycleRules implements DcaRuleSet {
                 + " module (application.shared included); classes outside every module or outside"
                 + " the application layer are ignored.")
         .checking(
-            "The slices form no dependency cycle between modules' application layers. Cycles"
-                + " between use cases or features inside one module do not count here (see"
-                + " DCA-CYC-005), nor do dependencies into domain or adapter classes.");
+            "The slices form no dependency cycle between modules' application layers. Slices are"
+                + " per module root, so a cycle between use cases or features inside one module is"
+                + " not detected here - DCA-CYC-005 covers the application layer per operation -"
+                + " and dependencies into domain or adapter classes do not count.");
   }
 
   public static DcaRule outgoingAdaptersFreeOfCycles(DcaLayout layout) {
@@ -115,10 +116,11 @@ public final class CycleRules implements DcaRuleSet {
             "One slice per module root, holding the classes in <module>.adapter.outgoing.. of"
                 + " that module; everything else is ignored.")
         .checking(
-            "The slices form no dependency cycle between modules' outgoing adapters. Cycles"
-                + " inside"
-                + " one module's outgoing adapters and dependencies into other layers do not"
-                + " count.");
+            "The slices form no dependency cycle between modules' outgoing adapters. Slices are"
+                + " per module root, so a cycle inside one module's outgoing adapters is not"
+                + " detected here, and dependencies into other layers do not count. DCA-CYC-005"
+                + " covers the application layer per operation; no rule slices the adapters within"
+                + " a module.");
   }
 
   public static DcaRule incomingAdaptersFreeOfCycles(DcaLayout layout) {
@@ -144,10 +146,11 @@ public final class CycleRules implements DcaRuleSet {
             "One slice per module root, holding the classes in <module>.adapter.incoming.. of"
                 + " that module; everything else is ignored.")
         .checking(
-            "The slices form no dependency cycle between modules' incoming adapters. Cycles"
-                + " inside"
-                + " one module's incoming adapters and dependencies into other layers do not"
-                + " count.");
+            "The slices form no dependency cycle between modules' incoming adapters. Slices are"
+                + " per module root, so a cycle inside one module's incoming adapters is not"
+                + " detected here, and dependencies into other layers do not count. DCA-CYC-005"
+                + " covers the application layer per operation; no rule slices the adapters within"
+                + " a module.");
   }
 
   /**

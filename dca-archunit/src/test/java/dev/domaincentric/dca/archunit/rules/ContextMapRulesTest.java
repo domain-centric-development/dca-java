@@ -1,6 +1,7 @@
 package dev.domaincentric.dca.archunit.rules;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.domaincentric.dca.archunit.DcaRuleViolation;
@@ -17,6 +18,8 @@ class ContextMapRulesTest {
   private static final String BAD = Fixtures.ROOT + ".contextmap.bad";
   private static final String NESTED = Fixtures.ROOT + ".contextmap.nested";
   private static final String COLLECT = Fixtures.ROOT + ".collect";
+  private static final String PLANNED = Fixtures.ROOT + ".contextmap.planned";
+  private static final String NO_MODULE = Fixtures.ROOT + ".contextmap.nomodule";
 
   @TestFactory
   Stream<DynamicTest> goodFixturePasses() {
@@ -59,6 +62,29 @@ class ContextMapRulesTest {
   }
 
   /** Both undeclared cross-context dependencies land in one violation. */
+  @Test
+  @DisplayName(
+      "DCA-MAP-008/009/010 skip PLANNED declarations like DCA-MAP-007, MAP-011 counts them")
+  void plannedDeclarationsAreNotEnforced() {
+    var arch = Fixtures.arch(PLANNED);
+    Fixtures.rule(PLANNED, "DCA-MAP-007").check(arch);
+    Fixtures.rule(PLANNED, "DCA-MAP-008").check(arch);
+    Fixtures.rule(PLANNED, "DCA-MAP-009").check(arch);
+    Fixtures.rule(PLANNED, "DCA-MAP-010").check(arch);
+    Fixtures.rule(PLANNED, "DCA-MAP-011").check(arch);
+  }
+
+  @Test
+  @DisplayName("DCA-MAP-006 reports a missing module declaration once, not every edge")
+  void missingModuleDeclarationIsOneDiagnostic() {
+    DcaRuleViolation violation = Fixtures.violation(NO_MODULE, "DCA-MAP-006");
+    assertEquals(1, violation.violations().size(), violation.getMessage());
+    String message = violation.violations().get(0);
+    assertTrue(message.contains("module declaration missing on 'billing'"), message);
+    assertTrue(message.contains("allowed dependencies unknown"), message);
+    assertFalse(message.contains("must describe the same edges"), message);
+  }
+
   @Test
   @DisplayName("DCA-MAP-011 reports every undeclared edge")
   void everyUndeclaredEdgeIsReported() {

@@ -66,9 +66,11 @@ public final class DcaLayout {
   private final String basePackage;
   private final String sharedKernelSubpackage;
   private final String domainSubpackage;
+  private final String modelSubpackage;
   private final String applicationSubpackage;
   private final String adapterSubpackage;
   private final String incomingSubpackage;
+  private final String incomingEventSubpackage;
   private final String outgoingSubpackage;
   private final String infrastructureSubpackage;
   private final String apiSubpackage;
@@ -99,10 +101,13 @@ public final class DcaLayout {
     this.sharedKernelSubpackage =
         requireSegment(settings.sharedKernelSubpackage, "sharedKernelSubpackage");
     this.domainSubpackage = requireSegment(settings.domainSubpackage, "domainSubpackage");
+    this.modelSubpackage = requireSegment(settings.modelSubpackage, "modelSubpackage");
     this.applicationSubpackage =
         requireSegment(settings.applicationSubpackage, "applicationSubpackage");
     this.adapterSubpackage = requireSegment(settings.adapterSubpackage, "adapterSubpackage");
     this.incomingSubpackage = requireSegment(settings.incomingSubpackage, "incomingSubpackage");
+    this.incomingEventSubpackage =
+        requireSegment(settings.incomingEventSubpackage, "incomingEventSubpackage");
     this.outgoingSubpackage = requireSegment(settings.outgoingSubpackage, "outgoingSubpackage");
     this.infrastructureSubpackage =
         requireSegment(settings.infrastructureSubpackage, "infrastructureSubpackage");
@@ -139,9 +144,11 @@ public final class DcaLayout {
     defaults.basePackage = basePackage;
     defaults.sharedKernelSubpackage = "sharedkernel";
     defaults.domainSubpackage = "domain";
+    defaults.modelSubpackage = "model";
     defaults.applicationSubpackage = "application";
     defaults.adapterSubpackage = "adapter";
     defaults.incomingSubpackage = "incoming";
+    defaults.incomingEventSubpackage = "event";
     defaults.outgoingSubpackage = "outgoing";
     defaults.infrastructureSubpackage = "infrastructure";
     defaults.apiSubpackage = "api";
@@ -223,6 +230,15 @@ public final class DcaLayout {
     return copy(settings -> settings.domainSubpackage = value);
   }
 
+  /**
+   * Sub-package of the domain layer that holds the domain model — aggregates, entities, value
+   * objects — e.g. {@code "model"} (default) or {@code "entities"}. The domain-model rules and the
+   * domain cycle rule select {@code <module>.domain.<model>..}.
+   */
+  public DcaLayout withModelSubpackage(String value) {
+    return copy(settings -> settings.modelSubpackage = value);
+  }
+
   public DcaLayout withApplicationSubpackage(String value) {
     return copy(settings -> settings.applicationSubpackage = value);
   }
@@ -234,6 +250,16 @@ public final class DcaLayout {
   /** Name of the incoming (driving/primary) adapter sub-package — {@code "in"} in some projects. */
   public DcaLayout withIncomingSubpackage(String value) {
     return copy(settings -> settings.incomingSubpackage = value);
+  }
+
+  /**
+   * Sub-package of the incoming adapters that holds the event consumers — the adapters that react
+   * to other modules' integration events — e.g. {@code "event"} (default) or {@code "listener"}.
+   * Classes below {@code <module>.adapter.incoming.<event>..} are the one kind of incoming adapter
+   * the adapter-isolation rules exempt.
+   */
+  public DcaLayout withIncomingEventSubpackage(String value) {
+    return copy(settings -> settings.incomingEventSubpackage = value);
   }
 
   /**
@@ -364,9 +390,11 @@ public final class DcaLayout {
     settings.basePackage = basePackage;
     settings.sharedKernelSubpackage = sharedKernelSubpackage;
     settings.domainSubpackage = domainSubpackage;
+    settings.modelSubpackage = modelSubpackage;
     settings.applicationSubpackage = applicationSubpackage;
     settings.adapterSubpackage = adapterSubpackage;
     settings.incomingSubpackage = incomingSubpackage;
+    settings.incomingEventSubpackage = incomingEventSubpackage;
     settings.outgoingSubpackage = outgoingSubpackage;
     settings.infrastructureSubpackage = infrastructureSubpackage;
     settings.apiSubpackage = apiSubpackage;
@@ -388,9 +416,11 @@ public final class DcaLayout {
     String basePackage;
     String sharedKernelSubpackage;
     String domainSubpackage;
+    String modelSubpackage;
     String applicationSubpackage;
     String adapterSubpackage;
     String incomingSubpackage;
+    String incomingEventSubpackage;
     String outgoingSubpackage;
     String infrastructureSubpackage;
     String apiSubpackage;
@@ -421,6 +451,11 @@ public final class DcaLayout {
     return domainSubpackage;
   }
 
+  /** The domain-model sub-package of the domain layer, {@code model} by default. */
+  public String modelSubpackage() {
+    return modelSubpackage;
+  }
+
   public String applicationSubpackage() {
     return applicationSubpackage;
   }
@@ -431,6 +466,11 @@ public final class DcaLayout {
 
   public String incomingSubpackage() {
     return incomingSubpackage;
+  }
+
+  /** The event-consumer sub-package of the incoming adapters, {@code event} by default. */
+  public String incomingEventSubpackage() {
+    return incomingEventSubpackage;
   }
 
   public String outgoingSubpackage() {
@@ -527,7 +567,7 @@ public final class DcaLayout {
 
   /** {@code base.sharedkernel.domain.model..} */
   public String sharedKernelDomainModelPattern() {
-    return sharedKernelPackage() + "." + domainSubpackage + ".model..";
+    return sharedKernelPackage() + "." + domainSubpackage + "." + modelSubpackage + "..";
   }
 
   /** {@code base.infrastructure} (no pattern suffix). */
@@ -566,7 +606,7 @@ public final class DcaLayout {
 
   /** {@code base.*.domain.model..} */
   public String domainModelPattern() {
-    return basePackage + ".*." + domainSubpackage + ".model..";
+    return basePackage + ".*." + domainSubpackage + "." + modelSubpackage + "..";
   }
 
   /** {@code base.*.application..} */
@@ -601,7 +641,12 @@ public final class DcaLayout {
   }
 
   public String domainModelPattern(String contextPackage) {
-    return contextPackage + "." + domainSubpackage + ".model..";
+    return contextPackage + "." + domainSubpackage + "." + modelSubpackage + "..";
+  }
+
+  /** {@code base.cart.domain.model} — a module's domain-model package (no pattern suffix). */
+  public String domainModelPackage(String contextPackage) {
+    return contextPackage + "." + domainSubpackage + "." + modelSubpackage;
   }
 
   public String applicationPattern(String contextPackage) {
@@ -618,6 +663,20 @@ public final class DcaLayout {
 
   public String incomingAdapterPattern(String contextPackage) {
     return contextPackage + "." + adapterSubpackage + "." + incomingSubpackage + "..";
+  }
+
+  /**
+   * {@code ..adapter.incoming.event..} — the event consumers of any module, at any depth; the
+   * segment names come from this layout.
+   */
+  public String incomingEventAdapterPattern() {
+    return ".."
+        + adapterSubpackage
+        + "."
+        + incomingSubpackage
+        + "."
+        + incomingEventSubpackage
+        + "..";
   }
 
   public String outgoingAdapterPattern(String contextPackage) {
