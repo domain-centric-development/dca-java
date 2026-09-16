@@ -66,9 +66,10 @@ public final class OnionRules implements DcaRuleSet {
                 + " when possible",
             "Domain should be framework-independent (Dependency Inversion Principle)",
             arch -> {
-              // Every discovered context's domain plus the shared kernel's own domain package — the
-              // inclusion is explicit here, where the former base.*.domain.. wildcard covered the
-              // shared kernel only as a side effect of matching one segment.
+              // The domain packages of every module root - the shared kernel among them when it
+              // owns a domain package - plus the two building-blocks packages a domain may use:
+              // the tactical markers and the output ports. Strategic annotations and input ports
+              // are deliberately not on the list.
               List<String> domainPackageList = new ArrayList<>(List.of(arch.allDomainPatterns()));
               domainPackageList.add(DcaLayout.BUILDING_BLOCKS_TACTICAL_PACKAGE);
               domainPackageList.add(DcaLayout.BUILDING_BLOCKS_PORT_OUT_PACKAGE);

@@ -52,6 +52,22 @@ class EventPolicyTest {
   }
 
   @Test
+  void integrationEventPlacementFollowsTheConfiguredEventsSegment() {
+    // With the default layout the contract in module.events passes; renaming the events segment
+    // makes the same class misplaced - the segment is read from the layout, not hard-coded.
+    assertFalse(Fixtures.failure(ROOT, "DCA-STR-007").getMessage().contains("Exported"));
+    var layout = DcaLayout.forBasePackage(ROOT).withEventsSubpackage("contracts");
+    var arch = DcaArchitecture.of(layout, new ClassFileImporter().importPackages(ROOT));
+    var rule =
+        DcaRules.all(layout).stream()
+            .filter(r -> r.id().equals("DCA-STR-007"))
+            .findFirst()
+            .orElseThrow();
+    String message = assertThrows(AssertionError.class, () -> rule.check(arch)).getMessage();
+    assertTrue(message.contains("Exported"), message);
+  }
+
+  @Test
   void publicationAfterEmptyBoundaryIsAKnownStaticPass() {
     var layout = DcaLayout.forBasePackage(ROOT);
     var classes =

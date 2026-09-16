@@ -4,6 +4,11 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+- `DCA-ONI-002`: the in-code comment describes what the rule allows today - the domain packages of every module root
+  plus the building-blocks tactical and output-port packages; no behaviour change.
+- `DCA-STR-007`: a test proves that a renamed events segment (`withEventsSubpackage`) is honoured; the rule has read
+  the segment from the layout since 0.4.0, nothing in it is hard-coded.
+
 ## [0.4.0] - 2026-09-10
 
 **Migration from 0.3.0.** Depends on `dca-building-blocks` 0.2.0 (`registerEvent` is protected — see its changelog).
