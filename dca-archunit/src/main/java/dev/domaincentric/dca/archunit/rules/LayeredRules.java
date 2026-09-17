@@ -214,8 +214,11 @@ public final class LayeredRules implements DcaRuleSet {
                 + " declares the manager) and in the shared kernel's infrastructure package"
                 + " (<base>.sharedkernel.infrastructure.., plumbing that hooks into the boundary);"
                 + " a domain, incoming-adapter or module-infrastructure package is reported. All"
-                + " findings are collected into one violation. Which transaction a boundary opens is"
-                + " not checked.");
+                + " findings are collected into one violation. Where manager and boundary"
+                + " dependencies are allowed the rule cannot tell wiring from a call: a class in the"
+                + " global or shared-kernel infrastructure package that obtains the manager and"
+                + " begins a transaction itself passes. Which transaction a boundary opens is not"
+                + " checked.");
   }
 
   public DcaRule outputPortMarkersMustBeInterfaces() {
