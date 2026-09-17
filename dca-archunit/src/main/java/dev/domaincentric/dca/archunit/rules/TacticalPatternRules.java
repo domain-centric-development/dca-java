@@ -126,7 +126,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
             arch -> {
               List<String> violations = new ArrayList<>();
               for (JavaClass aggregate : concreteClassesAssignableTo(arch, AggregateRoot.class)) {
-                for (JavaField field : TypeInspection.instanceFields(aggregate)) {
+                for (JavaField field : aggregate.getAllFields()) {
                   JavaClass fieldType = field.getRawType();
                   if (fieldType.isAssignableTo(Repository.class)
                       || fieldType.isAssignableTo(OutputPort.class)) {
@@ -148,8 +148,9 @@ public final class TacticalPatternRules implements DcaRuleSet {
             "Non-interface classes anywhere under scan assignable to AggregateRoot, "
                 + "abstract ones included.")
         .checking(
-            "No instance field of the class - inherited ones included, static ones excluded - "
-                + "has a raw type assignable to Repository or to any other OutputPort. Only the raw type is "
+            "No field of the class - inherited and static ones included, a static port breaks "
+                + "persistence ignorance just the same - has a raw type assignable to Repository or to "
+                + "any other OutputPort. Only the raw type is "
                 + "inspected; a port hidden in a generic type argument is not seen. A port passed "
                 + "as a method parameter is not a field and passes.");
   }

@@ -19,6 +19,7 @@ class ContextMapRulesTest {
   private static final String NESTED = Fixtures.ROOT + ".contextmap.nested";
   private static final String COLLECT = Fixtures.ROOT + ".collect";
   private static final String PLANNED = Fixtures.ROOT + ".contextmap.planned";
+  private static final String PLANNED_MISPLACED = Fixtures.ROOT + ".contextmap.plannedmisplaced";
   private static final String NO_MODULE = Fixtures.ROOT + ".contextmap.nomodule";
 
   @TestFactory
@@ -63,15 +64,24 @@ class ContextMapRulesTest {
 
   /** Both undeclared cross-context dependencies land in one violation. */
   @Test
-  @DisplayName(
-      "DCA-MAP-008/009/010 skip PLANNED declarations like DCA-MAP-007, MAP-011 counts them")
-  void plannedDeclarationsAreNotEnforced() {
+  @DisplayName("a PLANNED declaration without code passes MAP-007..011: nothing is demanded")
+  void plannedDeclarationsWithoutCodeDemandNothing() {
     var arch = Fixtures.arch(PLANNED);
-    Fixtures.rule(PLANNED, "DCA-MAP-007").check(arch);
-    Fixtures.rule(PLANNED, "DCA-MAP-008").check(arch);
-    Fixtures.rule(PLANNED, "DCA-MAP-009").check(arch);
-    Fixtures.rule(PLANNED, "DCA-MAP-010").check(arch);
-    Fixtures.rule(PLANNED, "DCA-MAP-011").check(arch);
+    for (String id :
+        new String[] {"DCA-MAP-007", "DCA-MAP-008", "DCA-MAP-009", "DCA-MAP-010", "DCA-MAP-011"}) {
+      Fixtures.rule(PLANNED, id).check(arch);
+    }
+  }
+
+  @Test
+  @DisplayName("a PLANNED declaration does not exempt existing code from placement")
+  void plannedDeclarationsStillGovernPlacement() {
+    Fixtures.rule(PLANNED_MISPLACED, "DCA-MAP-007").check(Fixtures.arch(PLANNED_MISPLACED));
+    for (String id : new String[] {"DCA-MAP-008", "DCA-MAP-009", "DCA-MAP-010"}) {
+      String message = Fixtures.violation(PLANNED_MISPLACED, id).getMessage();
+      assertTrue(message.contains("Invoice"), id + ": " + message);
+      assertFalse(message.contains("needs translation evidence"), id + ": " + message);
+    }
   }
 
   @Test

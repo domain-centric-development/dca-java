@@ -39,11 +39,12 @@ class TacticalPatternRulesTest {
   }
 
   @Test
-  @DisplayName("DCA-TAC-002 and DCA-TAC-003 inspect instance fields only")
-  void staticFieldsCarryNoAggregateState() {
-    var arch = Fixtures.arch(STATICS);
-    Fixtures.rule(STATICS, "DCA-TAC-002").check(arch);
-    Fixtures.rule(STATICS, "DCA-TAC-003").check(arch);
+  @DisplayName(
+      "a static port breaks persistence ignorance (TAC-002), a static same-type field holds no aggregate (TAC-003)")
+  void staticFieldsArePortsButNotAggregateState() {
+    String message = Fixtures.violation(STATICS, "DCA-TAC-002").getMessage();
+    assertTrue(message.contains("lookup"), message);
+    Fixtures.rule(STATICS, "DCA-TAC-003").check(Fixtures.arch(STATICS));
   }
 
   @Test

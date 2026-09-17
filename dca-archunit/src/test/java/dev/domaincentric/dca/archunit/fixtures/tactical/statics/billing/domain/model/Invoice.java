@@ -4,9 +4,8 @@ import dev.domaincentric.dca.archunit.fixtures.tactical.statics.billing.applicat
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.BaseAggregateRoot;
 
 /**
- * Static fields carry no aggregate state: a static repository reference and a static template of
- * the own aggregate type are neither an injected port (DCA-TAC-002) nor a held aggregate
- * (DCA-TAC-003).
+ * A static repository reference is a port in the aggregate all the same (DCA-TAC-002 reports it); a
+ * static template of the own aggregate type carries no aggregate state (DCA-TAC-003 does not).
  */
 public final class Invoice extends BaseAggregateRoot<Invoice, InvoiceId> {
   static InvoiceRepository lookup;

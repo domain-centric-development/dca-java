@@ -10,13 +10,15 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
   packages (the allow-list `DCA-STR-006` grants outgoing adapters); only the other module's internals are reported.
   Event consumers stay exempt. A build that was green stays green; a build that excluded HEX-007 because of a
   published-api dependency can enable it again.
-- `DCA-MAP-008`, `DCA-MAP-009` and `DCA-MAP-010` skip declarations with `status = PLANNED`, as `DCA-MAP-007` does;
-  `DCA-MAP-011` keeps counting a PLANNED declaration as declared.
+- `DCA-MAP-008`, `DCA-MAP-009` and `DCA-MAP-010` separate two questions: placement of code that exists is checked
+  for every declaration, PLANNED included; only an IMPLEMENTED `@Upstream` demands that a translation site exists
+  (`DCA-MAP-008`, as `DCA-MAP-007` demands an implementation). `DCA-MAP-011` keeps counting a PLANNED declaration as
+  declared.
 - `DCA-MAP-006` reports a context that declares `@Upstream` edges but carries no configured module declaration once,
   as "module declaration missing on '<context>', allowed dependencies unknown", instead of listing every edge as
   unmatched.
-- `DCA-TAC-002` inspects instance fields only (inherited ones included, static ones excluded), as `DCA-TAC-003`
-  always did; both `checks` texts say so.
+- `DCA-TAC-002` inspects every field, static ones included - a static port breaks persistence ignorance just the
+  same; `DCA-TAC-003` stays instance-only (a static same-type field holds no aggregate). Both `checks` texts say so.
 - `DCA-NAM-002` no longer lists records, as `DCA-NAM-001` never selected them.
 - `DCA-CYC-001..004`: the `checks` texts state the limit - slices are per module root, a cycle inside one module's
   layer is not detected there, `DCA-CYC-005` covers the application layer per operation. No code change.
