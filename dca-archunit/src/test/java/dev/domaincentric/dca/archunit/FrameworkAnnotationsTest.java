@@ -21,12 +21,14 @@ class FrameworkAnnotationsTest {
             FrameworkAnnotations.micronaut())) {
       assertFalse(preset.injectable().isEmpty(), preset.name());
       assertFalse(preset.transactional().isEmpty(), preset.name());
+      assertFalse(preset.transactionApi().isEmpty(), preset.name());
       assertFalse(preset.persistenceEntity().isEmpty(), preset.name());
       assertEquals(preset.name(), preset.toString());
     }
     FrameworkAnnotations none = FrameworkAnnotations.none();
     assertTrue(none.injectable().isEmpty());
     assertTrue(none.transactional().isEmpty());
+    assertTrue(none.transactionApi().isEmpty());
     assertTrue(none.persistenceEntity().isEmpty());
     assertFalse(none.hasModuleDeclaration());
   }

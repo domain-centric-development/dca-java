@@ -4,9 +4,12 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaClass;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
+import dev.domaincentric.dca.buildingblocks.application.TransactionBoundary;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -122,6 +125,7 @@ public final class LayeredRules implements DcaRuleSet {
             rationale,
             arch -> {
               List<String> transactional = layout.frameworkAnnotations().transactional();
+              List<String> transactionApi = layout.frameworkAnnotations().transactionApi();
               List<String> allowedPatterns =
                   new ArrayList<>(List.of(arch.allApplicationPatterns()));
               allowedPatterns.add(
@@ -145,19 +149,45 @@ public final class LayeredRules implements DcaRuleSet {
                       .allowEmptyShould(true),
                   arch.classes(),
                   rationale);
+              // Programmatic boundaries: the configured transaction APIs and DCA's own
+              // TransactionBoundary port. The boundary's implementations are the one legitimate
+              // site that depends on both, wherever they live.
+              DescribedPredicate<JavaClass> programmaticBoundary =
+                  DescribedPredicate.describe(
+                      "a configured transaction API or TransactionBoundary",
+                      c ->
+                          transactionApi.contains(c.getName())
+                              || c.isAssignableTo(TransactionBoundary.class));
+              violations.addAll(
+                  noClasses()
+                      .that()
+                      .resideOutsideOfPackages(allowed)
+                      .and()
+                      .areNotAssignableTo(TransactionBoundary.class)
+                      .should()
+                      .dependOnClassesThat(programmaticBoundary)
+                      .allowEmptyShould(true),
+                  arch.classes(),
+                  rationale);
               violations.throwIfAny();
             })
         .selecting(
-            "Methods and classes under scan that carry one of the configured transactional"
-                + " annotations directly (meta-annotations do not count); with an empty role nothing"
-                + " is selected.")
+            "Two mechanisms. Declarative: methods and classes under scan that carry one of the"
+                + " configured transactional annotations directly (meta-annotations do not count)."
+                + " Programmatic: classes under scan that depend on one of the configured"
+                + " transaction-API types (role transactionApi - a transaction template, manager or"
+                + " user transaction) or on TransactionBoundary, at any depth of the dependency"
+                + " (field, parameter, call); implementations of TransactionBoundary itself are not"
+                + " selected. With both roles empty only TransactionBoundary dependencies are"
+                + " selected.")
         .checking(
-            "Each annotated method is declared in, and each annotated class resides in, an"
-                + " application package of some module root (<module>.application..) or an outgoing"
-                + " adapter package (..adapter.outgoing..) anywhere. An annotation in a domain,"
-                + " incoming-adapter or infrastructure package is reported; all findings are"
-                + " collected into one violation. Programmatic boundaries"
-                + " (TransactionBoundary) are not checked.");
+            "Each annotated method is declared in, and each annotated class and each dependent"
+                + " class resides in, an application package of some module root"
+                + " (<module>.application..) or an outgoing adapter package (..adapter.outgoing..)"
+                + " anywhere. An annotation, a transaction-API dependency or a TransactionBoundary"
+                + " dependency in a domain, incoming-adapter or infrastructure package is reported;"
+                + " all findings are collected into one violation. Which transaction a boundary"
+                + " opens is not checked.");
   }
 
   public DcaRule outputPortMarkersMustBeInterfaces() {

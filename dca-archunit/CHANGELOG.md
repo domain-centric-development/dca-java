@@ -6,6 +6,12 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 **What can turn a green build red:**
 
+- `DCA-LAY-004` also sees programmatic boundaries: a class outside the application layer and the outgoing adapters
+  that depends on one of the configured transaction-API types (new `FrameworkAnnotations` role `transactionApi` -
+  transaction templates, transaction managers, user transactions; `withTransactionApi(...)` adjusts it) or on
+  `TransactionBoundary` is reported, as an annotated one always was. Implementations of `TransactionBoundary` are
+  the one exempt site. A bootstrap or web adapter that wraps its work in a transaction template turns red - move the
+  boundary into the use case.
 - `DCA-HEX-007` title and texts now describe the code: "Incoming adapters depend on no other module, except event
   consumers on the events they subscribe to". An incoming adapter may not depend on any package of another isolated
   module, published `api`/`events` included; the single exemption is the event-consumer sub-package. Behaviour

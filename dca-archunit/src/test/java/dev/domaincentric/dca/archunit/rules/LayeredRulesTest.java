@@ -15,6 +15,23 @@ class LayeredRulesTest {
 
   private static final String FIXTURES = Fixtures.ROOT + ".hexagonal";
   private static final String INFRASTRUCTURE = Fixtures.ROOT + ".infrastructure";
+  private static final String TRANSACTIONS = Fixtures.ROOT + ".transactions";
+
+  @Test
+  @DisplayName(
+      "DCA-LAY-004 sees programmatic boundaries: a transaction API in an incoming adapter, TransactionBoundary in the domain")
+  void programmaticBoundariesOutsideTheApplicationLayerAreReported() {
+    String message = Fixtures.failure(FIXTURES + ".bad", "DCA-LAY-004").getMessage();
+    assertTrue(message.contains("SeedRunner"), message);
+    assertTrue(message.contains("TransactionalPricing"), message);
+    assertTrue(message.contains("OrderResource"), message);
+  }
+
+  @Test
+  @DisplayName("DCA-LAY-004 accepts TransactionBoundary in a use case")
+  void aUseCaseMayDrawTheBoundaryItself() {
+    Fixtures.rule(TRANSACTIONS, "DCA-LAY-004").check(Fixtures.arch(TRANSACTIONS));
+  }
 
   @TestFactory
   Stream<DynamicTest> goodFixturePasses() {
