@@ -152,9 +152,12 @@ public final class LayeredRules implements DcaRuleSet {
               // Programmatic boundaries: the configured transaction APIs and DCA's own
               // TransactionBoundary port. The boundary's implementations are the one legitimate
               // site that depends on both, wherever they live; the composition root (the global
-              // infrastructure package) wires the transaction manager and draws no boundary.
+              // infrastructure package) and the shared kernel's infrastructure wire the transaction
+              // manager and its plumbing and draw no boundary.
               List<String> wiringAllowed = new ArrayList<>(allowedPatterns);
               wiringAllowed.add(layout.infrastructurePattern());
+              wiringAllowed.add(
+                  layout.sharedKernelPackage() + "." + layout.infrastructureSubpackage() + "..");
               DescribedPredicate<JavaClass> programmaticBoundary =
                   DescribedPredicate.describe(
                       "a configured transaction API or TransactionBoundary",
@@ -182,8 +185,10 @@ public final class LayeredRules implements DcaRuleSet {
                 + " user transaction) or on TransactionBoundary, at any depth of the dependency"
                 + " (field, parameter, call); implementations of TransactionBoundary itself and"
                 + " classes in the global infrastructure package (<base>.infrastructure.., the"
-                + " composition root that wires the transaction manager) are not selected. With"
-                + " both roles empty only TransactionBoundary dependencies are selected.")
+                + " composition root that wires the transaction manager) or in the shared kernel's"
+                + " infrastructure package (<base>.sharedkernel.infrastructure.., its plumbing) are"
+                + " not selected. With both roles empty only TransactionBoundary dependencies are"
+                + " selected.")
         .checking(
             "Each annotated method is declared in, and each annotated class and each dependent"
                 + " class resides in, an application package of some module root"
