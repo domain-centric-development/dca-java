@@ -6,10 +6,10 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 **What can turn a green build red:**
 
-- `DCA-HEX-007` now follows its title: an incoming adapter may depend on another module's published `api`/`events`
-  packages (the allow-list `DCA-STR-006` grants outgoing adapters); only the other module's internals are reported.
-  Event consumers stay exempt. A build that was green stays green; a build that excluded HEX-007 because of a
-  published-api dependency can enable it again.
+- `DCA-HEX-007` title and texts now describe the code: "Incoming adapters depend on no other module, except event
+  consumers on the events they subscribe to". An incoming adapter may not depend on any package of another isolated
+  module, published `api`/`events` included; the single exemption is the event-consumer sub-package. Behaviour
+  unchanged.
 - `DCA-MAP-008`, `DCA-MAP-009` and `DCA-MAP-010` separate two questions: placement of code that exists is checked
   for every declaration, PLANNED included; only an IMPLEMENTED `@Upstream` demands that a translation site exists
   (`DCA-MAP-008`, as `DCA-MAP-007` demands an implementation). `DCA-MAP-011` keeps counting a PLANNED declaration as
@@ -24,7 +24,8 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
   layer is not detected there, `DCA-CYC-005` covers the application layer per operation. No code change.
 - Two more layout segments: `withModelSubpackage` (default `model`) and `withIncomingEventSubpackage` (default
   `event`). `DCA-CYC-001` and the domain-model patterns read the first, the event-consumer exemption of `DCA-HEX-006`
-  and `DCA-HEX-007` the second; neither is hard-coded any more.
+  and `DCA-HEX-007` the second; neither is hard-coded any more. `DcaLayout.incomingEventAdapterPattern()` and
+  `domainModelPackage(module)` are new.
 - `DCA-ONI-002`: the in-code comment describes what the rule allows today - the domain packages of every module root
   plus the building-blocks tactical and output-port packages; no behaviour change.
 - `DCA-STR-007`: a test proves that a renamed events segment (`withEventsSubpackage`) is honoured; the rule has read

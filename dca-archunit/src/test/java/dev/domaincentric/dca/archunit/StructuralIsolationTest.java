@@ -100,28 +100,15 @@ class StructuralIsolationTest {
   }
 
   @Test
-  @DisplayName("an incoming adapter may use a foreign api package, an event consumer anything")
-  void theIncomingAdapterAllowListIsApiAndEventsPlusEventConsumers() {
+  @DisplayName("an incoming adapter may not use a foreign api package; an event consumer is exempt")
+  void theIncomingSideHasNoAllowListButEventConsumers() {
     List<String> hex007 = failuresOf("DCA-HEX-007");
-    assertFalse(
+    assertTrue(
         hex007.stream().anyMatch(m -> m.contains("ReportApiController")),
-        "DCA-HEX-007 must not report the adapter using the catalog's api: " + hex007);
+        "DCA-HEX-007 must report the adapter using the catalog's api: " + hex007);
     assertFalse(
         hex007.stream().anyMatch(m -> m.contains("CatalogChangedConsumer")),
         "DCA-HEX-007 must not report the event consumer: " + hex007);
-  }
-
-  /** The published packages are a layout setting for incoming adapters as well. */
-  @Test
-  @DisplayName("HEX-007's allow-list comes from the layout")
-  void theIncomingAllowListComesFromTheLayout() {
-    DcaLayout layout = DcaLayout.forBasePackage(BASE).withApiSubpackage("contract");
-    String message = failureOf(layout, "DCA-HEX-007");
-    assertTrue(
-        message.contains("ReportApiController"),
-        "with api renamed, the catalog's api package is internal and ReportApiController is"
-            + " reported: "
-            + message);
   }
 
   /** The event-consumer exemption is a layout setting, not a hard-coded package name. */

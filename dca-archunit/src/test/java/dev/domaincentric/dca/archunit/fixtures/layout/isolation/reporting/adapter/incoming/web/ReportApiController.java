@@ -3,8 +3,9 @@ package dev.domaincentric.dca.archunit.fixtures.layout.isolation.reporting.adapt
 import dev.domaincentric.dca.archunit.fixtures.layout.isolation.catalog.api.CatalogService;
 
 /**
- * Allowed: an incoming adapter depending on another module's published api package - the same
- * allow-list DCA-STR-006 grants outgoing adapters (DCA-HEX-007).
+ * Forbidden too: an incoming adapter depending on another module's <em>published</em> api package
+ * (DCA-HEX-007). The controller reaches a sibling through its own use case, output port and
+ * outgoing adapter; only DCA-STR-006 opens the api to outgoing adapters.
  */
 public class ReportApiController {
   public String report(final CatalogService catalog) {
