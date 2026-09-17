@@ -50,10 +50,13 @@ import java.util.WeakHashMap;
  *   <li>{@link #transactional()} — declarative transaction demarcation on a class or method.
  *       Belongs to the application layer; a use case that publishes domain events needs it or an
  *       explicit {@code TransactionBoundary}.
- *   <li>{@link #transactionApi()} — the framework's programmatic transaction-management types (a
- *       transaction template, a transaction manager, a user transaction). Like the declarative
- *       annotation they belong to the application layer and the outgoing adapters; a domain class
- *       or an incoming adapter that depends on one is reported.
+ *   <li>{@link #transactionApi()} — the types code <em>uses</em> to run a transaction (a
+ *       transaction template, a user transaction). Like the declarative annotation they belong to
+ *       the application layer and the outgoing adapters; any other class that depends on one is
+ *       reported.
+ *   <li>{@link #transactionManager()} — the types a composition root <em>declares or wires</em> (a
+ *       platform transaction manager). The global and the shared kernel's infrastructure may depend
+ *       on them; the domain, incoming adapters and a module's own infrastructure may not.
  *   <li>{@link #eventListener()} — an in-process event listener. Forbidden on domain events.
  *   <li>{@link #moduleDeclaration()} — a module system's declaration on {@code package-info}
  *       (Spring Modulith's {@code @ApplicationModule}). Read reflectively for its {@code
@@ -78,8 +81,10 @@ import java.util.WeakHashMap;
  * @param injectionSite constructor, field or setter injection annotations
  * @param persistenceMapping member-level persistence mapping annotations
  * @param persistenceEntity ORM mapping annotations of a persistent class
- * @param transactionApi programmatic transaction-management types (templates, managers, user
- *     transactions), matched as class dependencies rather than as annotations
+ * @param transactionApi types code uses to run a transaction (templates, user transactions),
+ *     matched as class dependencies rather than as annotations
+ * @param transactionManager types a composition root declares or wires (transaction managers),
+ *     matched as class dependencies rather than as annotations
  */
 public record FrameworkAnnotations(
     String name,
@@ -93,7 +98,8 @@ public record FrameworkAnnotations(
     List<String> persistenceEntity,
     List<String> injectionSite,
     List<String> persistenceMapping,
-    List<String> transactionApi) {
+    List<String> transactionApi,
+    List<String> transactionManager) {
 
   public FrameworkAnnotations {
     if (name == null || name.isBlank()) {
@@ -110,9 +116,40 @@ public record FrameworkAnnotations(
     injectionSite = role(injectionSite, "injectionSite");
     persistenceMapping = role(persistenceMapping, "persistenceMapping");
     transactionApi = role(transactionApi, "transactionApi");
+    transactionManager = role(transactionManager, "transactionManager");
   }
 
-  /** Compatibility constructor for presets without the transaction-API role (empty). */
+  /** Compatibility constructor for presets without the transaction-manager role (empty). */
+  public FrameworkAnnotations(
+      String name,
+      List<String> injectable,
+      List<String> webController,
+      List<String> restController,
+      List<String> transactional,
+      List<String> eventListener,
+      List<String> moduleDeclaration,
+      List<String> publishedInterface,
+      List<String> persistenceEntity,
+      List<String> injectionSite,
+      List<String> persistenceMapping,
+      List<String> transactionApi) {
+    this(
+        name,
+        injectable,
+        webController,
+        restController,
+        transactional,
+        eventListener,
+        moduleDeclaration,
+        publishedInterface,
+        persistenceEntity,
+        injectionSite,
+        persistenceMapping,
+        transactionApi,
+        List.of());
+  }
+
+  /** Compatibility constructor for presets without the transaction roles (empty). */
   public FrameworkAnnotations(
       String name,
       List<String> injectable,
@@ -216,10 +253,12 @@ public record FrameworkAnnotations(
         List.of(
             "org.springframework.transaction.support.TransactionTemplate",
             "org.springframework.transaction.support.TransactionOperations",
+            "org.springframework.transaction.reactive.TransactionalOperator",
+            "jakarta.transaction.UserTransaction"),
+        List.of(
             "org.springframework.transaction.PlatformTransactionManager",
             "org.springframework.transaction.TransactionManager",
-            "org.springframework.transaction.reactive.TransactionalOperator",
-            "jakarta.transaction.UserTransaction",
+            "org.springframework.transaction.ReactiveTransactionManager",
             "jakarta.transaction.TransactionManager"));
   }
 
@@ -253,7 +292,8 @@ public record FrameworkAnnotations(
             "jakarta.persistence.ManyToMany",
             "jakarta.persistence.Transient",
             "jakarta.persistence.Version"),
-        List.of("jakarta.transaction.UserTransaction", "jakarta.transaction.TransactionManager"));
+        List.of("jakarta.transaction.UserTransaction"),
+        List.of("jakarta.transaction.TransactionManager"));
   }
 
   /**
@@ -288,9 +328,8 @@ public record FrameworkAnnotations(
             "jakarta.persistence.Transient",
             "jakarta.persistence.Version"),
         List.of(
-            "jakarta.transaction.UserTransaction",
-            "jakarta.transaction.TransactionManager",
-            "io.quarkus.narayana.jta.QuarkusTransaction"));
+            "jakarta.transaction.UserTransaction", "io.quarkus.narayana.jta.QuarkusTransaction"),
+        List.of("jakarta.transaction.TransactionManager"));
   }
 
   /**
@@ -335,8 +374,8 @@ public record FrameworkAnnotations(
         List.of(
             "io.micronaut.transaction.TransactionOperations",
             "io.micronaut.transaction.SynchronousTransactionManager",
-            "jakarta.transaction.UserTransaction",
-            "jakarta.transaction.TransactionManager"));
+            "jakarta.transaction.UserTransaction"),
+        List.of("jakarta.transaction.TransactionManager"));
   }
 
   /**
@@ -348,7 +387,7 @@ public record FrameworkAnnotations(
   public static FrameworkAnnotations none() {
     return new FrameworkAnnotations(
         "none", List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
-        List.of(), List.of(), List.of(), List.of());
+        List.of(), List.of(), List.of(), List.of(), List.of());
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -486,7 +525,8 @@ public record FrameworkAnnotations(
         persistenceEntity,
         injectionSite,
         persistenceMapping,
-        transactionApi);
+        transactionApi,
+        transactionManager);
   }
 
   public FrameworkAnnotations withInjectable(String... annotationNames) {
@@ -502,7 +542,8 @@ public record FrameworkAnnotations(
         persistenceEntity,
         injectionSite,
         persistenceMapping,
-        transactionApi);
+        transactionApi,
+        transactionManager);
   }
 
   public FrameworkAnnotations withWebController(String... annotationNames) {
@@ -518,7 +559,8 @@ public record FrameworkAnnotations(
         persistenceEntity,
         injectionSite,
         persistenceMapping,
-        transactionApi);
+        transactionApi,
+        transactionManager);
   }
 
   public FrameworkAnnotations withRestController(String... annotationNames) {
@@ -534,7 +576,8 @@ public record FrameworkAnnotations(
         persistenceEntity,
         injectionSite,
         persistenceMapping,
-        transactionApi);
+        transactionApi,
+        transactionManager);
   }
 
   public FrameworkAnnotations withTransactional(String... annotationNames) {
@@ -550,7 +593,8 @@ public record FrameworkAnnotations(
         persistenceEntity,
         injectionSite,
         persistenceMapping,
-        transactionApi);
+        transactionApi,
+        transactionManager);
   }
 
   public FrameworkAnnotations withEventListener(String... annotationNames) {
@@ -566,7 +610,8 @@ public record FrameworkAnnotations(
         persistenceEntity,
         injectionSite,
         persistenceMapping,
-        transactionApi);
+        transactionApi,
+        transactionManager);
   }
 
   public FrameworkAnnotations withModuleDeclaration(String... annotationNames) {
@@ -582,7 +627,8 @@ public record FrameworkAnnotations(
         persistenceEntity,
         injectionSite,
         persistenceMapping,
-        transactionApi);
+        transactionApi,
+        transactionManager);
   }
 
   public FrameworkAnnotations withPublishedInterface(String... annotationNames) {
@@ -598,7 +644,8 @@ public record FrameworkAnnotations(
         persistenceEntity,
         injectionSite,
         persistenceMapping,
-        transactionApi);
+        transactionApi,
+        transactionManager);
   }
 
   public FrameworkAnnotations withPersistenceEntity(String... annotationNames) {
@@ -614,7 +661,8 @@ public record FrameworkAnnotations(
         List.of(annotationNames),
         injectionSite,
         persistenceMapping,
-        transactionApi);
+        transactionApi,
+        transactionManager);
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -631,7 +679,8 @@ public record FrameworkAnnotations(
         persistenceEntity,
         List.of(annotationNames),
         persistenceMapping,
-        transactionApi);
+        transactionApi,
+        transactionManager);
   }
 
   public FrameworkAnnotations withTransactionApi(String... typeNames) {
@@ -647,6 +696,24 @@ public record FrameworkAnnotations(
         persistenceEntity,
         injectionSite,
         persistenceMapping,
+        List.of(typeNames),
+        transactionManager);
+  }
+
+  public FrameworkAnnotations withTransactionManager(String... typeNames) {
+    return new FrameworkAnnotations(
+        name,
+        injectable,
+        webController,
+        restController,
+        transactional,
+        eventListener,
+        moduleDeclaration,
+        publishedInterface,
+        persistenceEntity,
+        injectionSite,
+        persistenceMapping,
+        transactionApi,
         List.of(typeNames));
   }
 
@@ -663,7 +730,8 @@ public record FrameworkAnnotations(
         persistenceEntity,
         injectionSite,
         List.of(annotationNames),
-        transactionApi);
+        transactionApi,
+        transactionManager);
   }
 
   // Queries

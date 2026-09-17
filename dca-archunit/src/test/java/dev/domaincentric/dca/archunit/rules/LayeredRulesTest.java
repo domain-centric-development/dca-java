@@ -23,6 +23,7 @@ class LayeredRulesTest {
   void programmaticBoundariesOutsideTheApplicationLayerAreReported() {
     String message = Fixtures.failure(FIXTURES + ".bad", "DCA-LAY-004").getMessage();
     assertTrue(message.contains("SeedRunner"), message);
+    assertTrue(message.contains("TransactionalSeeder"), message);
     assertTrue(message.contains("TransactionalPricing"), message);
     assertTrue(message.contains("OrderResource"), message);
   }

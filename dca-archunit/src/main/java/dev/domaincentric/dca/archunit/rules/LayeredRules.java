@@ -126,6 +126,7 @@ public final class LayeredRules implements DcaRuleSet {
             arch -> {
               List<String> transactional = layout.frameworkAnnotations().transactional();
               List<String> transactionApi = layout.frameworkAnnotations().transactionApi();
+              List<String> transactionManager = layout.frameworkAnnotations().transactionManager();
               List<String> allowedPatterns =
                   new ArrayList<>(List.of(arch.allApplicationPatterns()));
               allowedPatterns.add(
@@ -149,20 +150,35 @@ public final class LayeredRules implements DcaRuleSet {
                       .allowEmptyShould(true),
                   arch.classes(),
                   rationale);
-              // Programmatic boundaries: the configured transaction APIs and DCA's own
-              // TransactionBoundary port. The boundary's implementations are the one legitimate
-              // site that depends on both, wherever they live; the composition root (the global
-              // infrastructure package) and the shared kernel's infrastructure wire the transaction
-              // manager and its plumbing and draw no boundary.
+              // Programmatic boundaries, two kinds. Using a transaction API (template, user
+              // transaction) draws a boundary and is allowed exactly where the annotation is.
+              // Depending on a transaction manager or on DCA's TransactionBoundary port is wiring
+              // and plumbing as well: the composition root (the global infrastructure package) and
+              // the shared kernel's infrastructure may do that too. The boundary's implementations
+              // are exempt wherever they live.
+              DescribedPredicate<JavaClass> usesTransactionApi =
+                  DescribedPredicate.describe(
+                      "a configured transaction API", c -> transactionApi.contains(c.getName()));
+              violations.addAll(
+                  noClasses()
+                      .that()
+                      .resideOutsideOfPackages(allowed)
+                      .and()
+                      .areNotAssignableTo(TransactionBoundary.class)
+                      .should()
+                      .dependOnClassesThat(usesTransactionApi)
+                      .allowEmptyShould(true),
+                  arch.classes(),
+                  rationale);
               List<String> wiringAllowed = new ArrayList<>(allowedPatterns);
               wiringAllowed.add(layout.infrastructurePattern());
               wiringAllowed.add(
                   layout.sharedKernelPackage() + "." + layout.infrastructureSubpackage() + "..");
-              DescribedPredicate<JavaClass> programmaticBoundary =
+              DescribedPredicate<JavaClass> managerOrBoundary =
                   DescribedPredicate.describe(
-                      "a configured transaction API or TransactionBoundary",
+                      "a configured transaction manager or TransactionBoundary",
                       c ->
-                          transactionApi.contains(c.getName())
+                          transactionManager.contains(c.getName())
                               || c.isAssignableTo(TransactionBoundary.class));
               violations.addAll(
                   noClasses()
@@ -171,33 +187,35 @@ public final class LayeredRules implements DcaRuleSet {
                       .and()
                       .areNotAssignableTo(TransactionBoundary.class)
                       .should()
-                      .dependOnClassesThat(programmaticBoundary)
+                      .dependOnClassesThat(managerOrBoundary)
                       .allowEmptyShould(true),
                   arch.classes(),
                   rationale);
               violations.throwIfAny();
             })
         .selecting(
-            "Two mechanisms. Declarative: methods and classes under scan that carry one of the"
+            "Three selections. Declarative: methods and classes under scan that carry one of the"
                 + " configured transactional annotations directly (meta-annotations do not count)."
-                + " Programmatic: classes under scan that depend on one of the configured"
-                + " transaction-API types (role transactionApi - a transaction template, manager or"
-                + " user transaction) or on TransactionBoundary, at any depth of the dependency"
-                + " (field, parameter, call); implementations of TransactionBoundary itself and"
-                + " classes in the global infrastructure package (<base>.infrastructure.., the"
-                + " composition root that wires the transaction manager) or in the shared kernel's"
-                + " infrastructure package (<base>.sharedkernel.infrastructure.., its plumbing) are"
-                + " not selected. With both roles empty only TransactionBoundary dependencies are"
+                + " Transaction use: classes under scan that depend on one of the configured"
+                + " transaction-API types (role transactionApi - a transaction template or user"
+                + " transaction, the types code runs a transaction with). Wiring: classes under scan"
+                + " that depend on one of the configured transaction-manager types (role"
+                + " transactionManager) or on TransactionBoundary. A dependency counts at any depth"
+                + " (field, parameter, call); implementations of TransactionBoundary itself are never"
+                + " selected. With the roles empty only TransactionBoundary dependencies are"
                 + " selected.")
         .checking(
-            "Each annotated method is declared in, and each annotated class and each dependent"
-                + " class resides in, an application package of some module root"
-                + " (<module>.application..) or an outgoing adapter package (..adapter.outgoing..)"
-                + " anywhere. An annotation in a domain, incoming-adapter or infrastructure package"
-                + " is reported; a transaction-API or TransactionBoundary dependency in a domain,"
-                + " incoming-adapter or module-infrastructure package is reported; all findings are"
-                + " collected into one violation. Which transaction a boundary opens is not"
-                + " checked.");
+            "Annotations and transaction use: the method is declared in, or the class resides in,"
+                + " an application package of some module root (<module>.application..) or an"
+                + " outgoing adapter package (..adapter.outgoing..) anywhere - a domain,"
+                + " incoming-adapter or infrastructure package is reported, the global"
+                + " infrastructure package included. Wiring: additionally allowed in the global"
+                + " infrastructure package (<base>.infrastructure.., the composition root that"
+                + " declares the manager) and in the shared kernel's infrastructure package"
+                + " (<base>.sharedkernel.infrastructure.., plumbing that hooks into the boundary);"
+                + " a domain, incoming-adapter or module-infrastructure package is reported. All"
+                + " findings are collected into one violation. Which transaction a boundary opens is"
+                + " not checked.");
   }
 
   public DcaRule outputPortMarkersMustBeInterfaces() {
