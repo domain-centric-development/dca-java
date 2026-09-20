@@ -469,7 +469,7 @@ public final class DcaRuleSelection {
     }
   }
 
-  private static void requireKnownId(String ruleId) {
+  static void requireKnownId(String ruleId) {
     if (!DcaRules.allIds().contains(ruleId) && !DcaRules.retired().containsKey(ruleId)) {
       throw new IllegalArgumentException(
           "Unknown rule id: " + ruleId + ". See RULES.md for the catalog.");
@@ -490,7 +490,7 @@ public final class DcaRuleSelection {
     requireKnownId(ruleId);
   }
 
-  private static void requireKnownSet(String ruleSetName) {
+  static void requireKnownSet(String ruleSetName) {
     if (!DcaRules.setNames().contains(ruleSetName)) {
       throw new IllegalArgumentException(
           "Unknown rule set: "

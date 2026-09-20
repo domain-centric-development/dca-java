@@ -52,17 +52,45 @@ public final class DcaArchitecture {
   }
 
   /**
-   * Imports all production classes below the layout's base package (excluding tests, jars and
-   * archives) using the class path of the calling test.
+   * Imports all production classes below the layout's base package, using the class path of the
+   * calling test.
+   *
+   * <p>Jars and archives are imported as well, because {@code importPackages} already restricts the
+   * result to the base package: in a multi-module build the other modules reach the test class path
+   * as jars, and excluding those would leave their contexts undiscovered while every rule still
+   * reported success. A project whose base package is also shipped by a third-party artifact
+   * narrows the import with {@link #load(DcaLayout, ImportOption...)}.
+   *
+   * <p>Test code is excluded, the architecture test itself included.
    */
   public static DcaArchitecture load(DcaLayout layout) {
-    JavaClasses imported =
-        new ClassFileImporter()
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_JARS)
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_ARCHIVES)
-            .withImportOption(new DoNotIncludeArchitectureTests())
-            .importPackages(layout.basePackage());
+    return load(
+        layout, ImportOption.Predefined.DO_NOT_INCLUDE_TESTS, new DoNotIncludeArchitectureTests());
+  }
+
+  /**
+   * Imports the base package under the given import options instead of the defaults — for a class
+   * path the defaults read too broadly, such as a third-party artifact that ships the project's own
+   * base package ({@code ImportOption.Predefined.DO_NOT_INCLUDE_JARS} keeps it out, at the price of
+   * the sibling modules of a multi-module build).
+   */
+  public static DcaArchitecture load(DcaLayout layout, ImportOption... importOptions) {
+    ClassFileImporter importer = new ClassFileImporter();
+    for (ImportOption option : importOptions) {
+      importer = importer.withImportOption(option);
+    }
+    JavaClasses imported = importer.importPackages(layout.basePackage());
+    if (!imported.iterator().hasNext()) {
+      throw new IllegalStateException(
+          "No class was imported below the base package '"
+              + layout.basePackage()
+              + "', so every rule would pass without having looked at anything. Check that the"
+              + " base package is spelled as the production code declares it, that the production"
+              + " classes are compiled, and — in a multi-module build — that the module running"
+              + " the architecture test depends on every module that holds production code. Pass"
+              + " already imported classes to DcaArchitecture.of(layout, classes) to import them"
+              + " yourself.");
+    }
     return new DcaArchitecture(layout, imported);
   }
 

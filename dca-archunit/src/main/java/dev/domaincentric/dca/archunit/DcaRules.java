@@ -86,14 +86,22 @@ public final class DcaRules {
     return ruleSets(layout).stream().flatMap(s -> s.rules().stream()).toList();
   }
 
-  /** Every rule except the given identifiers. */
+  /**
+   * Every rule except the given identifiers. An identifier that is neither in the catalog nor
+   * retired is rejected: it would exclude nothing and leave the caller believing it had.
+   */
   public static List<DcaRule> allExcept(DcaLayout layout, Set<String> excludedIds) {
+    excludedIds.forEach(DcaRuleSelection::requireKnownId);
     return all(layout).stream().filter(r -> !excludedIds.contains(r.id())).toList();
   }
 
-  /** The rules of the named sets only ({@code "tactical"}, {@code "hexagonal"}, …). */
+  /**
+   * The rules of the named sets only ({@code "tactical"}, {@code "hexagonal"}, …). An unknown set
+   * name is rejected rather than silently selecting no rule.
+   */
   public static List<DcaRule> only(DcaLayout layout, String... ruleSetNames) {
-    Set<String> names = Set.of(ruleSetNames);
+    Set<String> names = new LinkedHashSet<>(List.of(ruleSetNames));
+    names.forEach(DcaRuleSelection::requireKnownSet);
     return ruleSets(layout).stream()
         .filter(s -> names.contains(s.name()))
         .flatMap(s -> s.rules().stream())

@@ -6,6 +6,21 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 **What can turn a green build red:**
 
+- `DCA-STR-011` is new: at least one package below the base package declares `@BoundedContext`. Without a
+  declaration the context-map and isolation rules select nothing and report success over an empty model. A code base
+  that deliberately declares no context switches the rule off with a recorded reason; the structural isolation rules
+  keep governing the modules.
+- `DcaArchitecture.load(layout)` now imports jars and archives as well. `importPackages` already restricts the
+  result to the base package, so what this adds are the sibling modules of a multi-module build - which used to be
+  excluded silently, leaving their contexts undiscovered while every rule still reported success. A class path that
+  ships the project's own base package in a third-party artifact narrows the import with the new
+  `load(layout, ImportOption...)`.
+- `DcaArchitecture.load` refuses an import that found no class below the base package, instead of running every rule
+  over nothing. `DcaArchitecture.of(layout, classes)` is unchanged - an explicitly imported set is the caller's.
+- `DcaRules.only(layout, ...)` rejects an unknown rule-set name and `DcaRules.allExcept(layout, ...)` an identifier
+  that is neither in the catalog nor retired; both used to select or exclude nothing silently. `DcaRuleSelection`
+  validated these all along.
+
 - `DCA-LAY-004` also sees programmatic boundaries, through two new `FrameworkAnnotations` roles. `transactionApi`
   (the types code runs a transaction with: transaction templates, user transactions) is allowed exactly where the
   annotation is - application layer and outgoing adapters; any other class that depends on one is reported, a

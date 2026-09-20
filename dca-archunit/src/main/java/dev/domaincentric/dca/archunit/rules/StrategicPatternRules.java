@@ -10,6 +10,7 @@ import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
+import dev.domaincentric.dca.archunit.DcaRuleViolation;
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.BoundedContext;
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.relationships.OpenHostService;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.IntegrationEvent;
@@ -44,7 +45,8 @@ public final class StrategicPatternRules implements DcaRuleSet {
             integrationEventsResideInEventsPackages(),
             integrationEventsAreRecords(),
             antiCorruptionLayerComponentsResideInAclPackages(),
-            eventListenersUseAntiCorruptionLayer());
+            eventListenersUseAntiCorruptionLayer(),
+            atLeastOneBoundedContextIsDeclared());
   }
 
   @Override
@@ -397,5 +399,41 @@ public final class StrategicPatternRules implements DcaRuleSet {
             "Nothing is asserted. Whether a consumed integration event is translated into the"
                 + " consuming context's own language before it reaches the domain is a code-review"
                 + " check.");
+  }
+
+  /** DCA-STR-011. */
+  public static DcaRule atLeastOneBoundedContextIsDeclared() {
+    return DcaRule.check(
+            "DCA-STR-011",
+            "At least one bounded context is declared",
+            "Without a declared context the context-map and isolation rules select nothing and"
+                + " report success over an empty model",
+            arch -> {
+              if (arch.boundedContexts().isEmpty()) {
+                throw new DcaRuleViolation(
+                    "No package below the base package '"
+                        + arch.layout().basePackage()
+                        + "' declares @BoundedContext, so every rule that selects over the"
+                        + " discovered contexts passes without having looked at anything.",
+                    List.of(
+                        "Declare the context: a package-info.java carrying @BoundedContext in the"
+                            + " root package of each context — a single-context application"
+                            + " annotates its base package.",
+                        "In a multi-module build, check that the module running the architecture"
+                            + " test depends on every module that holds a context.",
+                        "A code base that deliberately declares no context switches this rule off"
+                            + " with a recorded reason; the structural isolation rules keep"
+                            + " governing the modules."));
+              }
+            })
+        .selecting(
+            "The declared bounded contexts of the imported classes — every package whose"
+                + " package-info carries @BoundedContext, at any depth below the base package. No"
+                + " individual class is reported.")
+        .checking(
+            "At least one such package exists. The rule says nothing about how many contexts there"
+                + " should be, about their boundaries, or about modules that own a layer without"
+                + " declaring a context — those are governed structurally and are not a substitute"
+                + " for the declaration.");
   }
 }
