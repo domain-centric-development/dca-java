@@ -4,6 +4,16 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Added
+
+- `ddd.tactical.DomainException` and `application.UseCaseException` — abstract, unchecked base classes for the two
+  kinds of failure an inner layer raises: a broken business rule of the model and a request the use case cannot
+  serve. Neither carries a code or status field; mapping an outcome onto a protocol answer is the incoming
+  adapter's decision. The word is `UseCaseException` in both libraries, because the .NET platform occupies
+  `ApplicationException` and discourages deriving from it. The `errors` rule set of `dca-archunit`
+  (`DCA-ERR-001` … `DCA-ERR-006`) checks their use; `docs/adr/adr-002-exception-base-types-and-error-rules.md`
+  records the decision.
+
 ## [0.2.0] - 2026-09-10
 
 **Migration from 0.1.2.** `BaseAggregateRoot.registerEvent` is `protected`: an aggregate registers its own events, in the

@@ -6,6 +6,16 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 **What can turn a green build red:**
 
+- The `errors` rule set is new, `DCA-ERR-001` … `DCA-ERR-006`, and pins the two new building blocks
+  `DomainException` and `UseCaseException`. A project that declares its own exception types in the domain or
+  application layer will see `DCA-ERR-001` / `DCA-ERR-003` until those types extend the base type of their layer;
+  `DCA-ERR-002` adds the reverse direction (a subtype declared outside its layer), `DCA-ERR-004` forbids the
+  configured container, persistence, transaction, controller and event-listener annotations on them, and
+  `DCA-ERR-005` forbids the technical suffixes `Error`, `Fault`, `Failure` and the words `Http`, `Status`,
+  `Response` in their names. Argument guards are outside all of this: the platform's own argument exceptions are
+  never selected. `DCA-ERR-006` is informational — the import model carries neither a `throw` nor a `catch`, so an
+  adapter that catches a generic exception can only be listed, never failed.
+
 - `DCA-STR-011` is new: at least one package below the base package declares `@BoundedContext`. Without a
   declaration the context-map and isolation rules select nothing and report success over an empty model. A code base
   that deliberately declares no context switches the rule off with a recorded reason; the structural isolation rules
