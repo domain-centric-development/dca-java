@@ -121,7 +121,7 @@ class DcaRuleSelectionTest {
 
   @Test
   void catalogMetadataIsComplete() {
-    assertEquals(10, DcaRules.setNames().size());
+    assertEquals(11, DcaRules.setNames().size());
     assertEquals(DcaRules.all(LAYOUT).size(), DcaRules.allIds().size());
   }
 }

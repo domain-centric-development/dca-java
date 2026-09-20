@@ -8,8 +8,8 @@ Hexagonal Architecture and Clean Architecture.
 
 | Artifact | What it is | Dependencies |
 |----------|------------|--------------|
-| `dev.domaincentric:dca-building-blocks` | The building blocks your code implements: DDD tactical markers (`AggregateRoot`, `Entity`, `Value`, `DomainEvent`, …), strategic annotations (`@BoundedContext`, `@SharedKernel`, `@Upstream`, `@Partnership`, …) and hexagonal port interfaces (`UseCase`, `Repository`, `Store`, …) and the application-layer `TransactionBoundary` | none |
-| `dev.domaincentric:dca-archunit` | The governance rules: ~110 ArchUnit rules pinned to those building blocks, plus an executable context map | `dca-building-blocks`, ArchUnit |
+| `dev.domaincentric:dca-building-blocks` | The building blocks your code implements: DDD tactical markers (`AggregateRoot`, `Entity`, `Value`, `DomainEvent`, …), strategic annotations (`@BoundedContext`, `@SharedKernel`, `@Upstream`, `@Partnership`, …) and hexagonal port interfaces (`UseCase`, `Repository`, `Store`, …), the application-layer `TransactionBoundary` and the two exception base types (`DomainException`, `UseCaseException`) | none |
+| `dev.domaincentric:dca-archunit` | The governance rules: ~120 ArchUnit rules pinned to those building blocks, plus an executable context map | `dca-building-blocks`, ArchUnit |
 | `dev.domaincentric:dca-spring` | The runtime adapters the rules demand: `SpringDomainEventPublisher` (over `ApplicationEventPublisher`), `SpringTransactionBoundary` (over `TransactionTemplate`), an `InMemoryTransactionBoundary` for tests, and a Spring Boot auto-configuration | `dca-building-blocks`; Spring `compileOnly` — your Boot BOM pins the version |
 | `dev.domaincentric:dca-archunit-spring-modulith` | Spring Modulith's module verification as a DCA test: `DcaSpringModulithTest` next to `DcaArchitectureTest`, with the test-class exclusion Modulith needs | `dca-archunit`; `spring-modulith-core` `compileOnly` |
 
@@ -68,12 +68,13 @@ Packages:
 dev.domaincentric.dca.buildingblocks
 ├── ddd.tactical                 AggregateRoot, BaseAggregateRoot, Entity, Value, Id, DomainEvent,
 │                                IntegrationEvent, IntegrationEventType, DomainService, DomainGateway,
-│                                Factory, Specification
+│                                Factory, Specification, DomainException
 ├── ddd.strategic                @BoundedContext
 ├── ddd.strategic.relationships  @SharedKernel, @OpenHostService, @Upstream, @ExternalUpstream, @Partnership
 ├── hexagonal.port.in / .out     InputPort, UseCase  |  OutputPort, Repository, Store,
 │                                DomainEventPublisher, IntegrationEventPublisher
-└── application                  TransactionBoundary (execution abstraction, not a port)
+└── application                  TransactionBoundary (execution abstraction, not a port),
+                                 UseCaseException
 ```
 
 ### 2. Rules in an architecture test
@@ -278,6 +279,7 @@ Rule sets and identifier prefixes:
 | `usecase` | `DCA-USE` | one use case per package, `*InputPort` / `*UseCase` / `*Command` / `*Result` shape |
 | `naming` | `DCA-NAM` | naming conventions, forbidden technical suffixes and bucket packages |
 | `cycles` | `DCA-CYC` | no cycles between contexts, layers, use-case packages |
+| `errors` | `DCA-ERR` | domain and use-case exceptions: base types, their layer, no framework or transport vocabulary |
 
 The full list with rationale is in [RULES.md](RULES.md) (generated from the code — `./gradlew :dca-archunit:rulesCatalog`).
 

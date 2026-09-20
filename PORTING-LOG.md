@@ -382,3 +382,24 @@ Fixtures: Java `transactions/savenoboundary`, `eventpolicy/free/BoundedSaveUseCa
 `dca-building-blocks` 0.2.0 + `dca-archunit` 0.4.0, `DomainCentric.BuildingBlocks` 0.1.1 + `DomainCentric.ArchRules`
 (+`.Xunit`) 0.4.0. Nothing is pushed, tagged or published; the markers must be released before the rules that depend on
 their exact version. `dca-spring` and `dca-archunit-spring-modulith` stay at 0.2.0-SNAPSHOT and follow afterwards.
+
+## Errors
+
+New in this repository — no Groovy source. `rules/ErrorHandlingRules.java` (`DCA-ERR-001` … `DCA-ERR-006`,
+`name()` = `"errors"`), pinned to the two new building blocks `DomainException` and `UseCaseException`.
+The decision behind the set, the naming and the limits is `docs/adr/adr-002-exception-base-types-and-error-rules.md`.
+
+- **ERR-002 covers both directions in one rule.** The work package described it as "domain exceptions reside
+  in the domain layer"; the mirror case — a use-case failure declared in an adapter — would otherwise need a
+  seventh id. Both checks run in one rule and collect their findings together.
+- **ERR-004 reuses the configured annotation roles** (`injectable`, `persistenceEntity`, `transactional`,
+  `webController`, `restController`, `eventListener`), type level only. No role classifies a transport-status
+  annotation, so the doctrine's own counter-example stays uncaught until such a role exists in both libraries.
+- **ERR-005 is name-based**: forbidden suffixes `Error`, `Fault`, `Failure`; forbidden words `Http`, `Status`,
+  `Response`. Whether the remaining name is a term of the Ubiquitous Language is not decidable here.
+- **ERR-006 is informational.** ArchUnit's import model contains no `throw` and no `catch`, so neither "an
+  adapter catches a generic exception" nor "a business rule is raised as a state exception" is checkable. The
+  diagnostic lists incoming adapters that drive an input port and depend on neither failure type; the
+  semantic checks belong to the review perspectives.
+- **The base types are excluded from every selection** by their package (`dev.domaincentric.dca.buildingblocks`):
+  they are library code, and ERR-002 would otherwise report them as residing outside the project's layers.

@@ -48,7 +48,13 @@ class RetirementTest {
   void informationalEntriesHaveExplicitKind() {
     var layout = DcaLayout.forBasePackage("example");
     assertEquals(
-        java.util.Set.of("DCA-LAY-001", "DCA-STR-001", "DCA-STR-010", "DCA-MAP-013", "DCA-NAM-002"),
+        java.util.Set.of(
+            "DCA-LAY-001",
+            "DCA-STR-001",
+            "DCA-STR-010",
+            "DCA-MAP-013",
+            "DCA-NAM-002",
+            "DCA-ERR-006"),
         DcaRules.all(layout).stream()
             .filter(r -> r.kind() == DcaRule.Kind.INFORMATIONAL)
             .map(DcaRule::id)

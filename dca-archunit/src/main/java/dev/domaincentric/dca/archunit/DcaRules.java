@@ -3,6 +3,7 @@ package dev.domaincentric.dca.archunit;
 import dev.domaincentric.dca.archunit.rules.AdvancedPatternRules;
 import dev.domaincentric.dca.archunit.rules.ContextMapRules;
 import dev.domaincentric.dca.archunit.rules.CycleRules;
+import dev.domaincentric.dca.archunit.rules.ErrorHandlingRules;
 import dev.domaincentric.dca.archunit.rules.HexagonalRules;
 import dev.domaincentric.dca.archunit.rules.LayeredRules;
 import dev.domaincentric.dca.archunit.rules.NamingRules;
@@ -78,7 +79,8 @@ public final class DcaRules {
         new AdvancedPatternRules(layout),
         new UseCaseRules(layout),
         new NamingRules(layout),
-        new CycleRules(layout));
+        new CycleRules(layout),
+        new ErrorHandlingRules(layout));
   }
 
   /** Every rule of every set. */
@@ -153,7 +155,7 @@ public final class DcaRules {
     return Catalog.IDS;
   }
 
-  /** The names of the ten rule sets, in catalog order. Unmodifiable. */
+  /** The names of the eleven rule sets, in catalog order. Unmodifiable. */
   public static Set<String> setNames() {
     return Catalog.BY_SET.keySet();
   }
@@ -166,7 +168,7 @@ public final class DcaRules {
   /**
    * The catalog's metadata — ids and set names — built once. Every {@code DcaRuleSelection} setting
    * validates its id against it, and a set-wide setting resolves every id of the set; rebuilding
-   * ten rule sets for each of those lookups is wasted work.
+   * eleven rule sets for each of those lookups is wasted work.
    */
   private static final class Catalog {
     static final Map<String, List<DcaRule>> BY_SET;

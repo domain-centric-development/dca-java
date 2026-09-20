@@ -13,6 +13,7 @@
  *   <li>{@link DomainService} - Stateless domain operations
  *   <li>{@link Factory} - Complex object creation
  *   <li>{@link Specification} - Business rules as objects
+ *   <li>{@link DomainException} - Broken business rules, named in the Ubiquitous Language
  * </ul>
  *
  * <p><b>References:</b>
