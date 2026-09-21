@@ -9,7 +9,7 @@ Hexagonal Architecture and Clean Architecture.
 | Artifact | What it is | Dependencies |
 |----------|------------|--------------|
 | `dev.domaincentric:dca-building-blocks` | The building blocks your code implements: DDD tactical markers (`AggregateRoot`, `Entity`, `Value`, `DomainEvent`, …), strategic annotations (`@BoundedContext`, `@SharedKernel`, `@Upstream`, `@Partnership`, …) and hexagonal port interfaces (`UseCase`, `Repository`, `Store`, …), the application-layer `TransactionBoundary` and the two exception base types (`DomainException`, `UseCaseException`) | none |
-| `dev.domaincentric:dca-archunit` | The governance rules: ~120 ArchUnit rules pinned to those building blocks, plus an executable context map | `dca-building-blocks`, ArchUnit |
+| `dev.domaincentric:dca-archunit` | The governance rules: 121 ArchUnit rules pinned to those building blocks, plus an executable context map | `dca-building-blocks`, ArchUnit |
 | `dev.domaincentric:dca-spring` | The runtime adapters the rules demand: `SpringDomainEventPublisher` (over `ApplicationEventPublisher`), `SpringTransactionBoundary` (over `TransactionTemplate`), an `InMemoryTransactionBoundary` for tests, and a Spring Boot auto-configuration | `dca-building-blocks`; Spring `compileOnly` — your Boot BOM pins the version |
 | `dev.domaincentric:dca-archunit-spring-modulith` | Spring Modulith's module verification as a DCA test: `DcaSpringModulithTest` next to `DcaArchitectureTest`, with the test-class exclusion Modulith needs | `dca-archunit`; `spring-modulith-core` `compileOnly` |
 
@@ -265,6 +265,11 @@ DcaRules.checkAll(arch);                       // or checkAll(arch, selection) w
 
 ## Rule catalog
 
+**121 rule ids in 11 sets: 115 enforced, 6 informational.** Three further ids are retired and keep their meaning in the retirement list. The exact, current list is
+[RULES.md](RULES.md) and [rules.json](rules.json), both generated from the code by
+`./gradlew :dca-archunit:rulesCatalog` and verified in CI; every number in this README is taken from
+there. `rules.json` names the library version its texts belong to.
+
 Rule sets and identifier prefixes:
 
 | Set | Prefix | Covers |
@@ -318,16 +323,40 @@ registers its beans through Spring Boot 4 auto-configuration and does not work o
 ordering it relies on does not exist there, and nothing fails loudly, so pin Boot 4 or wire the beans
 yourself.
 
+## Public API
+
+What a consumer may rely on, and what may change in a patch:
+
+| Public — covered by the versioning promise | Internal — may change without notice |
+|---|---|
+| The **rule ids** and their meaning, `rules.json` and `RULES.md` | The rule-set classes (`TacticalPatternRules`, `UseCaseRules`, …) and their factory methods |
+| `DcaLayout`, `DcaMarkers`, `FrameworkAnnotations` and the preset SPI | The `rules` package as a whole, and every helper in it |
+| `DcaArchitecture`, `DcaRules`, `DcaRuleSelection`, `DcaRuleExecution`, `DcaRuleOutcome`, `DcaSeverity` | The wording of a violation message, beyond the `[DCA-XXX-nnn]` prefix every line carries |
+| `DcaRule` as a type to read — id, title, rationale, `selects()`, `checks()` | The retired rules' implementation classes, which exist only so an old reference still compiles |
+| `dev.domaincentric.dca.buildingblocks..` — every marker and port type | Test fixtures, and anything under a `catalog` or `spi.internal` package |
+| The JUnit base class `DcaArchitectureTest` | |
+
+The rule-set classes are `public` because the catalog generator and the JUnit integration are in a
+different package, not because they are meant to be called directly. Build a run through `DcaRules`
+and a `DcaRuleSelection`; that is the supported entry point, and it is the one that applies severities,
+freezing and tolerated violations.
+
 ## Versioning
 
 Semantic versioning, independent per artifact:
 
 - `dca-building-blocks` — rarely changes; a new marker is a minor bump, a removed or renamed one a
   major bump.
-- `dca-archunit` — a new rule is a minor bump (it can fail your build — pin versions), a tightened
-  rule is a major bump, a relaxed rule or fixed false positive a patch. **Before 1.0** a minor version
-  may add and tighten rules as well; every such change is listed under *Changed — breaking* in the
-  changelog, with a migration note at the top of the release.
+- `dca-archunit` — **from 1.0 on, a new or tightened rule is a major bump.** Adding a rule can turn a
+  green build red, and SemVer calls that breaking however small the change is; calling it a minor bump
+  would make the number useless for exactly the consumers who pin it. A relaxed rule, a fixed false
+  positive and a clearer message are patches. **Before 1.0** a minor version may add and tighten rules,
+  which is what 0.x is for: every such change is listed under *What can turn a green build red* in the
+  changelog, with a migration note at the top of the release. Either way, pin the version.
+- **Rule ids are the stable contract.** An id is never reused for a different check and never
+  renumbered. A withdrawn rule keeps its id in the retirement list of `rules.json` with the reason and
+  its replacement, so a `dca.rules.off` entry or a catalog reference never silently means something
+  else.
 - `dca-spring`, `dca-archunit-spring-modulith` — ordinary SemVer on their own APIs; a raised minimum Spring or
   Modulith version is a minor bump.
 

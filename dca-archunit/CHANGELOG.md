@@ -4,6 +4,14 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+**The tree names the version it will ship as, and `rules.json` says which release its texts belong to.**
+`archunitVersion` is `0.5.0-SNAPSHOT` and `buildingBlocksVersion` `0.3.0-SNAPSHOT` until the release
+pins them, so a locally built jar can no longer be mistaken for the released artifact of the same
+number. `rules.json` gained `library` and `version` at the top; the reader that takes `rules["rules"]`
+is unaffected. The README now states the public API surface, the versioning promise after 1.0 — a new
+or tightened rule is a major bump, not a minor one — and the exact rule counts, taken from the
+generated catalog rather than typed in.
+
 **The README states what the library runs on.** A compatibility table now names the minimum and the
 tested versions of Java, JUnit Jupiter, ArchUnit, Spring Boot and Spring Modulith. It also states that
 `dca-spring` needs Spring Boot 4: its auto-configuration ordering does not exist on Boot 3.x and
