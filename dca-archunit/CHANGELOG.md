@@ -4,6 +4,16 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+**Six `DCA-ADV` rules and `DCA-STR-007` / `DCA-STR-008` no longer report an intermediate marker
+interface.** `DCA-ADV-002`, `-010`, `-012`, `-013`, `-014`, `-016`, `DCA-STR-007` and `DCA-STR-008`
+selected every type assignable to their marker role, interfaces included, while both `rules.json`
+files said "Non-interface classes" and the .NET twins excluded them. A context that groups several
+domain events behind a shared contract interface, or its integration events behind a published-language
+interface, was reported in Java and passed in .NET — and `DCA-STR-008` asked that interface to be
+"final with final instance fields", which no interface can be. The eight rules now select concrete
+types only, as their texts always said. The concrete events are checked exactly as before. This can
+turn a red build green, never the other way round.
+
 **`DCA-ERR-002` and `DCA-ERR-003` no longer both report the same exception.** A subtype of
 `DomainException` declared in an application package was reported twice, with contradictory remedies:
 `DCA-ERR-002` says move it to the domain, `DCA-ERR-003` says give it another base type — which would

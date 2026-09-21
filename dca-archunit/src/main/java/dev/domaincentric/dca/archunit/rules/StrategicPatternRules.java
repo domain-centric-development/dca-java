@@ -330,6 +330,8 @@ public final class StrategicPatternRules implements DcaRuleSet {
                 classes()
                     .that()
                     .areAssignableTo(arch.layout().markers().integrationEvent())
+                    .and()
+                    .areNotInterfaces()
                     .should()
                     .resideInAnyPackage(".." + layout.eventsSubpackage() + "..")
                     .allowEmptyShould(true))
@@ -352,6 +354,8 @@ public final class StrategicPatternRules implements DcaRuleSet {
                 classes()
                     .that()
                     .areAssignableTo(arch.layout().markers().integrationEvent())
+                    .and()
+                    .areNotInterfaces()
                     .should(TypeInspection.haveImmutableShape())
                     .allowEmptyShould(true))
         .selecting(
