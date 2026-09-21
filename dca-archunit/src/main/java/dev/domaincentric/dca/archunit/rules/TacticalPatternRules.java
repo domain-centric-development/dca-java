@@ -781,7 +781,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
             "No method declared on the interface itself is named save, deleteById "
                 + "or delete - matched by name alone, parameters and return type disregarded. "
                 + "Inherited methods are not inspected, and no particular vocabulary (record, "
-                + "count, exists) is required.");
+                + "count, exists) is required. The three names are fixed and are not part of the marker roles: a vocabulary that writes under another name is selected and then found to declare no write.");
   }
 
   // ---------------------------------------------------------------------------------------------

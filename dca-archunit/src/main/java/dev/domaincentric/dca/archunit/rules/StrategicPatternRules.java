@@ -436,9 +436,9 @@ public final class StrategicPatternRules implements DcaRuleSet {
                       + observed
                       + ".",
                   List.of(
-                      "Name the segments this code base uses: withDomainSubpackage(...),"
-                          + " withApplicationSubpackage(...) and withAdapterSubpackage(...) on the"
-                          + " layout, or the matching dca.layout.* properties.",
+                      "Name the segments this code base uses on the layout:"
+                          + " withDomainSubpackage(...), withApplicationSubpackage(...) and"
+                          + " withAdapterSubpackage(...).",
                       "Check that the base package passed to DcaLayout.forBasePackage is the one"
                           + " the modules live under, and that the import covers them.",
                       "A code base that deliberately has no layered module switches this rule off"

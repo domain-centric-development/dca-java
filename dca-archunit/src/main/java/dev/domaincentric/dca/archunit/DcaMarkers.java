@@ -38,6 +38,16 @@ import java.util.Objects;
  * them, they read their members — the context a relationship names, the dependencies a module
  * allows — and a name alone does not carry members. Those annotations stay the library's own.
  *
+ * <p><b>A role names a type, never a method.</b> Four method names are fixed, and pointing a role
+ * at your own type does not rename them: {@code save} and {@code deleteById} / {@code delete} on
+ * the repository role, {@code publishAndClearEvents} on the domain-event-publisher role, and {@code
+ * registerEvent} on the aggregate root. The rules that reason about a unit of work — {@code
+ * DCA-USE-009}, {@code DCA-USE-012}, {@code DCA-TAC-021} and the event-free-aggregate proof behind
+ * {@code DCA-USE-009} — look for calls by those names. A vocabulary whose repository writes through
+ * {@code store(...)} or {@code persist(...)} is selected correctly and then found to save nothing,
+ * so those rules pass over it. Keep the four names, or switch the affected ids off with a recorded
+ * reason.
+ *
  * @param name the vocabulary's name ({@code dca}, or whatever {@link #named(String)} set). {@code
  *     DcaArchitectureTest} prints it as a passing diagnostic case together with the roles that
  *     differ from the default, so a reader knows which types the rules resolved; {@code

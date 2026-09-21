@@ -260,7 +260,7 @@ public final class UseCaseRules implements DcaRuleSet {
         .selecting(
             "Non-interface classes in <module>.application.. that implement InputPort or whose simple name ends with the configured use-case suffix.")
         .checking(
-            "Only a resolved Repository<T,ID> whose aggregate and every non-building-block superclass are scanned and have no registration call (including helpers) is exempt. Unresolved generics, partial scans or undecidable external helpers remain required. For every non-exempt method of the class that calls Repository.save, every entry point reaching it (a method callable from outside the class, or one nothing in the class calls) also reaches, through calls within the class, a call of DomainEventPublisher.publishAndClearEvents. Only publishAndClearEvents counts - publish(event), even followed by clearDomainEvents(), does not. A use case without a save (a query, a bulk delete) is selected but has nothing to check and passes.");
+            "Only a resolved Repository<T,ID> whose aggregate and every non-building-block superclass are scanned and have no registration call (including helpers) is exempt. Unresolved generics, partial scans or undecidable external helpers remain required. For every non-exempt method of the class that calls Repository.save, every entry point reaching it (a method callable from outside the class, or one nothing in the class calls) also reaches, through calls within the class, a call of DomainEventPublisher.publishAndClearEvents. Only publishAndClearEvents counts - publish(event), even followed by clearDomainEvents(), does not. A use case without a save (a query, a bulk delete) is selected but has nothing to check and passes. The method names are fixed and are not part of the marker roles: a vocabulary whose repository writes under another name is selected and then found to save nothing, so this rule passes over it.");
   }
 
   public static DcaRule noDtosInDomain(DcaLayout layout) {
@@ -382,7 +382,7 @@ public final class UseCaseRules implements DcaRuleSet {
                 + " saves, deletes nor publishes (a query, a Store write) is selected but has nothing"
                 + " to check and passes. Whether the save or publish call sits inside the"
                 + " inTransaction block is not checked - ArchUnit folds a lambda into its enclosing"
-                + " method.");
+                + " method. The method names are fixed and are not part of the marker roles: a vocabulary whose repository writes under another name is selected and then found to save nothing, so this rule passes over it.");
   }
 
   public static DcaRule transactionalUseCasesDoNotCallRemotePorts(DcaLayout layout) {

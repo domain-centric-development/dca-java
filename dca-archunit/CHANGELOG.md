@@ -4,6 +4,19 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+**No logging library in the domain by default, and the allow-list is how you change that.** The two
+`DCA-ONI-002` allow-lists were not translations of each other: Java forbade SLF4J, .NET permitted
+`Microsoft.Extensions.Logging.Abstractions`. Decided on 2026-09-21: by default neither, in both
+languages — which logging, validation or utility library a domain model may see is a project decision,
+made with `withThirdPartyPackagesAllowedInDomain(...)`. The Java default is unchanged; the rule text now
+says the facade is deliberately absent and names the way to add it.
+
+**The four fixed method names are written down.** `save`, `deleteById`, `publishAndClearEvents` and
+`registerEvent` are matched by name and are not marker roles, so a vocabulary whose repository writes
+under another name is selected and then found to save nothing — `DCA-USE-009`, `DCA-USE-012` and
+`DCA-TAC-021` pass over it. The three `checks` texts and the `DcaMarkers` javadoc now say so instead of
+leaving a reader to assume the roles cover it. No new configuration point: roles name types.
+
 **The tree names the version it will ship as, and `rules.json` says which release its texts belong to.**
 `archunitVersion` is `0.5.0-SNAPSHOT` and `buildingBlocksVersion` `0.3.0-SNAPSHOT` until the release
 pins them, so a locally built jar can no longer be mistaken for the released artifact of the same

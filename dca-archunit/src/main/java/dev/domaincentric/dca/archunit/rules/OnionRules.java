@@ -98,8 +98,10 @@ public final class OnionRules implements DcaRuleSet {
         .checking(
             "Every dependency targets a class in one of those same packages or in an allowed"
                 + " third-party package: by default java.., lombok.., org.apache.commons.lang3..,"
-                + " org.apache.commons.collections4.. and org.jspecify.annotations.., plus"
-                + " whatever the layout adds. The vocabulary's own packages are on the list"
+                + " org.apache.commons.collections4.. and org.jspecify.annotations... A logging"
+                + " facade is deliberately not among them - which logging, validation or utility"
+                + " library a domain model may see is a project decision, made with"
+                + " withThirdPartyPackagesAllowedInDomain(...). The vocabulary's own packages are on the list"
                 + " because they are derived from the roles, so pointing a role at another"
                 + " library's type does not make that library a reported dependency. The"
                 + " application-layer roles and the incoming ports are not on the list, nor are"
