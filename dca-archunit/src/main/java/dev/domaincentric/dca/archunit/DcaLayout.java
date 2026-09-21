@@ -73,6 +73,12 @@ public final class DcaLayout {
   private final List<String> operationContainers;
   private final String controllerSuffix;
   private final String restControllerSuffix;
+  private final String aggregateRootSuffix;
+  private final String repositorySuffix;
+  private final String storeSuffix;
+  private final String factorySuffix;
+  private final String specificationSuffix;
+  private final String domainServiceSubpackage;
   private final List<String> thirdPartyPackagesAllowedInDomain;
   private final DcaMarkers markers;
   private final FrameworkAnnotations frameworkAnnotations;
@@ -125,6 +131,13 @@ public final class DcaLayout {
     this.controllerSuffix = requireSuffix(settings.controllerSuffix, "controllerSuffix");
     this.restControllerSuffix =
         requireSuffix(settings.restControllerSuffix, "restControllerSuffix");
+    this.aggregateRootSuffix = requireSuffix(settings.aggregateRootSuffix, "aggregateRootSuffix");
+    this.repositorySuffix = requireSuffix(settings.repositorySuffix, "repositorySuffix");
+    this.storeSuffix = requireSuffix(settings.storeSuffix, "storeSuffix");
+    this.factorySuffix = requireSuffix(settings.factorySuffix, "factorySuffix");
+    this.specificationSuffix = requireSuffix(settings.specificationSuffix, "specificationSuffix");
+    this.domainServiceSubpackage =
+        requireSegment(settings.domainServiceSubpackage, "domainServiceSubpackage");
     this.thirdPartyPackagesAllowedInDomain =
         List.copyOf(
             Objects.requireNonNull(
@@ -162,6 +175,12 @@ public final class DcaLayout {
     defaults.useCaseSuffix = "UseCase";
     defaults.controllerSuffix = "Controller";
     defaults.restControllerSuffix = "Resource";
+    defaults.aggregateRootSuffix = "AggregateRoot";
+    defaults.repositorySuffix = "Repository";
+    defaults.storeSuffix = "Store";
+    defaults.factorySuffix = "Factory";
+    defaults.specificationSuffix = "Specification";
+    defaults.domainServiceSubpackage = "service";
     defaults.thirdPartyPackagesAllowedInDomain = DEFAULT_THIRD_PARTY_ALLOWED_IN_DOMAIN;
     defaults.markers = DcaMarkers.dca();
     FrameworkAnnotations.Detection detection = FrameworkAnnotations.detect();
@@ -354,6 +373,49 @@ public final class DcaLayout {
   }
 
   /**
+   * Suffix by which {@code DCA-TAC-001} finds a project's aggregate roots by name - {@code
+   * "AggregateRoot"} by default. Only the suffix selects: an aggregate root named otherwise is
+   * never reported by that rule, and the role is what every other tactical rule selects on.
+   */
+  public DcaLayout withAggregateRootSuffix(String value) {
+    return copy(settings -> settings.aggregateRootSuffix = value);
+  }
+
+  /**
+   * Suffix of a repository port, {@code "Repository"} by default - read by {@code DCA-TAC-013} and
+   * {@code DCA-TAC-016}, which also requires the name to be the bound aggregate plus this suffix.
+   */
+  public DcaLayout withRepositorySuffix(String value) {
+    return copy(settings -> settings.repositorySuffix = value);
+  }
+
+  /** Suffix of a store port, {@code "Store"} by default - read by {@code DCA-TAC-018}. */
+  public DcaLayout withStoreSuffix(String value) {
+    return copy(settings -> settings.storeSuffix = value);
+  }
+
+  /** Suffix of a factory, {@code "Factory"} by default - read by {@code DCA-ADV-013}. */
+  public DcaLayout withFactorySuffix(String value) {
+    return copy(settings -> settings.factorySuffix = value);
+  }
+
+  /**
+   * Suffix by which a specification is found when it carries no marker, {@code "Specification"} by
+   * default - read by {@code DCA-ADV-017} and {@code DCA-ADV-018} alongside the specification role.
+   */
+  public DcaLayout withSpecificationSuffix(String value) {
+    return copy(settings -> settings.specificationSuffix = value);
+  }
+
+  /**
+   * Sub-package of the domain layer that holds the domain services - e.g. {@code "service"}
+   * (default) or {@code "policy"}. Read by {@code DCA-ADV-009}.
+   */
+  public DcaLayout withDomainServiceSubpackage(String value) {
+    return copy(settings -> settings.domainServiceSubpackage = value);
+  }
+
+  /**
    * Third-party packages the domain layer may depend on (ArchUnit patterns). Replaces the default
    * list ({@code java..}, {@code lombok..}, commons-lang3, commons-collections4, jspecify).
    */
@@ -442,6 +504,12 @@ public final class DcaLayout {
     settings.operationContainers = operationContainers;
     settings.controllerSuffix = controllerSuffix;
     settings.restControllerSuffix = restControllerSuffix;
+    settings.aggregateRootSuffix = aggregateRootSuffix;
+    settings.repositorySuffix = repositorySuffix;
+    settings.storeSuffix = storeSuffix;
+    settings.factorySuffix = factorySuffix;
+    settings.specificationSuffix = specificationSuffix;
+    settings.domainServiceSubpackage = domainServiceSubpackage;
     settings.thirdPartyPackagesAllowedInDomain = thirdPartyPackagesAllowedInDomain;
     settings.markers = markers;
     settings.frameworkAnnotations = frameworkAnnotations;
@@ -471,6 +539,12 @@ public final class DcaLayout {
     List<String> operationContainers = List.of();
     String controllerSuffix;
     String restControllerSuffix;
+    String aggregateRootSuffix;
+    String repositorySuffix;
+    String storeSuffix;
+    String factorySuffix;
+    String specificationSuffix;
+    String domainServiceSubpackage;
     List<String> thirdPartyPackagesAllowedInDomain;
     DcaMarkers markers;
     FrameworkAnnotations frameworkAnnotations;
@@ -561,6 +635,36 @@ public final class DcaLayout {
 
   public String restControllerSuffix() {
     return restControllerSuffix;
+  }
+
+  /** Name suffix of an aggregate root, {@code AggregateRoot} by default. */
+  public String aggregateRootSuffix() {
+    return aggregateRootSuffix;
+  }
+
+  /** Name suffix of a repository port, {@code Repository} by default. */
+  public String repositorySuffix() {
+    return repositorySuffix;
+  }
+
+  /** Name suffix of a store port, {@code Store} by default. */
+  public String storeSuffix() {
+    return storeSuffix;
+  }
+
+  /** Name suffix of a factory, {@code Factory} by default. */
+  public String factorySuffix() {
+    return factorySuffix;
+  }
+
+  /** Name suffix of a specification, {@code Specification} by default. */
+  public String specificationSuffix() {
+    return specificationSuffix;
+  }
+
+  /** The domain-service sub-package of the domain layer, {@code service} by default. */
+  public String domainServiceSubpackage() {
+    return domainServiceSubpackage;
   }
 
   public List<String> thirdPartyPackagesAllowedInDomain() {

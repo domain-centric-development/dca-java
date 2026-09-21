@@ -286,6 +286,52 @@ DcaArchitecture arch = DcaArchitecture.load(DcaLayout.forBasePackage("com.acme.s
 DcaRules.checkAll(arch);                       // or checkAll(arch, selection) with a selection
 ```
 
+## The smallest DCA
+
+Nothing in the catalog fires on a concept the project has not declared: a rule with an empty
+selection passes. So the first day needs seven building blocks, not thirty-one:
+
+- `AggregateRoot<T, ID>` and `Id` — one aggregate and its identifier
+- `Value` — the attributes that have no lifecycle of their own
+- `Repository<T, ID>` — how that aggregate is loaded and stored
+- `InputPort` — what the outside may ask the application to do
+- `DomainException` — a broken rule of the model, named after the rule
+- `@BoundedContext` on one `package-info.java` — so the rules know where the module begins
+
+That is enough for `DcaArchitectureTest` to say something useful. `Entity`, `DomainEvent`,
+`IntegrationEvent`, `DomainService`, `Factory`, `Specification`, `Store`, the publishers and the
+context-map annotations each switch on the rules that govern them, when and only when the project
+introduces the concept. The test source set's `fixtures/layout/greenfield` package is that shape,
+nine files, and every rule of the catalog passes over it.
+
+**Your own vocabulary instead of ours.** A code base that already has an aggregate base class keeps
+it and points the roles at it, rather than migrating types or excluding rule ids:
+
+```java
+DcaLayout.forBasePackage("com.acme.billing")
+    .withMarkers(
+        DcaMarkers.dca()
+            .named("acme")
+            .withAggregateRoot("com.acme.common.Aggregate")
+            .withRepository("com.acme.common.Store"));
+```
+
+Every rule then selects on those types, the vocabulary's own packages are excluded from the
+third-party checks, and the test report names the vocabulary it resolved. One caveat:
+`withOutputPort` must be set as soon as any other port role is, because `DCA-HEX-009` measures every
+port against it.
+
+**Domain events are optional; the marker's API is not.** `AggregateRoot<T, ID>` declares
+`domainEvents()` and `clearDomainEvents()`, so a project that models no events still inherits
+them. No rule requires an event to exist — every event rule passes on an empty selection — but if
+the two methods are unwanted on the model, point the aggregate-root role at a type of your own; the
+rules follow the role, not the base class.
+
+**Your own names.** Where a rule finds something by name rather than by role — the use-case,
+controller, REST-controller, aggregate-root, repository, store, factory and specification suffixes,
+and the segments of the package layout — `DcaLayout` has a `with…` for it. Configure the name; do
+not switch the rule off.
+
 ## Rule catalog
 
 **121 rule ids in 11 sets: 115 enforced, 6 informational.** Three further ids are retired and keep their meaning in the retirement list. The exact, current list is

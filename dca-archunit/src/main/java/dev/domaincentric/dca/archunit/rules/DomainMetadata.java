@@ -12,12 +12,12 @@ import java.util.List;
 final class DomainMetadata {
   private DomainMetadata() {}
 
-  static String owner(JavaClass type, DcaMarkers markers) {
+  static String owner(JavaClass type, DcaMarkers markers, String specificationSuffix) {
     if (type.isAssignableTo(markers.domainEvent())) return "DCA-ADV-004";
     if (type.isAssignableTo(markers.domainService())) return "DCA-ADV-011";
     if (type.isAssignableTo(markers.factory())) return "DCA-ADV-015";
     if (type.isAssignableTo(markers.specification())
-        || type.getSimpleName().endsWith("Specification")) return "DCA-ADV-018";
+        || type.getSimpleName().endsWith(specificationSuffix)) return "DCA-ADV-018";
     return "DCA-ONI-003";
   }
 
@@ -26,7 +26,7 @@ final class DomainMetadata {
     List<String> violations = new ArrayList<>();
     for (JavaClass type : arch.classes()) {
       if (type.isInterface()
-          || !owner(type, arch.layout().markers()).equals(id)
+          || !owner(type, arch.layout().markers(), arch.layout().specificationSuffix()).equals(id)
           || !JavaClass.Predicates.resideInAnyPackage(arch.allDomainPatterns()).test(type))
         continue;
       if (id.equals("DCA-ONI-003")

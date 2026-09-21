@@ -3,8 +3,11 @@ package dev.domaincentric.dca.archunit.rules;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.tngtech.archunit.core.importer.ClassFileImporter;
+import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRuleViolation;
+import dev.domaincentric.dca.archunit.DcaRules;
 import dev.domaincentric.dca.archunit.Fixtures;
 import java.util.List;
 import java.util.stream.Stream;
@@ -182,5 +185,31 @@ class TacticalPatternRulesTest {
   @DisplayName("DCA-TAC-016 skips a generic intermediate repository port")
   void aGenericIntermediateRepositoryPortIsSkipped() {
     Fixtures.rule(GOOD, "DCA-TAC-016").check(Fixtures.arch(GOOD));
+  }
+
+  /**
+   * The suffix drives the selection, so a project whose ports are called something else configures
+   * the layout rather than excluding the ids. With the repository suffix changed, the bad fixture's
+   * {@code *Repository} interfaces are no longer selected and the two name-anchored rules pass.
+   */
+  @Test
+  @DisplayName("the tactical suffixes select: a changed repository suffix moves the selection")
+  void theRepositorySuffixDrivesTheSelection() {
+    DcaLayout own = DcaLayout.forBasePackage(BAD).withRepositorySuffix("Gateway");
+    DcaArchitecture arch = DcaArchitecture.of(own, new ClassFileImporter().importPackages(BAD));
+
+    for (String id : java.util.List.of("DCA-TAC-013", "DCA-TAC-016")) {
+      DcaRules.all(own).stream()
+          .filter(r -> r.id().equals(id))
+          .findFirst()
+          .orElseThrow()
+          .check(arch);
+    }
+
+    // and with the default suffix they still report, so the test is not vacuous
+    assertTrue(
+        Fixtures.violation(BAD, "DCA-TAC-016").violations().stream()
+            .anyMatch(v -> v.contains("Repository")),
+        "the default suffix still selects");
   }
 }

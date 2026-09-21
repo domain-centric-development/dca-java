@@ -33,9 +33,6 @@ import java.util.stream.Collectors;
  */
 public final class TacticalPatternRules implements DcaRuleSet {
 
-  private static final String REPOSITORY_SUFFIX = "Repository";
-  private static final String STORE_SUFFIX = "Store";
-
   /**
    * Write vocabulary a Store must not declare, compared case-insensitively so that the same six
    * names are matched in both languages - {@code save} and {@code SaveAsync} are the same name.
@@ -102,11 +99,11 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .that()
                     .resideInAnyPackage(arch.allDomainModelPatterns())
                     .and()
-                    .haveSimpleNameEndingWith("AggregateRoot")
+                    .haveSimpleNameEndingWith(layout.aggregateRootSuffix())
                     .and()
                     .areNotInterfaces()
                     .and()
-                    .doNotHaveSimpleName("AggregateRoot")
+                    .doNotHaveSimpleName(layout.aggregateRootSuffix())
                     .should()
                     .beAssignableTo(arch.layout().markers().aggregateRoot())
                     .allowEmptyShould(true))
@@ -520,9 +517,9 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .and()
                     .areInterfaces()
                     .and()
-                    .haveSimpleNameEndingWith(REPOSITORY_SUFFIX)
+                    .haveSimpleNameEndingWith(arch.layout().repositorySuffix())
                     .and()
-                    .doNotHaveSimpleName(REPOSITORY_SUFFIX)
+                    .doNotHaveSimpleName(arch.layout().repositorySuffix())
                     .should()
                     .beAssignableTo(arch.layout().markers().repository())
                     .allowEmptyShould(true))
@@ -548,7 +545,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .and()
                     .areAssignableTo(arch.layout().markers().repository())
                     .and()
-                    .doNotHaveSimpleName(REPOSITORY_SUFFIX)
+                    .doNotHaveSimpleName(arch.layout().repositorySuffix())
                     .should()
                     .resideInAnyPackage(arch.allApplicationPatterns())
                     .allowEmptyShould(true))
@@ -581,7 +578,10 @@ public final class TacticalPatternRules implements DcaRuleSet {
         .checking(
             "The class resides in <module>.adapter.outgoing.. of some module root. An "
                 + "implementation in any other package under scan - a test double, say - is "
-                + "reported; an empty selection passes.");
+                + "reported; an empty selection passes. An implementation that carries the "
+                + "repository role and is also named *Repository is reported by DCA-HEX-008 as "
+                + "well: that rule finds unmarked implementations by name, and the two "
+                + "populations overlap where a project does both.");
   }
 
   public static DcaRule repositoriesOnlyForAggregateRoots() {
@@ -594,7 +594,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
               List<String> violations = new ArrayList<>();
               for (JavaClass repository : repositoryInterfaces(arch)) {
                 String repoName = repository.getSimpleName();
-                if (!repoName.endsWith(REPOSITORY_SUFFIX)) {
+                if (!repoName.endsWith(arch.layout().repositorySuffix())) {
                   continue;
                 }
                 Optional<JavaType> bound =
@@ -611,7 +611,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
                             + " binds "
                             + aggregate.getName()
                             + " which does not implement AggregateRoot");
-                  } else if (!repoName.equals(aggregate.getSimpleName() + REPOSITORY_SUFFIX)) {
+                  } else if (!repoName.equals(
+                      aggregate.getSimpleName() + arch.layout().repositorySuffix())) {
                     violations.add(
                         repository.getName()
                             + " binds "
@@ -620,12 +621,13 @@ public final class TacticalPatternRules implements DcaRuleSet {
                             + repoName
                             + " - name it "
                             + aggregate.getSimpleName()
-                            + REPOSITORY_SUFFIX);
+                            + arch.layout().repositorySuffix());
                   }
                   continue;
                 }
                 String aggregateName =
-                    repoName.substring(0, repoName.length() - REPOSITORY_SUFFIX.length());
+                    repoName.substring(
+                        0, repoName.length() - arch.layout().repositorySuffix().length());
                 String context = arch.rootContextPackage(repository.getPackageName());
                 List<JavaClass> candidates =
                     arch.classes().stream()
@@ -734,9 +736,9 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .that()
                     .areInterfaces()
                     .and()
-                    .haveSimpleNameEndingWith(STORE_SUFFIX)
+                    .haveSimpleNameEndingWith(arch.layout().storeSuffix())
                     .and()
-                    .doNotHaveSimpleName(STORE_SUFFIX)
+                    .doNotHaveSimpleName(arch.layout().storeSuffix())
                     .should()
                     .beAssignableTo(arch.layout().markers().store())
                     .andShould()
@@ -763,7 +765,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .and()
                     .areAssignableTo(arch.layout().markers().store())
                     .and()
-                    .doNotHaveSimpleName(STORE_SUFFIX)
+                    .doNotHaveSimpleName(arch.layout().storeSuffix())
                     .should()
                     .resideInAnyPackage(arch.allApplicationPatterns())
                     .allowEmptyShould(true))
@@ -881,7 +883,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
         c ->
             c.isAssignableTo(arch.layout().markers().repository())
                 && c.isInterface()
-                && !c.getSimpleName().equals(REPOSITORY_SUFFIX));
+                && !c.getSimpleName().equals(arch.layout().repositorySuffix()));
   }
 
   private static List<JavaClass> storeInterfaces(DcaArchitecture arch) {
@@ -890,7 +892,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
         c ->
             c.isAssignableTo(arch.layout().markers().store())
                 && c.isInterface()
-                && !c.getSimpleName().equals(STORE_SUFFIX));
+                && !c.getSimpleName().equals(arch.layout().storeSuffix()));
   }
 
   /** The simple name of a configured marker, for a message a reader has to recognise. */

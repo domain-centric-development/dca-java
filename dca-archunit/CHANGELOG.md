@@ -4,6 +4,32 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+**Every name a rule matches on is configurable.** `withAggregateRootSuffix`,
+`withRepositorySuffix`, `withStoreSuffix`, `withFactorySuffix`, `withSpecificationSuffix` and
+`withDomainServiceSubpackage` join the use-case and controller suffixes, so `DCA-TAC-001`,
+`DCA-TAC-013`, `DCA-TAC-016`, `DCA-TAC-018`, `DCA-ADV-009`, `DCA-ADV-013` and `DCA-ADV-017` follow
+the project's names instead of the library's. A code base whose ports are called `*Gateway`
+configures the layout; it no longer has to switch the ids off. Defaults unchanged.
+
+**`DCA-ADV-013` and `DCA-ADV-017` are titled after what they check.** "Factories should implement
+Factory Marker Interface" selected the marked types and checked the *name*; "Specifications must end
+with 'Specification'" selected by the name and checked the *placement* — and since the specification
+role was added it does not require the suffix at all. They are now "Types carrying the factory role
+are named *Factory" and "Specifications reside in the domain layer", with rationales that argue the
+check rather than the selection. Open since the review of 2026-09-09.
+
+**`DCA-TAC-015` names its overlap with `DCA-HEX-008`.** An implementation that carries the
+repository role and is also named `*Repository` is reported by both; the two populations are
+different, and the `checks` text says so now.
+
+**The READMEs have a "smallest DCA" and an "own vocabulary" section.** Seven building blocks and one
+`@BoundedContext` are enough for the catalog to say something useful; every other marker switches on
+the rules that govern it when the project introduces the concept. `DcaMarkers` appeared in no README
+at all, although keeping an existing vocabulary is the library's main adoption argument — it is
+documented now, together with the one caveat (`withOutputPort` once any port role is set) and with
+the note that the aggregate-root marker's event API is inherited whether or not a project models
+events.
+
 **`DCA-TAC-016` reads the aggregate the repository binds, and the name must name it.** The rule
 resolved the aggregate from the interface name alone and never looked at the type argument, so
 `CategoryRepository extends Repository<Order, OrderId>` passed. It now takes the first type argument

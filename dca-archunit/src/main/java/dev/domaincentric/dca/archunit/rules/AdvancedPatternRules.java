@@ -263,13 +263,18 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                     .and()
                     .areNotInterfaces()
                     .should()
-                    .resideInAPackage(".." + layout.domainSubpackage() + ".service..")
+                    .resideInAPackage(
+                        ".."
+                            + layout.domainSubpackage()
+                            + "."
+                            + layout.domainServiceSubpackage()
+                            + "..")
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes anywhere on the classpath under scan that are assignable to"
                 + " DomainService.")
         .checking(
-            "Each resides in a package matching ..<domain subpackage>.service.. - the configured domain"
+            "Each resides in a package matching ..<domain>.<service>.. - both segments are the configured ones, the domain"
                 + " subpackage followed by service, anywhere in the package path, not tied to a module root. A"
                 + " domain service directly in domain or in domain.model is reported. An empty selection passes.");
   }
@@ -339,8 +344,10 @@ public final class AdvancedPatternRules implements DcaRuleSet {
   public DcaRule factoriesAreNamedFactory() {
     return DcaRule.of(
             "DCA-ADV-013",
-            "Factories should implement Factory Marker Interface",
-            "Classes implementing Factory marker should have 'Factory' in their name",
+            "Types carrying the factory role are named *Factory",
+            "A factory is found by its role, and read by its name: a type that creates aggregates"
+                + " and is not called one makes the creation site hard to find in review and in a"
+                + " search",
             arch ->
                 classes()
                     .that()
@@ -348,7 +355,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                     .and()
                     .areNotInterfaces()
                     .should()
-                    .haveSimpleNameEndingWith("Factory")
+                    .haveSimpleNameEndingWith(arch.layout().factorySuffix())
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes anywhere on the classpath under scan that are assignable to Factory.")
@@ -419,11 +426,14 @@ public final class AdvancedPatternRules implements DcaRuleSet {
   public DcaRule specificationsResideInDomain() {
     return DcaRule.of(
             "DCA-ADV-017",
-            "Specifications must end with 'Specification'",
-            "Specification implementations are part of the domain layer",
+            "Specifications reside in the domain layer",
+            "A specification is a rule of the model expressed as a predicate; it belongs where the"
+                + " model is, not in the layer that happens to ask the question",
             arch ->
                 classes()
-                    .that(specifications(arch.layout().markers()))
+                    .that(
+                        specifications(
+                            arch.layout().markers(), arch.layout().specificationSuffix()))
                     .should()
                     .resideInAnyPackage(arch.allDomainPatterns())
                     .allowEmptyShould(true))
@@ -460,15 +470,14 @@ public final class AdvancedPatternRules implements DcaRuleSet {
    * because a project may carry the marker without the suffix — as both reference samples do — or
    * the suffix without the marker.
    */
-  private static DescribedPredicate<JavaClass> specifications(DcaMarkers markers) {
+  private static DescribedPredicate<JavaClass> specifications(DcaMarkers markers, String suffix) {
     DescribedPredicate<JavaClass> byRole =
         JavaClass.Predicates.assignableTo(markers.specification());
-    DescribedPredicate<JavaClass> byName =
-        JavaClass.Predicates.simpleNameEndingWith("Specification");
+    DescribedPredicate<JavaClass> byName = JavaClass.Predicates.simpleNameEndingWith(suffix);
     return byRole
         .or(byName)
         .and(DescribedPredicate.not(JavaClass.Predicates.INTERFACES))
-        .and(DescribedPredicate.not(JavaClass.Predicates.simpleName("Specification")))
+        .and(DescribedPredicate.not(JavaClass.Predicates.simpleName(suffix)))
         .and(
             DescribedPredicate.not(
                 DescribedPredicate.describe(

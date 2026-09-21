@@ -121,4 +121,40 @@ class DcaLayoutTest {
     assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withWebSubpackage(""));
     assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withSharedSubpackage("a.b"));
   }
+
+  /**
+   * The tactical suffixes and the domain-service segment are configurable like the use-case and
+   * controller suffixes; a project that calls its ports differently configures them rather than
+   * excluding the rule ids.
+   */
+  @Test
+  void theTacticalNamesAreConfigurable() {
+    assertEquals("AggregateRoot", DEFAULTS.aggregateRootSuffix());
+    assertEquals("Repository", DEFAULTS.repositorySuffix());
+    assertEquals("Store", DEFAULTS.storeSuffix());
+    assertEquals("Factory", DEFAULTS.factorySuffix());
+    assertEquals("Specification", DEFAULTS.specificationSuffix());
+    assertEquals("service", DEFAULTS.domainServiceSubpackage());
+
+    DcaLayout own =
+        DEFAULTS
+            .withAggregateRootSuffix("Root")
+            .withRepositorySuffix("Gateway")
+            .withStoreSuffix("Table")
+            .withFactorySuffix("Builder")
+            .withSpecificationSuffix("Rule")
+            .withDomainServiceSubpackage("policy");
+
+    assertEquals("Root", own.aggregateRootSuffix());
+    assertEquals("Gateway", own.repositorySuffix());
+    assertEquals("Table", own.storeSuffix());
+    assertEquals("Builder", own.factorySuffix());
+    assertEquals("Rule", own.specificationSuffix());
+    assertEquals("policy", own.domainServiceSubpackage());
+    assertEquals("com.acme.shop", own.basePackage(), "the rest is unchanged");
+
+    assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withRepositorySuffix(""));
+    assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withStoreSuffix("a.b"));
+    assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withDomainServiceSubpackage("a.b"));
+  }
 }
