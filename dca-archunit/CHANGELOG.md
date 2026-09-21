@@ -4,6 +4,8 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-21
+
 **Every name a rule matches on is configurable.** `withAggregateRootSuffix`,
 `withRepositorySuffix`, `withStoreSuffix`, `withFactorySuffix` and `withSpecificationSuffix` join
 the use-case and controller suffixes, so `DCA-TAC-001`, `DCA-TAC-013`, `DCA-TAC-016`, `DCA-TAC-018`,
