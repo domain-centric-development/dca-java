@@ -50,48 +50,20 @@ public final class DcaRules {
   }
 
   private static final Map<String, RetiredRule> RETIRED =
-      Map.ofEntries(
-          Map.entry(
-              "DCA-CYC-001",
-              new RetiredRule(
-                  "A cycle between domain packages is already reported by DCA-STR-004",
-                  "DCA-STR-004",
-                  "0.5.0")),
-          Map.entry(
-              "DCA-CYC-002",
-              new RetiredRule(
-                  "A cycle between application packages is already reported by DCA-STR-003;"
-                      + " DCA-CYC-005 covers the application layer per operation",
-                  "DCA-STR-003",
-                  "0.5.0")),
-          Map.entry(
-              "DCA-CYC-003",
-              new RetiredRule(
-                  "A cycle between outgoing-adapter packages is already reported by DCA-STR-006",
-                  "DCA-STR-006",
-                  "0.5.0")),
-          Map.entry(
-              "DCA-CYC-004",
-              new RetiredRule(
-                  "A cycle between incoming-adapter packages is already reported by DCA-HEX-007",
-                  "DCA-HEX-007",
-                  "0.5.0")),
-          Map.entry(
-              "DCA-MAP-003",
+      Map.of(
+          "DCA-MAP-003",
               new RetiredRule(
                   "Renderer disambiguates normalized external-system identifiers",
                   "ContextMapRenderer",
-                  "0.4.0")),
-          Map.entry(
-              "DCA-ADV-003",
+                  "0.4.0"),
+          "DCA-ADV-003",
               new RetiredRule(
-                  "Immutable event shape is checked by DCA-ADV-001", "DCA-ADV-001", "0.4.0")),
-          Map.entry(
-              "DCA-TAC-022",
+                  "Immutable event shape is checked by DCA-ADV-001", "DCA-ADV-001", "0.4.0"),
+          "DCA-TAC-022",
               new RetiredRule(
                   "Value model already covered; enrichment remains guide and catalog guidance",
                   "DCA-TAC-008..012",
-                  "0.4.0")));
+                  "0.4.0"));
 
   private DcaRules() {}
 

@@ -10,16 +10,6 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 turn a broken rule of the model into a use-case failure. `DCA-ERR-002` owns the case now;
 `DCA-ERR-003` no longer selects domain-exception subtypes and says so in its `selects` text.
 
-**Retired: `DCA-CYC-001`, `DCA-CYC-002`, `DCA-CYC-003`, `DCA-CYC-004`.** All four sliced *per module
-root*, so the only cycle they could ever report ran between two modules — and the first direction of
-such a cycle is already forbidden outright by `DCA-STR-004` (domain), `DCA-STR-003` (application),
-`DCA-STR-006` (outgoing adapters) and `DCA-HEX-007` (incoming adapters). Measured, not assumed: on the
-`cycles/bad` fixture each of the four failed together with its sibling, and on the grouped-contexts
-fixture `DCA-STR-003` reports exactly what `DCA-CYC-002` did. A cycle *inside* one module's domain
-model was detected by none of them before and is detected by none of them now — `DCA-CYC-001`'s own
-text said so. `DCA-CYC-005`, which slices within a module and reports what no sibling does, stays.
-The four ids keep their meaning in the retirement list with their replacement.
-
 **No logging library in the domain by default, and the allow-list is how you change that.** The two
 `DCA-ONI-002` allow-lists were not translations of each other: Java forbade SLF4J, .NET permitted
 `Microsoft.Extensions.Logging.Abstractions`. Decided on 2026-09-21: by default neither, in both

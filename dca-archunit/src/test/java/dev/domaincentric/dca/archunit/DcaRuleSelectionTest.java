@@ -30,10 +30,10 @@ class DcaRuleSelectionTest {
   @Test
   void onlyIdsNarrowsTheRun() {
     List<DcaRule> rules =
-        DcaRules.selectFlat(LAYOUT, DcaRuleSelection.all().onlyIds("DCA-NAM-001", "DCA-CYC-005"));
+        DcaRules.selectFlat(LAYOUT, DcaRuleSelection.all().onlyIds("DCA-NAM-001", "DCA-CYC-001"));
 
     assertEquals(
-        List.of("DCA-CYC-005", "DCA-NAM-001"), rules.stream().map(DcaRule::id).sorted().toList());
+        List.of("DCA-CYC-001", "DCA-NAM-001"), rules.stream().map(DcaRule::id).sorted().toList());
   }
 
   @Test
