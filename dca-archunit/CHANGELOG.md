@@ -4,6 +4,11 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+**The README states what the library runs on.** A compatibility table now names the minimum and the
+tested versions of Java, JUnit Jupiter, ArchUnit, Spring Boot and Spring Modulith. It also states that
+`dca-spring` needs Spring Boot 4: its auto-configuration ordering does not exist on Boot 3.x and
+nothing fails loudly there.
+
 **New rule `DCA-STR-012` — at least one module owns a DCA layer.** The third guard of the same kind as
 an empty import and an undeclared bounded context. A code base whose layers are named `core` and `usecases`
 instead of the configured segments yields no module root, so every rule that selects over the layers — the

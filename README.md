@@ -301,6 +301,23 @@ void renderContextMap() {
 
 Because the rules guarantee declarations match the code, the rendered map cannot drift.
 
+## Compatibility
+
+| Runs on | Minimum | Built and tested against |
+|---|---|---|
+| Java | 17 | 17 bytecode, toolchain 21 and 25 |
+| JUnit Jupiter | 5.10 | 5.10.2 and 6.1.3 |
+| ArchUnit | 1.4 | 1.4.1 and 1.5.0 |
+| Spring Boot (`dca-spring`) | **4.0** | 4.0.2 |
+| Spring Framework (`dca-spring`) | 7.0 | 7.0.3 |
+| Spring Modulith (`dca-archunit-spring-modulith`) | 2.0 | 2.0.3 |
+
+`dca-building-blocks` and `dca-archunit` have no framework on their class path; the JUnit dependency of
+`dca-archunit` is `compileOnly`, so the version above is the one your own build brings. `dca-spring`
+registers its beans through Spring Boot 4 auto-configuration and does not work on Boot 3.x — the
+ordering it relies on does not exist there, and nothing fails loudly, so pin Boot 4 or wire the beans
+yourself.
+
 ## Versioning
 
 Semantic versioning, independent per artifact:
