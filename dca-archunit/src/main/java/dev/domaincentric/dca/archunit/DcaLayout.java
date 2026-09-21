@@ -78,7 +78,6 @@ public final class DcaLayout {
   private final String storeSuffix;
   private final String factorySuffix;
   private final String specificationSuffix;
-  private final String domainServiceSubpackage;
   private final List<String> thirdPartyPackagesAllowedInDomain;
   private final DcaMarkers markers;
   private final FrameworkAnnotations frameworkAnnotations;
@@ -136,8 +135,6 @@ public final class DcaLayout {
     this.storeSuffix = requireSuffix(settings.storeSuffix, "storeSuffix");
     this.factorySuffix = requireSuffix(settings.factorySuffix, "factorySuffix");
     this.specificationSuffix = requireSuffix(settings.specificationSuffix, "specificationSuffix");
-    this.domainServiceSubpackage =
-        requireSegment(settings.domainServiceSubpackage, "domainServiceSubpackage");
     this.thirdPartyPackagesAllowedInDomain =
         List.copyOf(
             Objects.requireNonNull(
@@ -180,7 +177,6 @@ public final class DcaLayout {
     defaults.storeSuffix = "Store";
     defaults.factorySuffix = "Factory";
     defaults.specificationSuffix = "Specification";
-    defaults.domainServiceSubpackage = "service";
     defaults.thirdPartyPackagesAllowedInDomain = DEFAULT_THIRD_PARTY_ALLOWED_IN_DOMAIN;
     defaults.markers = DcaMarkers.dca();
     FrameworkAnnotations.Detection detection = FrameworkAnnotations.detect();
@@ -408,14 +404,6 @@ public final class DcaLayout {
   }
 
   /**
-   * Sub-package of the domain layer that holds the domain services - e.g. {@code "service"}
-   * (default) or {@code "policy"}. Read by {@code DCA-ADV-009}.
-   */
-  public DcaLayout withDomainServiceSubpackage(String value) {
-    return copy(settings -> settings.domainServiceSubpackage = value);
-  }
-
-  /**
    * Third-party packages the domain layer may depend on (ArchUnit patterns). Replaces the default
    * list ({@code java..}, {@code lombok..}, commons-lang3, commons-collections4, jspecify).
    */
@@ -509,7 +497,6 @@ public final class DcaLayout {
     settings.storeSuffix = storeSuffix;
     settings.factorySuffix = factorySuffix;
     settings.specificationSuffix = specificationSuffix;
-    settings.domainServiceSubpackage = domainServiceSubpackage;
     settings.thirdPartyPackagesAllowedInDomain = thirdPartyPackagesAllowedInDomain;
     settings.markers = markers;
     settings.frameworkAnnotations = frameworkAnnotations;
@@ -544,7 +531,6 @@ public final class DcaLayout {
     String storeSuffix;
     String factorySuffix;
     String specificationSuffix;
-    String domainServiceSubpackage;
     List<String> thirdPartyPackagesAllowedInDomain;
     DcaMarkers markers;
     FrameworkAnnotations frameworkAnnotations;
@@ -660,11 +646,6 @@ public final class DcaLayout {
   /** Name suffix of a specification, {@code Specification} by default. */
   public String specificationSuffix() {
     return specificationSuffix;
-  }
-
-  /** The domain-service sub-package of the domain layer, {@code service} by default. */
-  public String domainServiceSubpackage() {
-    return domainServiceSubpackage;
   }
 
   public List<String> thirdPartyPackagesAllowedInDomain() {

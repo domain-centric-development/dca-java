@@ -21,8 +21,8 @@ class AdvancedPatternRulesTest {
   void setHasExpectedShape() {
     AdvancedPatternRules set = new AdvancedPatternRules(DcaLayout.forBasePackage(GOOD));
     assertEquals("advanced", set.name());
-    assertEquals(17, set.rules().size());
-    assertEquals(17, set.rules().stream().map(DcaRule::id).distinct().count());
+    assertEquals(16, set.rules().size());
+    assertEquals(16, set.rules().stream().map(DcaRule::id).distinct().count());
     Fixtures.assertIdsAreSequential(set, "ADV");
   }
 

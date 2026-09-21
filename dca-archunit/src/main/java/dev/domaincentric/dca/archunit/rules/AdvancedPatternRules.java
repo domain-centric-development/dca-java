@@ -49,7 +49,6 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             integrationEventsHaveNoVersionField(),
             domainOnlyEventsHaveNoVersionField(),
             domainEventsHaveTimestampField(),
-            domainServicesResideInDomainService(),
             domainServicesResideInDomain(),
             domainServicesHaveNoFrameworkAnnotations(),
             domainServicesAreStateless(),
@@ -249,35 +248,6 @@ public final class AdvancedPatternRules implements DcaRuleSet {
   // ============================================================================
   // DOMAIN SERVICES PATTERN
   // ============================================================================
-
-  public DcaRule domainServicesResideInDomainService() {
-    return DcaRule.of(
-            "DCA-ADV-009",
-            "Marked domain services reside in the configured domain service segment",
-            "Domain services implement DomainService marker and reside in domain.service packages"
-                + " (named descriptively, e.g., PricingService, CartTotalCalculator)",
-            arch ->
-                classes()
-                    .that()
-                    .areAssignableTo(arch.layout().markers().domainService())
-                    .and()
-                    .areNotInterfaces()
-                    .should()
-                    .resideInAPackage(
-                        ".."
-                            + layout.domainSubpackage()
-                            + "."
-                            + layout.domainServiceSubpackage()
-                            + "..")
-                    .allowEmptyShould(true))
-        .selecting(
-            "Non-interface classes anywhere on the classpath under scan that are assignable to"
-                + " DomainService.")
-        .checking(
-            "Each resides in a package matching ..<domain>.<service>.. - both segments are the configured ones, the domain"
-                + " subpackage followed by service, anywhere in the package path, not tied to a module root. A"
-                + " domain service directly in domain or in domain.model is reported. An empty selection passes.");
-  }
 
   public DcaRule domainServicesResideInDomain() {
     return DcaRule.of(

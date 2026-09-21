@@ -5,11 +5,20 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 ## [Unreleased]
 
 **Every name a rule matches on is configurable.** `withAggregateRootSuffix`,
-`withRepositorySuffix`, `withStoreSuffix`, `withFactorySuffix`, `withSpecificationSuffix` and
-`withDomainServiceSubpackage` join the use-case and controller suffixes, so `DCA-TAC-001`,
-`DCA-TAC-013`, `DCA-TAC-016`, `DCA-TAC-018`, `DCA-ADV-009`, `DCA-ADV-013` and `DCA-ADV-017` follow
-the project's names instead of the library's. A code base whose ports are called `*Gateway`
+`withRepositorySuffix`, `withStoreSuffix`, `withFactorySuffix` and `withSpecificationSuffix` join
+the use-case and controller suffixes, so `DCA-TAC-001`, `DCA-TAC-013`, `DCA-TAC-016`, `DCA-TAC-018`,
+`DCA-ADV-013` and `DCA-ADV-017` follow the project's names instead of the library's. A code base whose ports are called `*Gateway`
 configures the layout; it no longer has to switch the ids off. Defaults unchanged.
+
+**`DCA-ADV-009` is retired; `DCA-ADV-010` keeps the layer.** Both selected the same population —
+non-interface types assignable to the domain-service marker — and differed only in what they
+required of the package: `..domain.service..` anywhere versus the domain layer of a module. A
+misplaced domain service was reported twice, and the stricter half asked for something the guide
+itself does not ask for (`topics/domain-services-with-data-dependencies.md` allows `..domain..`). A
+domain service is part of the model; whether it gets its own segment inside the domain layer is the
+team's decision, per project. `DCA-ADV-010` continues to keep it out of the application layer.
+`withDomainServiceSubpackage` goes with it — `DCA-ADV-009` was its only reader, and it was never
+released.
 
 **`DCA-ADV-013` and `DCA-ADV-017` are titled after what they check.** "Factories should implement
 Factory Marker Interface" selected the marked types and checked the *name*; "Specifications must end

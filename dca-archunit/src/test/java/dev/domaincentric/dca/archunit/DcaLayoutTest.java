@@ -134,7 +134,6 @@ class DcaLayoutTest {
     assertEquals("Store", DEFAULTS.storeSuffix());
     assertEquals("Factory", DEFAULTS.factorySuffix());
     assertEquals("Specification", DEFAULTS.specificationSuffix());
-    assertEquals("service", DEFAULTS.domainServiceSubpackage());
 
     DcaLayout own =
         DEFAULTS
@@ -142,19 +141,16 @@ class DcaLayoutTest {
             .withRepositorySuffix("Gateway")
             .withStoreSuffix("Table")
             .withFactorySuffix("Builder")
-            .withSpecificationSuffix("Rule")
-            .withDomainServiceSubpackage("policy");
+            .withSpecificationSuffix("Rule");
 
     assertEquals("Root", own.aggregateRootSuffix());
     assertEquals("Gateway", own.repositorySuffix());
     assertEquals("Table", own.storeSuffix());
     assertEquals("Builder", own.factorySuffix());
     assertEquals("Rule", own.specificationSuffix());
-    assertEquals("policy", own.domainServiceSubpackage());
     assertEquals("com.acme.shop", own.basePackage(), "the rest is unchanged");
 
     assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withRepositorySuffix(""));
     assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withStoreSuffix("a.b"));
-    assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withDomainServiceSubpackage("a.b"));
   }
 }

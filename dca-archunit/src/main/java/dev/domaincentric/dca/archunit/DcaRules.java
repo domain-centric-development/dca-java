@@ -63,7 +63,13 @@ public final class DcaRules {
               new RetiredRule(
                   "Value model already covered; enrichment remains guide and catalog guidance",
                   "DCA-TAC-008..012",
-                  "0.4.0"));
+                  "0.4.0"),
+          "DCA-ADV-009",
+              new RetiredRule(
+                  "Where a domain service sits inside the domain layer is the team's decision;"
+                      + " DCA-ADV-010 keeps the layer itself",
+                  "DCA-ADV-010",
+                  "0.5.0"));
 
   private DcaRules() {}
 
