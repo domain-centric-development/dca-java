@@ -74,9 +74,9 @@ public final class DcaRules {
                   "0.5.0"),
           "DCA-STR-009",
               new RetiredRule(
-                  "An acl segment is a filing decision, and the selection named three suffixes a"
-                      + " project cannot change; the anti-corruption layer stays guide and catalog"
-                      + " guidance",
+                  "A separate segment for the anti-corruption layer is a filing decision, and the"
+                      + " selection named three suffixes a project cannot change; the pattern stays"
+                      + " guide and catalog guidance",
                   "none",
                   "0.5.0"));
 
