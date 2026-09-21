@@ -154,7 +154,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
     return DcaRule.check(
             "DCA-TAC-003",
             "Aggregate Roots must not have fields with other Aggregate Root types",
-            "Vernon's Aggregate Design Rule #2: reference other Aggregates by identity to keep"
+            "Vernon's Aggregate Design Rule #3: reference other Aggregates by identity to keep"
                 + " aggregate boundaries and transactional consistency intact",
             arch -> {
               List<String> violations = new ArrayList<>();
@@ -171,7 +171,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 }
               }
               fail(
-                  "Aggregates must reference other aggregates by ID only (Vernon's Rule #2).",
+                  "Aggregates must reference other aggregates by ID only (Vernon's Rule #3).",
                   violations);
             })
         .selecting(
