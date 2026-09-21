@@ -264,7 +264,10 @@ the file, so a `dca-archunit.properties` added later would be ignored without a 
 
 **Two limitations.** Freezing needs a single ArchUnit rule to build the baseline from. The rules that
 run several checks internally — the context-map set and those iterating over bounded contexts —
-cannot be frozen; freezing one fails with a message naming it. Lower those to `warning(...)` instead.
+cannot be frozen; freezing one fails with a message naming it. Lower those to `warning(...)` instead,
+or scope them with `dca.rule.<id>.ignore`, which works for every rule and is the only one of the two
+that `DomainCentric.ArchRules` also offers — it has no baseline dial yet, so a project that keeps one
+configuration file for both stacks should prefer `ignore`.
 And the transaction rules (`DCA-USE-009`, `-012`, `-013`) reason per *entry path*, following the directed
 calls within the use case class: an entry point (a method callable from outside the class, or one nothing
 in the class calls) may save through one helper and publish through another, and from every entry point no
