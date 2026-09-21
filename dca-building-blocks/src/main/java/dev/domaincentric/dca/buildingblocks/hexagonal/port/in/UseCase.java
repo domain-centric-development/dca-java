@@ -47,7 +47,7 @@ package dev.domaincentric.dca.buildingblocks.hexagonal.port.in;
  * </ul>
  *
  * @param <INPUT> the input model type (Command or Query)
- * @param <OUTPUT> the output model type (Response)
+ * @param <OUTPUT> the output model type (Result)
  */
 public interface UseCase<INPUT, OUTPUT> extends InputPort {
 
@@ -55,7 +55,7 @@ public interface UseCase<INPUT, OUTPUT> extends InputPort {
    * Executes this use case with the given input.
    *
    * @param input the use case input (Command or Query)
-   * @return the use case output (Response)
+   * @return the use case output (Result)
    */
   OUTPUT execute(INPUT input);
 }
