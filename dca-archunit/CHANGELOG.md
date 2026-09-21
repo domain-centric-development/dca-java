@@ -4,6 +4,16 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+**`DCA-ONI-002` no longer reports a project's own marker vocabulary.** The rule named the two
+building-blocks packages directly, so a project that pointed the roles at its own markers — the
+adoption path `DcaMarkers`'s own javadoc shows — was told its aggregate root was a forbidden
+third-party dependency inside its own domain, once per aggregate, value object and domain exception,
+on the first run. The allowed packages are now derived from the configured roles
+(`DcaMarkers.declaringPackagePatternsOf(DcaMarkers.DOMAIN_FACING_ROLES)`). With the default roles
+this yields exactly the two packages that were written in by hand, so nothing changes for a project
+on the building blocks. The application-layer roles and the incoming ports stay off the list: a
+domain class reaching for one of them is what the rule exists to report.
+
 **Every violation now names its rule.** A report line used to carry the offending element and, for six of the
 rules, the id; the other rules named it nowhere, so the only thing a reader could match on was the rule title —
 which changes as soon as a suffix is configured. `DcaRuleExecution` now prefixes every line of every report with

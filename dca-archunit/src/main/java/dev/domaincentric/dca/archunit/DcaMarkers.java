@@ -1,5 +1,6 @@
 package dev.domaincentric.dca.archunit;
 
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -270,7 +271,52 @@ public record DcaMarkers(
    * foreign base class as an exception outside its layer.
    */
   public List<String> declaringPackagePatterns() {
-    return roles().values().stream()
+    return packagePatternsOf(roles().values());
+  }
+
+  /**
+   * The roles whose types a domain class may legitimately depend on: the tactical vocabulary and
+   * the outgoing ports. The application-layer roles ({@code useCaseException}, {@code
+   * transactionBoundary}) and the incoming ports ({@code inputPort}, {@code useCase}) are
+   * deliberately absent — a domain class that reaches for one of them is the violation {@code
+   * DCA-ONI-002} exists to report.
+   */
+  public static final List<String> DOMAIN_FACING_ROLES =
+      List.of(
+          "aggregateRoot",
+          "entity",
+          "value",
+          "id",
+          "domainEvent",
+          "integrationEvent",
+          "domainService",
+          "factory",
+          "domainException",
+          "outputPort",
+          "repository",
+          "store",
+          "domainEventPublisher",
+          "integrationEventPublisher");
+
+  /**
+   * The packages of the named roles, as ArchUnit patterns.
+   *
+   * <p>This is what a rule asks for when it needs "the packages the vocabulary declares these types
+   * in" rather than a hard-wired library package. With the default roles and {@link
+   * #DOMAIN_FACING_ROLES} it yields the building blocks' tactical and outgoing-port packages —
+   * exactly the two that used to be written into {@code DCA-ONI-002} by hand — and with a project's
+   * own markers it yields the packages those markers live in, so the project's vocabulary is not
+   * reported as a foreign library inside its own domain.
+   *
+   * @param roleNames role names as {@link #roles()} keys them; an unknown name is ignored
+   */
+  public List<String> declaringPackagePatternsOf(Collection<String> roleNames) {
+    Map<String, String> roles = roles();
+    return packagePatternsOf(roleNames.stream().map(roles::get).filter(Objects::nonNull).toList());
+  }
+
+  private static List<String> packagePatternsOf(Collection<String> fullyQualifiedNames) {
+    return fullyQualifiedNames.stream()
         .map(fqn -> fqn.substring(0, Math.max(fqn.lastIndexOf('.'), 0)))
         .filter(pkg -> !pkg.isEmpty())
         .distinct()

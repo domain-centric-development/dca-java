@@ -22,6 +22,18 @@ class DcaMarkersTest {
   /** The same vocabulary, in a tree whose domain failure sits in an incoming adapter. */
   private static final String MISPLACED = Fixtures.ROOT + ".ownmarkersbad";
 
+  /** The same vocabulary in a tree that violates nothing — the adoption path as documented. */
+  private static final String CLEAN = Fixtures.ROOT + ".ownmarkersclean";
+
+  private static final String CLEAN_VOCABULARY = CLEAN + ".vocabulary";
+
+  private static final DcaMarkers OWN_CLEAN =
+      DcaMarkers.dca()
+          .named("own")
+          .withAggregateRoot(CLEAN_VOCABULARY + ".ContractRoot")
+          .withRepository(CLEAN_VOCABULARY + ".ContractStore")
+          .withDomainException(CLEAN_VOCABULARY + ".ContractFailure");
+
   private static final DcaMarkers OWN =
       DcaMarkers.dca()
           .named("own")
@@ -150,5 +162,35 @@ class DcaMarkersTest {
         assertThrows(IllegalArgumentException.class, () -> DcaMarkers.dca().withRepository(""));
 
     assertTrue(refused.getMessage().contains("repository"), refused.getMessage());
+  }
+
+  /**
+   * The documented adoption path does not report the vocabulary it was pointed at. {@code
+   * DCA-ONI-002} used to name the two building-blocks packages directly, so a project that put its
+   * own markers into the roles was told its own aggregate root was a forbidden third-party
+   * dependency inside its own domain — one violation per aggregate, value object and domain
+   * exception, on the very first run.
+   */
+  @Test
+  @DisplayName("DCA-ONI-002 accepts the marker vocabulary the roles were pointed at")
+  void ownVocabularyIsNotAForeignDependencyInTheDomain() {
+    rule(CLEAN, OWN_CLEAN, "DCA-ONI-002").check(arch(CLEAN, OWN_CLEAN));
+  }
+
+  /**
+   * The contrast that shows the roles are what decides it: with the roles left at the library's own
+   * markers, the same tree's vocabulary is a foreign dependency and is reported. Configuring the
+   * roles is the supported answer, not adding the package to the third-party allow-list.
+   */
+  @Test
+  @DisplayName("DCA-ONI-002 reports that same vocabulary while the roles still default")
+  void anUnconfiguredVocabularyIsStillAForeignDependency() {
+    AssertionError failure =
+        assertThrows(
+            AssertionError.class,
+            () ->
+                rule(CLEAN, DcaMarkers.dca(), "DCA-ONI-002").check(arch(CLEAN, DcaMarkers.dca())));
+
+    assertTrue(failure.getMessage().contains("ContractRoot"), failure.getMessage());
   }
 }
