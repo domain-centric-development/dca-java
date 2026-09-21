@@ -182,44 +182,6 @@ public final class ContextMapRules implements DcaRuleSet {
                 + " and contractPackages() are not checked here.");
   }
 
-  /** DCA-MAP-003. */
-  public static DcaRule externalSystemNamesDistinctAfterNormalization() {
-    return DcaRule.check(
-            "DCA-MAP-003",
-            "Distinct external system names must not collide after mermaid id normalization",
-            "The generated context map renders one node per normalized external system name — two"
-                + " spellings of the same system would silently merge into one node",
-            arch -> {
-              CollectedViolations violations = CollectedViolations.withoutHeader();
-              Map<String, String> idToName = new LinkedHashMap<>();
-              for (String pkg : arch.boundedContextPackages()) {
-                for (ExternalUpstream e : arch.packageAnnotations(pkg, ExternalUpstream.class)) {
-                  String id = normalizedExternalId(e.name());
-                  String known = idToName.getOrDefault(id, e.name());
-                  violations.require(
-                      known.equals(e.name()),
-                      "External system names '"
-                          + known
-                          + "' and '"
-                          + e.name()
-                          + "' normalize to the same mermaid node id '"
-                          + id
-                          + "' — use one canonical spelling");
-                  idToName.put(id, e.name());
-                }
-              }
-              violations.throwIfAny();
-            })
-        .selecting(
-            "Every @ExternalUpstream declaration on the package-info of every package"
-                + " carrying @BoundedContext, across all contexts, reading name(). PLANNED"
-                + " declarations are included.")
-        .checking(
-            "Two declarations whose name() differs but normalizes to the same node id of"
-                + " the generated context map (the renderer's own normalization) are reported"
-                + " as a collision. Repeating one spelling of a name is not a collision.");
-  }
-
   /** DCA-MAP-004. */
   public static DcaRule upstreamsReferenceExistingContexts() {
     return DcaRule.check(
