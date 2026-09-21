@@ -4,6 +4,16 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-21
+
+### Changed
+
+- Rebuilt against `dca-building-blocks` **0.3.0**. No source change in this artifact: the published
+  POM of `0.1.0` pins `dca-building-blocks 0.2.0`, so a project combining `dca-spring` with the
+  current building blocks relied on the build tool resolving the conflict in favour of the newer
+  version. The dependency is now stated rather than resolved. `0.1.0` stays usable with
+  `dca-building-blocks 0.2.0`.
+
 ## [0.1.0] - 2026-09-08
 
 Depends on `dca-building-blocks` 0.1.2. Spring Framework 7 / Spring Boot 4 are `compileOnly` — the
