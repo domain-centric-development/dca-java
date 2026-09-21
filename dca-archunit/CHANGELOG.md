@@ -4,6 +4,12 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+**`DCA-ERR-002` and `DCA-ERR-003` no longer both report the same exception.** A subtype of
+`DomainException` declared in an application package was reported twice, with contradictory remedies:
+`DCA-ERR-002` says move it to the domain, `DCA-ERR-003` says give it another base type — which would
+turn a broken rule of the model into a use-case failure. `DCA-ERR-002` owns the case now;
+`DCA-ERR-003` no longer selects domain-exception subtypes and says so in its `selects` text.
+
 **Retired: `DCA-CYC-001`, `DCA-CYC-002`, `DCA-CYC-003`, `DCA-CYC-004`.** All four sliced *per module
 root*, so the only cycle they could ever report ran between two modules — and the first direction of
 such a cycle is already forbidden outright by `DCA-STR-004` (domain), `DCA-STR-003` (application),

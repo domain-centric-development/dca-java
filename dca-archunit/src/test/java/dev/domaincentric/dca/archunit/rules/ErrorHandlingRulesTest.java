@@ -1,5 +1,6 @@
 package dev.domaincentric.dca.archunit.rules;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.domaincentric.dca.archunit.DcaLayout;
@@ -82,5 +83,21 @@ class ErrorHandlingRulesTest {
     String message = Fixtures.failure(FIXTURES + ".bad", "DCA-ERR-005").getMessage();
 
     assertTrue(message.contains("ReservationResponseException"), message);
+  }
+
+  /**
+   * One misplacement, one owner. A subtype of DomainException declared in an application package is
+   * misplaced, not mis-based: DCA-ERR-002 reports it and says to move it to the domain, while
+   * DCA-ERR-003's remedy would be to change its base type, turning a broken rule of the model into
+   * a use-case failure. Both reported it until 0.5.0.
+   */
+  @Test
+  @DisplayName("a domain failure in the application layer is reported by DCA-ERR-002 only")
+  void oneOwnerForAMisplacedDomainFailure() {
+    String residence = Fixtures.failure(FIXTURES + ".bad", "DCA-ERR-002").getMessage();
+    assertTrue(residence.contains("ReservationRuleBrokenException"), residence);
+
+    String baseType = Fixtures.failure(FIXTURES + ".bad", "DCA-ERR-003").getMessage();
+    assertFalse(baseType.contains("ReservationRuleBrokenException"), baseType);
   }
 }

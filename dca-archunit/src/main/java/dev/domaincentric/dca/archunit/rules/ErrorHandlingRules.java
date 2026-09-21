@@ -145,18 +145,22 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                     .resideInAnyPackage(arch.allApplicationPatterns())
                     .and()
                     .areAssignableTo(Throwable.class)
+                    .and()
+                    .areNotAssignableTo(arch.layout().markers().domainException())
                     .should()
                     .beAssignableTo(arch.layout().markers().useCaseException())
                     .allowEmptyShould(true))
         .selecting(
             "Classes in <module>.application.. of every module root that are assignable to Throwable"
-                + " - the exception types the application layer declares itself. The base type"
-                + " UseCaseException lives in the building blocks and is not selected.")
+                + " and not to DomainException - the exception types the application layer declares"
+                + " itself. The base type UseCaseException lives in the building blocks and is not"
+                + " selected. A subtype of DomainException declared in an application package is"
+                + " not selected either: it is misplaced rather than mis-based, and DCA-ERR-002"
+                + " owns that case with the remedy that fits it - move the failure to the domain,"
+                + " do not change its base type.")
         .checking(
-            "Each extends UseCaseException, directly or through an intermediate base class. A"
-                + " subtype of DomainException declared in an application package is reported here"
-                + " as well: a failure of the model belongs to the model. An empty selection"
-                + " passes.");
+            "Each extends UseCaseException, directly or through an intermediate base class. An"
+                + " empty selection passes.");
   }
 
   public DcaRule exceptionsCarryNoFrameworkMetadata(DcaLayout layout) {
