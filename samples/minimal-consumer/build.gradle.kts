@@ -2,9 +2,12 @@ plugins { java }
 
 java { toolchain.languageVersion.set(JavaLanguageVersion.of(21)) }
 
-// The released versions a consumer would pin. CI overrides them to test a fresh local publication.
-val buildingBlocksVersion = providers.gradleProperty("buildingBlocksVersion").getOrElse("0.1.2")
-val archunitVersion = providers.gradleProperty("archunitVersion").getOrElse("0.3.0")
+// The versions a consumer pins - kept equal to the README's quick start, and bumped with every
+// release (see RELEASING.md). CI overrides them: once through the composite build, once against a
+// fresh local publication. While the version below is not on Maven Central yet, run this sample with
+// -PwithDcaJava, which substitutes the surrounding checkout.
+val buildingBlocksVersion = providers.gradleProperty("buildingBlocksVersion").getOrElse("0.3.0")
+val archunitVersion = providers.gradleProperty("archunitVersion").getOrElse("0.5.0")
 
 dependencies {
     implementation("dev.domaincentric:dca-building-blocks:$buildingBlocksVersion")

@@ -109,7 +109,19 @@ Afterwards, as the script prints:
 The tag comes **after** the release, so the workflow finds the artifact on Central instead of waiting for
 a publish that has not happened. After a `dca-building-blocks` or `dca-archunit` release, set
 `buildingBlocksVersion` / `archunitVersion` in `gradle.properties` to that version and commit — the
-artifacts depending on it read their POM dependency from there. Central takes about ten minutes to serve
+artifacts depending on it read their POM dependency from there.
+
+Three places name a released version by hand and drift apart if one is forgotten. Change them in the
+same commit:
+
+1. `gradle.properties` — the two properties above, set to the version just released, then the next
+   artifact's own property to its next `-SNAPSHOT`.
+2. `samples/minimal-consumer/build.gradle.kts` — the two `getOrElse(...)` defaults, which are what a
+   reader gets when they run the sample with no flags.
+3. `README.md` — the quick-start dependency block, which must stay identical to the sample's.
+
+Then regenerate the catalog (`./gradlew :dca-archunit:rulesCatalog`) so that `rules.json` records the
+released version rather than the snapshot, and commit it with the rest. Central takes about ten minutes to serve
 a published deployment; poll `repo1.maven.org` before tagging, or the workflow's wait runs out.
 
 To release without the manual click, change `publishToMavenCentral()` in

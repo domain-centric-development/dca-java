@@ -18,10 +18,10 @@ of them is optional except the building blocks:
 
 ```kotlin
 dependencies {
-    implementation("dev.domaincentric:dca-building-blocks:0.2.0")
-    implementation("dev.domaincentric:dca-spring:0.1.0")
-    testImplementation("dev.domaincentric:dca-archunit:0.4.0")
-    testImplementation("dev.domaincentric:dca-archunit-spring-modulith:0.1.0")   // Spring Modulith projects only
+    implementation("dev.domaincentric:dca-building-blocks:0.3.0")
+    implementation("dev.domaincentric:dca-spring:0.2.0")
+    testImplementation("dev.domaincentric:dca-archunit:0.5.0")
+    testImplementation("dev.domaincentric:dca-archunit-spring-modulith:0.2.0")   // Spring Modulith projects only
 }
 ```
 
@@ -41,7 +41,7 @@ see [Versioning](#versioning).
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("dev.domaincentric:dca-building-blocks:0.2.0")
+    implementation("dev.domaincentric:dca-building-blocks:0.3.0")
 }
 ```
 
@@ -81,10 +81,22 @@ dev.domaincentric.dca.buildingblocks
 
 ```kotlin
 dependencies {
-    testImplementation("dev.domaincentric:dca-archunit:0.4.0")
+    implementation("dev.domaincentric:dca-building-blocks:0.3.0")
+
+    testImplementation("dev.domaincentric:dca-archunit:0.5.0")
+    testImplementation(platform("org.junit:junit-bom:6.1.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
+
+tasks.test { useJUnitPlatform() }
 ```
+
+All five lines are needed: without the BOM the Jupiter dependency has no version, without
+`useJUnitPlatform()` Gradle finds no test, and without the launcher the test executor does not
+start. This is the block of
+[`samples/minimal-consumer/build.gradle.kts`](samples/minimal-consumer/build.gradle.kts), which CI
+keeps green against a freshly published local build.
 
 ```java
 package com.acme.shop;
@@ -146,13 +158,29 @@ statements, and Spring's after-commit relays (`@TransactionalEventListener`,
 ports; `dca-spring` ships the two implementations every project used to copy:
 
 ```kotlin
-implementation("dev.domaincentric:dca-spring:0.1.0")
+implementation("dev.domaincentric:dca-spring:0.2.0")
 ```
 
-In a Spring Boot application nothing else is needed: the auto-configuration registers
-`SpringDomainEventPublisher` and — once a `PlatformTransactionManager` bean exists —
-`SpringTransactionBoundary`, each unless you define the port yourself. Without Boot, register the two
-classes as beans.
+In a Spring Boot **4** application with a transaction manager, nothing else is needed: the
+auto-configuration registers `SpringDomainEventPublisher` and — once a `PlatformTransactionManager`
+bean exists — `SpringTransactionBoundary`, each unless you define the port yourself. Without Boot,
+register the two classes as beans. (The auto-configuration is Boot 4; on Boot 3.x the ordering it
+relies on does not exist and nothing says so — see [Compatibility](#compatibility).)
+
+**Without a transaction manager, three things are missing, and none of them announces itself.** An
+in-memory application started from `spring-boot-starter` has no manager, and neither
+`spring-boot-starter` nor `spring-modulith-starter-core` brings Boot's `TransactionAutoConfiguration`.
+Add all three, visibly:
+
+| Add | Otherwise |
+|---|---|
+| `org.springframework.boot:spring-boot-transaction` | `@Transactional` — which `DCA-USE-012` demands — does not compile: *package org.springframework.transaction.annotation does not exist* |
+| a `PlatformTransactionManager` bean of your own | the context does not start: *required a bean of type TransactionBoundary that could not be found*, because `dcaTransactionBoundary` is conditional on a manager. `dca-spring` deliberately publishes no no-op manager |
+| `org.springframework.modulith:spring-modulith-events-api` | `@ApplicationModuleListener` is not on the class path |
+
+With `spring-tx` present but no manager, `@Transactional` compiles and does nothing: the relays never
+fire while every rule stays green. `InMemoryTransactionBoundary` is for tests — same nesting contract,
+no Spring.
 
 **A default, not a prescription.** The rules check that a use case publishes through the
 `DomainEventPublisher` port inside a transaction boundary — not which class stands behind the port.
@@ -163,14 +191,6 @@ classes remain usable by hand), or leave `dca-spring` out and keep only the buil
 `dca-spring` deliberately does not provide is an `IntegrationEventPublisher`: outbox table, Modulith's
 event publication registry or a broker is a project decision.
 
-**An in-memory application has no transaction manager**, and `spring-boot-starter` +
-`spring-modulith-starter-core` bring neither one nor Boot's `TransactionAutoConfiguration`. Then
-`@Transactional` compiles and does nothing, and the relays never fire while every rule stays green.
-Add, visibly, `org.springframework.boot:spring-boot-transaction`, a `PlatformTransactionManager` bean of
-your own until a database arrives (`dca-spring` deliberately publishes no no-op manager), and
-`org.springframework.modulith:spring-modulith-events-api` for `@ApplicationModuleListener` itself.
-`InMemoryTransactionBoundary` is for tests: same nesting contract, no Spring.
-
 ### 5. Spring Modulith verification — `dca-archunit-spring-modulith`
 
 Modulith's `ApplicationModules.verify()` is not an ArchUnit rule and needs `spring-modulith-core` at
@@ -178,7 +198,7 @@ compile time, so it lives in its own optional artifact instead of `dca-archunit`
 framework-free — a build check enforces it):
 
 ```kotlin
-testImplementation("dev.domaincentric:dca-archunit-spring-modulith:0.1.0")
+testImplementation("dev.domaincentric:dca-archunit-spring-modulith:0.2.0")
 ```
 
 ```java
