@@ -1,5 +1,6 @@
 package dev.domaincentric.dca.archunit.rules;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -141,6 +142,44 @@ class UseCaseRulesTest {
       assertFalse(message.contains("AnnotatedExecuteUseCase"), message);
       String saves = Fixtures.failure(TRANSACTIONS, "DCA-USE-009").getMessage();
       assertFalse(saves.contains("AnnotatedExecuteUseCase"), saves);
+    }
+
+    /**
+     * The three rules select classes in an application package. An input-port implementation that
+     * sits in an incoming adapter — a composition-root decorator, a test double — is outside that
+     * set, and the rule texts of both libraries say so. Java read the selection as {@code
+     * ((inApplication ∧ suffix) ∨ isInputPort)} and reported it anyway.
+     */
+    @Test
+    @DisplayName("an input-port implementation outside the application layer is not selected")
+    void anInputPortOutsideTheApplicationLayerIsNotSelected() {
+      for (String id : List.of("DCA-USE-009", "DCA-USE-012", "DCA-USE-013")) {
+        assertFalse(reportOf(id).contains("OutOfLayerInputPort"), id + ": " + reportOf(id));
+      }
+    }
+
+    /** The rule's report against the transactions tree, or the empty string when it holds. */
+    private String reportOf(String id) {
+      try {
+        Fixtures.rule(TRANSACTIONS, id).check(Fixtures.arch(TRANSACTIONS));
+        return "";
+      } catch (AssertionError violation) {
+        return String.valueOf(violation.getMessage());
+      }
+    }
+
+    /**
+     * Every real use case implements a generic input port, and the compiler then writes a bridge
+     * method {@code execute(Object)} beside {@code execute(Command)}. Counting it as a second entry
+     * point reported the same violation twice, the second time as "execute (via execute)".
+     */
+    @Test
+    @DisplayName("a use case over a generic input port is reported once, not twice")
+    void aGenericInputPortIsReportedOnce() {
+      String message = Fixtures.failure(TRANSACTIONS, "DCA-USE-009").getMessage();
+      long mentions = message.lines().filter(line -> line.contains("PlaceOrderUseCase")).count();
+
+      assertEquals(1, mentions, message);
     }
 
     @Test

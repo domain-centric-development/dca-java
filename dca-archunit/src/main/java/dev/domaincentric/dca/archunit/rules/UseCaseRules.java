@@ -3,6 +3,7 @@ package dev.domaincentric.dca.archunit.rules;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaCodeUnit;
 import com.tngtech.archunit.core.domain.JavaField;
@@ -253,14 +254,7 @@ public final class UseCaseRules implements DcaRuleSet {
                 + " clearDomainEvents(), separates dispatch from acknowledgement and is not accepted",
             arch ->
                 classes()
-                    .that()
-                    .resideInAnyPackage(arch.allApplicationPatterns())
-                    .and()
-                    .haveSimpleNameEndingWith(layout.useCaseSuffix())
-                    .or()
-                    .areAssignableTo(arch.layout().markers().inputPort())
-                    .and()
-                    .areNotInterfaces()
+                    .that(useCases(arch, layout))
                     .should(publishAfterSaving(arch))
                     .allowEmptyShould(true))
         .selecting(
@@ -306,6 +300,32 @@ public final class UseCaseRules implements DcaRuleSet {
             "No dependency on a class whose simple name ends with Dto. Command, Query and Result models are not DTOs by this rule's definition - only the Dto suffix is checked.");
   }
 
+  /**
+   * The documented use-case selection: a non-interface class in an application package that either
+   * carries the configured use-case suffix or implements the input-port role.
+   *
+   * <p>Spelled inline, ArchUnit joins {@code and}/{@code or} left to right, so {@code
+   * resideInAnyPackage(app).and().haveSimpleNameEndingWith(suffix).or().areAssignableTo(port)
+   * .and().areNotInterfaces()} reads {@code ((inApplication ∧ suffix) ∨ isInputPort) ∧ ¬interface}
+   * and selects every input-port implementation anywhere, adapters included — which is neither what
+   * the rule texts say nor what the .NET twin does.
+   */
+  private static DescribedPredicate<JavaClass> useCases(DcaArchitecture arch, DcaLayout layout) {
+    DescribedPredicate<JavaClass> inApplication =
+        JavaClass.Predicates.resideInAnyPackage(arch.allApplicationPatterns());
+    DescribedPredicate<JavaClass> named =
+        JavaClass.Predicates.simpleNameEndingWith(layout.useCaseSuffix());
+    DescribedPredicate<JavaClass> port =
+        JavaClass.Predicates.assignableTo(arch.layout().markers().inputPort());
+    return inApplication
+        .and(named.or(port))
+        .and(DescribedPredicate.not(JavaClass.Predicates.INTERFACES))
+        .as(
+            "non-interface classes in an application package that implement the input port or end"
+                + " with \"%s\"",
+            layout.useCaseSuffix());
+  }
+
   private static com.tngtech.archunit.lang.ArchRule immutableApplicationModels(
       DcaArchitecture arch, String suffix) {
     return classes()
@@ -345,14 +365,7 @@ public final class UseCaseRules implements DcaRuleSet {
                 + " placement stays a review check",
             arch ->
                 classes()
-                    .that()
-                    .resideInAnyPackage(arch.allApplicationPatterns())
-                    .and()
-                    .haveSimpleNameEndingWith(layout.useCaseSuffix())
-                    .or()
-                    .areAssignableTo(arch.layout().markers().inputPort())
-                    .and()
-                    .areNotInterfaces()
+                    .that(useCases(arch, layout))
                     .should(
                         beTransactionalWhenMutating(
                             layout.frameworkAnnotations().transactional(), layout.markers()))
@@ -387,14 +400,7 @@ public final class UseCaseRules implements DcaRuleSet {
                 + " - or after it, as a reaction to an integration event",
             arch ->
                 classes()
-                    .that()
-                    .resideInAnyPackage(arch.allApplicationPatterns())
-                    .and()
-                    .haveSimpleNameEndingWith(layout.useCaseSuffix())
-                    .or()
-                    .areAssignableTo(arch.layout().markers().inputPort())
-                    .and()
-                    .areNotInterfaces()
+                    .that(useCases(arch, layout))
                     .should(
                         notCallRemotePortsWhenTransactional(
                             layout.frameworkAnnotations().transactional(), layout.markers()))

@@ -4,6 +4,21 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+**`DCA-USE-009`, `DCA-USE-012` and `DCA-USE-013` select what their texts say.** The three selections
+were spelled as a chain of `and`/`or`, which ArchUnit joins left to right, so they read
+`((inApplication ∧ suffix) ∨ isInputPort) ∧ ¬interface` and reported every input-port
+implementation anywhere — a composition-root decorator or a test double in an adapter included.
+The .NET twin never did. The selection is now one predicate matching the documented wording:
+a non-interface class in an application package that carries the use-case suffix or implements the
+input-port role.
+
+**A use case over a generic input port is reported once.** The compiler writes a bridge method
+`execute(Object)` beside `execute(Command)`; nothing inside the class calls it, so the "nothing
+calls it" fallback made it a second entry point and `DCA-USE-009` and `DCA-USE-012` reported the
+same violation twice, the second time as `execute (via execute)`. Synthetic and bridge units are
+never entry points now. This is the ordinary shape of a Java use case, so the change halves the
+violation count a team sees on its first run.
+
 **`DCA-ONI-002` no longer reports a project's own marker vocabulary.** The rule named the two
 building-blocks packages directly, so a project that pointed the roles at its own markers — the
 adoption path `DcaMarkers`'s own javadoc shows — was told its aggregate root was a forbidden
