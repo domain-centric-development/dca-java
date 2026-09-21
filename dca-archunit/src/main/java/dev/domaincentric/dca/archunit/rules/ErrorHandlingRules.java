@@ -10,7 +10,12 @@ import dev.domaincentric.dca.archunit.FrameworkAnnotations;
 import dev.domaincentric.dca.buildingblocks.application.UseCaseException;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.DomainException;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.in.InputPort;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * Error-handling rules: a failure carries the name of what went wrong, in the layer that knows it.
@@ -237,34 +242,53 @@ public final class ErrorHandlingRules implements DcaRuleSet {
   public DcaRule adaptersWithoutTranslation() {
     return DcaRule.informational(
             "DCA-ERR-006",
-            "Diagnostic: incoming adapters that drive a use case without translating its failures",
-            "An adapter that knows neither failure type either lets everything escape to a generic"
-                + " handler or catches a generic type and answers every outcome the same way;"
-                + " whether it does is not visible in the import model",
+            "Diagnostic: incoming adapter packages that drive a use case without translating its"
+                + " failures",
+            "A package that drives the application and knows neither failure type either lets"
+                + " everything escape to a generic handler or catches a generic type and answers"
+                + " every outcome the same way; whether it does is not visible in the import model",
             arch -> {
+              Map<String, List<JavaClass>> drivingByPackage = new TreeMap<>();
+              Set<String> packagesThatName = new HashSet<>();
               for (JavaClass type : arch.classes()) {
-                if (type.isInterface()
-                    || !JavaClass.Predicates.resideInAnyPackage(arch.allIncomingAdapterPatterns())
-                        .test(type)
-                    || !dependsOnAssignableTo(type, InputPort.class)
-                    || dependsOnAssignableTo(type, DomainException.class)
-                    || dependsOnAssignableTo(type, UseCaseException.class)) {
+                if (!JavaClass.Predicates.resideInAnyPackage(arch.allIncomingAdapterPatterns())
+                    .test(type)) {
                   continue;
                 }
-                System.out.println(
-                    "[DCA-ERR-006] "
-                        + type.getName()
-                        + ": drives an input port and names no failure type of the inner layers");
+                if (dependsOnAssignableTo(type, DomainException.class)
+                    || dependsOnAssignableTo(type, UseCaseException.class)) {
+                  packagesThatName.add(type.getPackageName());
+                }
+                if (!type.isInterface() && dependsOnAssignableTo(type, InputPort.class)) {
+                  drivingByPackage
+                      .computeIfAbsent(type.getPackageName(), pkg -> new ArrayList<>())
+                      .add(type);
+                }
               }
+              drivingByPackage.forEach(
+                  (pkg, driving) -> {
+                    if (packagesThatName.contains(pkg)) {
+                      return;
+                    }
+                    System.out.println(
+                        "[DCA-ERR-006] "
+                            + pkg
+                            + ": drives an input port and names no failure type of the inner layers"
+                            + " ("
+                            + driving.stream().map(JavaClass::getSimpleName).sorted().toList()
+                            + ")");
+                  });
             })
         .selecting(
-            "Non-interface classes in <module>.adapter.incoming.. of every module root that depend"
-                + " on a class assignable to InputPort - the adapters that drive the application.")
+            "Incoming adapter packages of every module root (<module>.adapter.incoming..) that hold"
+                + " at least one non-interface class depending on a class assignable to InputPort -"
+                + " the packages that drive the application.")
         .checking(
-            "Informational diagnostic only: lists those that depend on no class assignable to"
-                + " DomainException or UseCaseException and never fails. A central handler"
-                + " elsewhere in the adapter layer is a valid answer, and a caught type is not"
-                + " visible to the import model - this does not establish that an adapter"
+            "Informational diagnostic only: lists a package when no class in it - a central"
+                + " exception handler beside the adapters included - depends on a class assignable"
+                + " to DomainException or UseCaseException, and never fails. A handler in a"
+                + " different package of the same module is not seen, and a caught type is not"
+                + " visible to the import model, so this does not establish that a package"
                 + " translates nothing.");
   }
 

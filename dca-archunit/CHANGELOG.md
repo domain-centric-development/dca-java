@@ -14,7 +14,9 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
   `DCA-ERR-005` forbids the technical suffixes `Error`, `Fault`, `Failure` and the words `Http`, `Status`,
   `Response` in their names. Argument guards are outside all of this: the platform's own argument exceptions are
   never selected. `DCA-ERR-006` is informational — the import model carries neither a `throw` nor a `catch`, so an
-  adapter that catches a generic exception can only be listed, never failed.
+  adapter that catches a generic exception can only be listed, never failed. It reports an incoming adapter
+  *package*, not a single class: a central exception handler beside the adapters is what the doctrine asks
+  for, and a per-class diagnostic would list exactly the adapters that use one.
 
 - `DCA-STR-011` is new: at least one package below the base package declares `@BoundedContext`. Without a
   declaration the context-map and isolation rules select nothing and report success over an empty model. A code base
