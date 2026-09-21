@@ -9,7 +9,7 @@ Hexagonal Architecture and Clean Architecture.
 | Artifact | What it is | Dependencies |
 |----------|------------|--------------|
 | `dev.domaincentric:dca-building-blocks` | The building blocks your code implements: DDD tactical markers (`AggregateRoot`, `Entity`, `Value`, `DomainEvent`, …), strategic annotations (`@BoundedContext`, `@SharedKernel`, `@Upstream`, `@Partnership`, …) and hexagonal port interfaces (`UseCase`, `Repository`, `Store`, …), the application-layer `TransactionBoundary` and the two exception base types (`DomainException`, `UseCaseException`) | none |
-| `dev.domaincentric:dca-archunit` | The governance rules: ~120 ArchUnit rules pinned to those building blocks, plus an executable context map | `dca-building-blocks`, ArchUnit |
+| `dev.domaincentric:dca-archunit` | The governance rules: 121 ArchUnit rules pinned to those building blocks, plus an executable context map | `dca-building-blocks`, ArchUnit |
 | `dev.domaincentric:dca-spring` | The runtime adapters the rules demand: `SpringDomainEventPublisher` (over `ApplicationEventPublisher`), `SpringTransactionBoundary` (over `TransactionTemplate`), an `InMemoryTransactionBoundary` for tests, and a Spring Boot auto-configuration | `dca-building-blocks`; Spring `compileOnly` — your Boot BOM pins the version |
 | `dev.domaincentric:dca-archunit-spring-modulith` | Spring Modulith's module verification as a DCA test: `DcaSpringModulithTest` next to `DcaArchitectureTest`, with the test-class exclusion Modulith needs | `dca-archunit`; `spring-modulith-core` `compileOnly` |
 
@@ -18,10 +18,10 @@ of them is optional except the building blocks:
 
 ```kotlin
 dependencies {
-    implementation("dev.domaincentric:dca-building-blocks:0.2.0")
-    implementation("dev.domaincentric:dca-spring:0.1.0")
-    testImplementation("dev.domaincentric:dca-archunit:0.4.0")
-    testImplementation("dev.domaincentric:dca-archunit-spring-modulith:0.1.0")   // Spring Modulith projects only
+    implementation("dev.domaincentric:dca-building-blocks:0.3.0")
+    implementation("dev.domaincentric:dca-spring:0.2.0")
+    testImplementation("dev.domaincentric:dca-archunit:0.5.0")
+    testImplementation("dev.domaincentric:dca-archunit-spring-modulith:0.2.0")   // Spring Modulith projects only
 }
 ```
 
@@ -41,7 +41,7 @@ see [Versioning](#versioning).
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("dev.domaincentric:dca-building-blocks:0.2.0")
+    implementation("dev.domaincentric:dca-building-blocks:0.3.0")
 }
 ```
 
@@ -81,10 +81,22 @@ dev.domaincentric.dca.buildingblocks
 
 ```kotlin
 dependencies {
-    testImplementation("dev.domaincentric:dca-archunit:0.4.0")
+    implementation("dev.domaincentric:dca-building-blocks:0.3.0")
+
+    testImplementation("dev.domaincentric:dca-archunit:0.5.0")
+    testImplementation(platform("org.junit:junit-bom:6.1.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
+
+tasks.test { useJUnitPlatform() }
 ```
+
+All five lines are needed: without the BOM the Jupiter dependency has no version, without
+`useJUnitPlatform()` Gradle finds no test, and without the launcher the test executor does not
+start. This is the block of
+[`samples/minimal-consumer/build.gradle.kts`](samples/minimal-consumer/build.gradle.kts), which CI
+keeps green against a freshly published local build.
 
 ```java
 package com.acme.shop;
@@ -146,13 +158,29 @@ statements, and Spring's after-commit relays (`@TransactionalEventListener`,
 ports; `dca-spring` ships the two implementations every project used to copy:
 
 ```kotlin
-implementation("dev.domaincentric:dca-spring:0.1.0")
+implementation("dev.domaincentric:dca-spring:0.2.0")
 ```
 
-In a Spring Boot application nothing else is needed: the auto-configuration registers
-`SpringDomainEventPublisher` and — once a `PlatformTransactionManager` bean exists —
-`SpringTransactionBoundary`, each unless you define the port yourself. Without Boot, register the two
-classes as beans.
+In a Spring Boot **4** application with a transaction manager, nothing else is needed: the
+auto-configuration registers `SpringDomainEventPublisher` and — once a `PlatformTransactionManager`
+bean exists — `SpringTransactionBoundary`, each unless you define the port yourself. Without Boot,
+register the two classes as beans. (The auto-configuration is Boot 4; on Boot 3.x the ordering it
+relies on does not exist and nothing says so — see [Compatibility](#compatibility).)
+
+**Without a transaction manager, three things are missing, and none of them announces itself.** An
+in-memory application started from `spring-boot-starter` has no manager, and neither
+`spring-boot-starter` nor `spring-modulith-starter-core` brings Boot's `TransactionAutoConfiguration`.
+Add all three, visibly:
+
+| Add | Otherwise |
+|---|---|
+| `org.springframework.boot:spring-boot-transaction` | `@Transactional` — which `DCA-USE-012` demands — does not compile: *package org.springframework.transaction.annotation does not exist* |
+| a `PlatformTransactionManager` bean of your own | the context does not start: *required a bean of type TransactionBoundary that could not be found*, because `dcaTransactionBoundary` is conditional on a manager. `dca-spring` deliberately publishes no no-op manager |
+| `org.springframework.modulith:spring-modulith-events-api` | `@ApplicationModuleListener` is not on the class path |
+
+With `spring-tx` present but no manager, `@Transactional` compiles and does nothing: the relays never
+fire while every rule stays green. `InMemoryTransactionBoundary` is for tests — same nesting contract,
+no Spring.
 
 **A default, not a prescription.** The rules check that a use case publishes through the
 `DomainEventPublisher` port inside a transaction boundary — not which class stands behind the port.
@@ -163,14 +191,6 @@ classes remain usable by hand), or leave `dca-spring` out and keep only the buil
 `dca-spring` deliberately does not provide is an `IntegrationEventPublisher`: outbox table, Modulith's
 event publication registry or a broker is a project decision.
 
-**An in-memory application has no transaction manager**, and `spring-boot-starter` +
-`spring-modulith-starter-core` bring neither one nor Boot's `TransactionAutoConfiguration`. Then
-`@Transactional` compiles and does nothing, and the relays never fire while every rule stays green.
-Add, visibly, `org.springframework.boot:spring-boot-transaction`, a `PlatformTransactionManager` bean of
-your own until a database arrives (`dca-spring` deliberately publishes no no-op manager), and
-`org.springframework.modulith:spring-modulith-events-api` for `@ApplicationModuleListener` itself.
-`InMemoryTransactionBoundary` is for tests: same nesting contract, no Spring.
-
 ### 5. Spring Modulith verification — `dca-archunit-spring-modulith`
 
 Modulith's `ApplicationModules.verify()` is not an ArchUnit rule and needs `spring-modulith-core` at
@@ -178,7 +198,7 @@ compile time, so it lives in its own optional artifact instead of `dca-archunit`
 framework-free — a build check enforces it):
 
 ```kotlin
-testImplementation("dev.domaincentric:dca-archunit-spring-modulith:0.1.0")
+testImplementation("dev.domaincentric:dca-archunit-spring-modulith:0.2.0")
 ```
 
 ```java
@@ -244,7 +264,10 @@ the file, so a `dca-archunit.properties` added later would be ignored without a 
 
 **Two limitations.** Freezing needs a single ArchUnit rule to build the baseline from. The rules that
 run several checks internally — the context-map set and those iterating over bounded contexts —
-cannot be frozen; freezing one fails with a message naming it. Lower those to `warning(...)` instead.
+cannot be frozen; freezing one fails with a message naming it. Lower those to `warning(...)` instead,
+or scope them with `dca.rule.<id>.ignore`, which works for every rule and is the only one of the two
+that `DomainCentric.ArchRules` also offers — it has no baseline dial yet, so a project that keeps one
+configuration file for both stacks should prefer `ignore`.
 And the transaction rules (`DCA-USE-009`, `-012`, `-013`) reason per *entry path*, following the directed
 calls within the use case class: an entry point (a method callable from outside the class, or one nothing
 in the class calls) may save through one helper and publish through another, and from every entry point no
@@ -263,7 +286,59 @@ DcaArchitecture arch = DcaArchitecture.load(DcaLayout.forBasePackage("com.acme.s
 DcaRules.checkAll(arch);                       // or checkAll(arch, selection) with a selection
 ```
 
+## The smallest DCA
+
+Nothing in the catalog fires on a concept the project has not declared: a rule with an empty
+selection passes. So the first day needs seven building blocks, not thirty-one:
+
+- `AggregateRoot<T, ID>` and `Id` — one aggregate and its identifier
+- `Value` — the attributes that have no lifecycle of their own
+- `Repository<T, ID>` — how that aggregate is loaded and stored
+- `InputPort` — what the outside may ask the application to do
+- `DomainException` — a broken rule of the model, named after the rule
+- `@BoundedContext` on one `package-info.java` — so the rules know where the module begins
+
+That is enough for `DcaArchitectureTest` to say something useful. `Entity`, `DomainEvent`,
+`IntegrationEvent`, `DomainService`, `Factory`, `Specification`, `Store`, the publishers and the
+context-map annotations each switch on the rules that govern them, when and only when the project
+introduces the concept. The test source set's `fixtures/layout/greenfield` package is that shape,
+nine files, and every rule of the catalog passes over it.
+
+**Your own vocabulary instead of ours.** A code base that already has an aggregate base class keeps
+it and points the roles at it, rather than migrating types or excluding rule ids:
+
+```java
+DcaLayout.forBasePackage("com.acme.billing")
+    .withMarkers(
+        DcaMarkers.dca()
+            .named("acme")
+            .withAggregateRoot("com.acme.common.Aggregate")
+            .withRepository("com.acme.common.Store"));
+```
+
+Every rule then selects on those types, the vocabulary's own packages are excluded from the
+third-party checks, and the test report names the vocabulary it resolved. One caveat:
+`withOutputPort` must be set as soon as any other port role is, because `DCA-HEX-009` measures every
+port against it.
+
+**Domain events are optional; the marker's API is not.** `AggregateRoot<T, ID>` declares
+`domainEvents()` and `clearDomainEvents()`, so a project that models no events still inherits
+them. No rule requires an event to exist — every event rule passes on an empty selection — but if
+the two methods are unwanted on the model, point the aggregate-root role at a type of your own; the
+rules follow the role, not the base class.
+
+**Your own names.** Where a rule finds something by name rather than by role — the use-case,
+controller, REST-controller, aggregate-root, repository, store, factory and specification suffixes,
+the segments of the package layout, and the types a domain event may store its occurrence time in
+(`withTimestampTypes`) — `DcaLayout` has a `with…` for it. Configure the name; do not switch the
+rule off.
+
 ## Rule catalog
+
+**119 rule ids in 11 sets: 113 enforced, 6 informational.** Five further ids are retired and keep their meaning in the retirement list. The exact, current list is
+[RULES.md](RULES.md) and [rules.json](rules.json), both generated from the code by
+`./gradlew :dca-archunit:rulesCatalog` and verified in CI; every number in this README is taken from
+there. `rules.json` names the library version its texts belong to.
 
 Rule sets and identifier prefixes:
 
@@ -301,16 +376,57 @@ void renderContextMap() {
 
 Because the rules guarantee declarations match the code, the rendered map cannot drift.
 
+## Compatibility
+
+| Runs on | Minimum | Built and tested against |
+|---|---|---|
+| Java | 17 | 17 bytecode, toolchain 21 and 25 |
+| JUnit Jupiter | 5.10 | 5.10.2 and 6.1.3 |
+| ArchUnit | 1.4 | 1.4.1 and 1.5.0 |
+| Spring Boot (`dca-spring`) | **4.0** | 4.0.2 |
+| Spring Framework (`dca-spring`) | 7.0 | 7.0.3 |
+| Spring Modulith (`dca-archunit-spring-modulith`) | 2.0 | 2.0.3 |
+
+`dca-building-blocks` and `dca-archunit` have no framework on their class path; the JUnit dependency of
+`dca-archunit` is `compileOnly`, so the version above is the one your own build brings. `dca-spring`
+registers its beans through Spring Boot 4 auto-configuration and does not work on Boot 3.x — the
+ordering it relies on does not exist there, and nothing fails loudly, so pin Boot 4 or wire the beans
+yourself.
+
+## Public API
+
+What a consumer may rely on, and what may change in a patch:
+
+| Public — covered by the versioning promise | Internal — may change without notice |
+|---|---|
+| The **rule ids** and their meaning, `rules.json` and `RULES.md` | The rule-set classes (`TacticalPatternRules`, `UseCaseRules`, …) and their factory methods |
+| `DcaLayout`, `DcaMarkers`, `FrameworkAnnotations` and the preset SPI | The `rules` package as a whole, and every helper in it |
+| `DcaArchitecture`, `DcaRules`, `DcaRuleSelection`, `DcaRuleExecution`, `DcaRuleOutcome`, `DcaSeverity` | The wording of a violation message, beyond the `[DCA-XXX-nnn]` prefix every line carries |
+| `DcaRule` as a type to read — id, title, rationale, `selects()`, `checks()` | The retired rules' implementation classes, which exist only so an old reference still compiles |
+| `dev.domaincentric.dca.buildingblocks..` — every marker and port type | Test fixtures, and anything under a `catalog` or `spi.internal` package |
+| The JUnit base class `DcaArchitectureTest` | |
+
+The rule-set classes are `public` because the catalog generator and the JUnit integration are in a
+different package, not because they are meant to be called directly. Build a run through `DcaRules`
+and a `DcaRuleSelection`; that is the supported entry point, and it is the one that applies severities,
+freezing and tolerated violations.
+
 ## Versioning
 
 Semantic versioning, independent per artifact:
 
 - `dca-building-blocks` — rarely changes; a new marker is a minor bump, a removed or renamed one a
   major bump.
-- `dca-archunit` — a new rule is a minor bump (it can fail your build — pin versions), a tightened
-  rule is a major bump, a relaxed rule or fixed false positive a patch. **Before 1.0** a minor version
-  may add and tighten rules as well; every such change is listed under *Changed — breaking* in the
-  changelog, with a migration note at the top of the release.
+- `dca-archunit` — **from 1.0 on, a new or tightened rule is a major bump.** Adding a rule can turn a
+  green build red, and SemVer calls that breaking however small the change is; calling it a minor bump
+  would make the number useless for exactly the consumers who pin it. A relaxed rule, a fixed false
+  positive and a clearer message are patches. **Before 1.0** a minor version may add and tighten rules,
+  which is what 0.x is for: every such change is listed under *What can turn a green build red* in the
+  changelog, with a migration note at the top of the release. Either way, pin the version.
+- **Rule ids are the stable contract.** An id is never reused for a different check and never
+  renumbered. A withdrawn rule keeps its id in the retirement list of `rules.json` with the reason and
+  its replacement, so a `dca.rules.off` entry or a catalog reference never silently means something
+  else.
 - `dca-spring`, `dca-archunit-spring-modulith` — ordinary SemVer on their own APIs; a raised minimum Spring or
   Modulith version is a minor bump.
 

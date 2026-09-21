@@ -89,4 +89,24 @@ class RetirementTest {
     String md = ContextMapRenderer.of(arch).render();
     assertTrue(md.contains("_2[["), md);
   }
+
+  /**
+   * A retired id has no way back into the catalog. Until 0.5.0 the factory methods behind {@code
+   * DCA-ADV-003} and {@code DCA-TAC-022} were public, so a project could build a rule the selection
+   * refuses and the report cannot place; they are gone, and nothing reintroduces them.
+   */
+  @Test
+  void noRuleSetOffersARetiredIdentity() {
+    var layout = DcaLayout.forBasePackage("example");
+    var offered =
+        DcaRules.ruleSets(layout).stream()
+            .flatMap(set -> set.rules().stream())
+            .map(DcaRule::id)
+            .collect(java.util.stream.Collectors.toSet());
+
+    for (String retired : DcaRules.retired().keySet()) {
+      assertFalse(
+          offered.contains(retired), retired + " is retired but still offered by a rule set");
+    }
+  }
 }

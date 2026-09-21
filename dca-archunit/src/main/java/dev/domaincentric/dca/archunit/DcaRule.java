@@ -57,6 +57,17 @@ public interface DcaRule {
    */
   String checks();
 
+  /**
+   * What to change to satisfy the rule, in one imperative sentence, when the rule can name it —
+   * "rename the class to *UseCase", "break the cycle by moving the shared concept behind a port".
+   * {@link DcaRuleExecution} appends it to the violation report as a {@code Fix:} line, so the
+   * remedy reaches the reader for rules built with {@link #of} as well, whose ArchUnit report says
+   * only what is wrong. The counterpart of the {@code fix} argument of .NET's {@code DcaRule.Fail}.
+   */
+  default Optional<String> remedy() {
+    return Optional.empty();
+  }
+
   /** Runs the rule; throws {@link AssertionError} on violation. */
   void check(DcaArchitecture architecture);
 
@@ -138,12 +149,21 @@ public interface DcaRule {
 
     /** Names what the rule asserts about each selected class; see {@link DcaRule#checks()}. */
     public DcaRule checking(String checks) {
+      return checking(checks, null);
+    }
+
+    /**
+     * The same, with the one imperative sentence that says what to change; see {@link
+     * DcaRule#remedy()}.
+     */
+    public DcaRule checking(String checks, String remedy) {
       return new SimpleRule(
           rule.id,
           rule.title,
           rule.rationale,
           selects,
           requireText(checks, "checks", rule.id),
+          remedy == null ? null : requireText(remedy, "remedy", rule.id),
           rule.check,
           rule.archRule,
           rule.kind);
@@ -171,6 +191,7 @@ public interface DcaRule {
     private final String rationale;
     private final String selects;
     private final String checks;
+    private final String remedy;
     private final Consumer<DcaArchitecture> check;
     private final Function<DcaArchitecture, ArchRule> archRule;
 
@@ -180,6 +201,7 @@ public interface DcaRule {
         String rationale,
         String selects,
         String checks,
+        String remedy,
         Consumer<DcaArchitecture> check,
         Function<DcaArchitecture, ArchRule> archRule,
         Kind kind) {
@@ -189,6 +211,7 @@ public interface DcaRule {
       this.rationale = Objects.requireNonNull(rationale);
       this.selects = Objects.requireNonNull(selects);
       this.checks = Objects.requireNonNull(checks);
+      this.remedy = remedy;
       this.check = check;
       this.archRule = archRule;
     }
@@ -216,6 +239,11 @@ public interface DcaRule {
     @Override
     public String checks() {
       return checks;
+    }
+
+    @Override
+    public Optional<String> remedy() {
+      return Optional.ofNullable(remedy);
     }
 
     @Override

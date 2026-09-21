@@ -5,6 +5,7 @@ import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyP
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.lang.ArchRule;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
@@ -13,8 +14,8 @@ import dev.domaincentric.dca.archunit.DcaRuleSet;
 import dev.domaincentric.dca.archunit.DcaRuleViolation;
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.BoundedContext;
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.relationships.OpenHostService;
-import dev.domaincentric.dca.buildingblocks.ddd.tactical.IntegrationEvent;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -44,9 +45,9 @@ public final class StrategicPatternRules implements DcaRuleSet {
             outgoingAdaptersOnlyUseOpenHostServices(),
             integrationEventsResideInEventsPackages(),
             integrationEventsAreRecords(),
-            antiCorruptionLayerComponentsResideInAclPackages(),
             eventListenersUseAntiCorruptionLayer(),
-            atLeastOneBoundedContextIsDeclared());
+            atLeastOneBoundedContextIsDeclared(),
+            atLeastOneModuleOwnsALayer());
   }
 
   @Override
@@ -327,7 +328,9 @@ public final class StrategicPatternRules implements DcaRuleSet {
             arch ->
                 classes()
                     .that()
-                    .implement(IntegrationEvent.class)
+                    .areAssignableTo(arch.layout().markers().integrationEvent())
+                    .and()
+                    .areNotInterfaces()
                     .should()
                     .resideInAnyPackage(".." + layout.eventsSubpackage() + "..")
                     .allowEmptyShould(true))
@@ -344,12 +347,16 @@ public final class StrategicPatternRules implements DcaRuleSet {
     return DcaRule.of(
             "DCA-STR-008",
             "Integration Events should have immutable shape",
-            "Integration Events must be immutable to ensure event integrity across contexts (Event"
-                + " Sourcing best practice)",
+            "An integration event is a published contract: once another context has read it, its"
+                + " shape may only grow, never change under an existing reader. A mutable event"
+                + " cannot make that promise - any holder can rewrite what a second consumer will"
+                + " read",
             arch ->
                 classes()
                     .that()
-                    .implement(IntegrationEvent.class)
+                    .areAssignableTo(arch.layout().markers().integrationEvent())
+                    .and()
+                    .areNotInterfaces()
                     .should(TypeInspection.haveImmutableShape())
                     .allowEmptyShould(true))
         .selecting(
@@ -357,33 +364,8 @@ public final class StrategicPatternRules implements DcaRuleSet {
                 + " sub-interface - anywhere on the classpath under scan.")
         .checking(
             "The class is final or a record with final inherited instance fields and no instance setter methods - a name heuristic: set followed by an upper-case letter, with parameters, returning void (settle(x) is not a setter)."
-                + " Referenced objects and collection contents are not inspected. Interfaces are excluded.");
-  }
-
-  public static DcaRule antiCorruptionLayerComponentsResideInAclPackages() {
-    return DcaRule.of(
-            "DCA-STR-009",
-            "Anti-Corruption Layer components must be in acl packages",
-            "Anti-Corruption Layer components must be in 'acl' packages for clear architectural intent"
-                + " (DDD Strategic Pattern)",
-            arch ->
-                classes()
-                    .that()
-                    .haveSimpleNameEndingWith("EventTranslator")
-                    .or()
-                    .haveSimpleNameEndingWith("ACL")
-                    .or()
-                    .haveSimpleNameEndingWith("AntiCorruptionLayer")
-                    .should()
-                    .resideInAPackage("..acl..")
-                    .allowEmptyShould(true))
-        .selecting(
-            "Classes anywhere on the classpath under scan whose simple name ends with"
-                + " EventTranslator, ACL or AntiCorruptionLayer - selected by name alone, no marker"
-                + " or annotation is read.")
-        .checking(
-            "Each resides in a package whose path contains an acl segment (..acl..), at any depth."
-                + " A translation class named otherwise is neither selected nor checked.");
+                + " Referenced objects and collection contents are not inspected. Interfaces are excluded.",
+            "declare the event as a final record");
   }
 
   /** DCA-STR-010 — documentation only, never fails. */
@@ -399,6 +381,58 @@ public final class StrategicPatternRules implements DcaRuleSet {
             "Nothing is asserted. Whether a consumed integration event is translated into the"
                 + " consuming context's own language before it reaches the domain is a code-review"
                 + " check.");
+  }
+
+  /** DCA-STR-012. */
+  public static DcaRule atLeastOneModuleOwnsALayer() {
+    return DcaRule.check(
+            "DCA-STR-012",
+            "At least one module owns a DCA layer",
+            "Without a discovered module root every rule that selects over the layers matches"
+                + " nothing and reports success over an empty model",
+            arch -> {
+              if (!arch.moduleRoots().isEmpty()) {
+                return;
+              }
+              List<String> segments = new ArrayList<>(arch.layerSegments());
+              Collections.sort(segments);
+              List<String> observed =
+                  arch.classes().stream()
+                      .map(JavaClass::getPackageName)
+                      .distinct()
+                      .sorted()
+                      .limit(10)
+                      .toList();
+              throw new DcaRuleViolation(
+                  "No package below the base package '"
+                      + arch.layout().basePackage()
+                      + "' carries one of the configured layer segments "
+                      + segments
+                      + ", so no module root was discovered and every rule that selects over the"
+                      + " layers - the whole use-case set among them - passes without having"
+                      + " looked at anything. Packages seen"
+                      + (observed.size() < 10 ? "" : " (first ten)")
+                      + ": "
+                      + observed
+                      + ".",
+                  List.of(
+                      "Name the segments this code base uses on the layout:"
+                          + " withDomainSubpackage(...), withApplicationSubpackage(...) and"
+                          + " withAdapterSubpackage(...).",
+                      "Check that the base package passed to DcaLayout.forBasePackage is the one"
+                          + " the modules live under, and that the import covers them.",
+                      "A code base that deliberately has no layered module switches this rule off"
+                          + " with a recorded reason."));
+            })
+        .selecting(
+            "The packages of the imported classes, as a whole - no individual class is reported."
+                + " A module root is any package that has a subpackage named after one of the"
+                + " configured layer segments, at any depth below the base package.")
+        .checking(
+            "At least one module root was discovered. The rule says nothing about how many"
+                + " modules there should be or how they are cut; it only establishes that the"
+                + " layer-selecting rules have something to look at. It is the third guard of the"
+                + " same kind as an empty import and an undeclared bounded context.");
   }
 
   /** DCA-STR-011. */

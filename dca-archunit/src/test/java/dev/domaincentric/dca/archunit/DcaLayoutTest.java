@@ -99,4 +99,77 @@ class DcaLayoutTest {
     assertEquals("published", layout.channelSubpackage(Upstream.Consumes.EVENTS));
     assertEquals(List.of("contract", "published"), layout.publishedSubpackages());
   }
+
+  /**
+   * The web adapter and shared segments are configurable like every other one: DCA-NAM-011 reads
+   * the first, the shared-output-port patterns read the second, and the shared segment stays
+   * reserved against the operation containers whatever it is called.
+   */
+  @Test
+  void theWebAdapterAndSharedSegmentsAreConfigurable() {
+    assertEquals("web", DEFAULTS.webSubpackage());
+    assertEquals("shared", DEFAULTS.sharedSubpackage());
+    assertEquals("ui", DEFAULTS.withWebSubpackage("ui").webSubpackage());
+
+    DcaLayout ports = DEFAULTS.withSharedSubpackage("ports");
+    assertEquals("com.acme.shop.*.application.ports..", ports.sharedOutputPortPattern());
+    assertEquals(
+        "com.acme.cart.application.ports..", ports.sharedOutputPortPattern("com.acme.cart"));
+
+    assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withOperationContainers("shared"));
+    assertThrows(IllegalArgumentException.class, () -> ports.withOperationContainers("ports"));
+    assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withWebSubpackage(""));
+    assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withSharedSubpackage("a.b"));
+  }
+
+  /**
+   * The tactical suffixes and the domain-service segment are configurable like the use-case and
+   * controller suffixes; a project that calls its ports differently configures them rather than
+   * excluding the rule ids.
+   */
+  @Test
+  void theTacticalNamesAreConfigurable() {
+    assertEquals("AggregateRoot", DEFAULTS.aggregateRootSuffix());
+    assertEquals("Repository", DEFAULTS.repositorySuffix());
+    assertEquals("Store", DEFAULTS.storeSuffix());
+    assertEquals("Factory", DEFAULTS.factorySuffix());
+    assertEquals("Specification", DEFAULTS.specificationSuffix());
+
+    DcaLayout own =
+        DEFAULTS
+            .withAggregateRootSuffix("Root")
+            .withRepositorySuffix("Gateway")
+            .withStoreSuffix("Table")
+            .withFactorySuffix("Builder")
+            .withSpecificationSuffix("Rule");
+
+    assertEquals("Root", own.aggregateRootSuffix());
+    assertEquals("Gateway", own.repositorySuffix());
+    assertEquals("Table", own.storeSuffix());
+    assertEquals("Builder", own.factorySuffix());
+    assertEquals("Rule", own.specificationSuffix());
+    assertEquals("com.acme.shop", own.basePackage(), "the rest is unchanged");
+
+    assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withRepositorySuffix(""));
+    assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withStoreSuffix("a.b"));
+  }
+
+  @Test
+  void theTimestampTypesAreConfigurable() {
+    assertEquals(
+        java.util.List.of(
+            "java.time.Instant",
+            "java.time.OffsetDateTime",
+            "java.time.ZonedDateTime",
+            "java.time.LocalDateTime"),
+        DEFAULTS.timestampTypes());
+
+    DcaLayout own = DEFAULTS.withTimestampTypes("com.acme.shop.platform.Timestamp");
+    assertEquals(java.util.List.of("com.acme.shop.platform.Timestamp"), own.timestampTypes());
+    assertEquals("com.acme.shop", own.basePackage(), "the rest is unchanged");
+
+    // An empty list would report every event, which is never what a caller means.
+    assertThrows(IllegalArgumentException.class, DEFAULTS::withTimestampTypes);
+    assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withTimestampTypes(" "));
+  }
 }

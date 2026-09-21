@@ -3,8 +3,11 @@ package dev.domaincentric.dca.archunit.rules;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.tngtech.archunit.core.importer.ClassFileImporter;
+import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRuleViolation;
+import dev.domaincentric.dca.archunit.DcaRules;
 import dev.domaincentric.dca.archunit.Fixtures;
 import java.util.List;
 import java.util.stream.Stream;
@@ -135,5 +138,78 @@ class TacticalPatternRulesTest {
     assertTrue(
         violation.violations().stream().anyMatch(v -> v.contains("Weight")),
         violation.getMessage());
+  }
+
+  /**
+   * An enum value object with constant-specific class bodies is compiled abstract, so requiring
+   * {@code final} of it could never be satisfied. DCA-TAC-009 therefore does not select enums - as
+   * the .NET twin never has.
+   */
+  @Test
+  @DisplayName("DCA-TAC-009 does not select an enum value object")
+  void enumValueObjectsAreNotSelected() {
+    Fixtures.rule(GOOD, "DCA-TAC-009").check(Fixtures.arch(GOOD));
+  }
+
+  /** The asynchronous spellings are the same names to DCA-TAC-021, as they are in .NET. */
+  @Test
+  @DisplayName("DCA-TAC-021 reports the asynchronous write vocabulary too")
+  void asynchronousRepositorySemanticsOnAStoreAreReported() {
+    DcaRuleViolation violation = Fixtures.violation(BAD, "DCA-TAC-021");
+    assertTrue(
+        violation.violations().stream().anyMatch(v -> v.contains("saveAsync")),
+        violation.getMessage());
+  }
+
+  /**
+   * The aggregate comes from the bound type argument, and the name must name it. A repository bound
+   * to one aggregate and named after another is what the name-only resolution could not see.
+   */
+  @Test
+  @DisplayName("DCA-TAC-016 reports a repository named after another aggregate than it binds")
+  void aRepositoryMustBeNamedAfterTheAggregateItBinds() {
+    DcaRuleViolation violation = Fixtures.violation(BAD, "DCA-TAC-016");
+
+    assertTrue(
+        violation.violations().stream()
+            .anyMatch(
+                v -> v.contains("CategoryRepository") && v.contains("name it OrderRepository")),
+        violation.getMessage());
+  }
+
+  /**
+   * A generic intermediate port binds a type variable, not an aggregate. Resolving its name would
+   * look for a class called "Audited" and report a violation with no remedy, so it is skipped.
+   */
+  @Test
+  @DisplayName("DCA-TAC-016 skips a generic intermediate repository port")
+  void aGenericIntermediateRepositoryPortIsSkipped() {
+    Fixtures.rule(GOOD, "DCA-TAC-016").check(Fixtures.arch(GOOD));
+  }
+
+  /**
+   * The suffix drives the selection, so a project whose ports are called something else configures
+   * the layout rather than excluding the ids. With the repository suffix changed, the bad fixture's
+   * {@code *Repository} interfaces are no longer selected and the two name-anchored rules pass.
+   */
+  @Test
+  @DisplayName("the tactical suffixes select: a changed repository suffix moves the selection")
+  void theRepositorySuffixDrivesTheSelection() {
+    DcaLayout own = DcaLayout.forBasePackage(BAD).withRepositorySuffix("Gateway");
+    DcaArchitecture arch = DcaArchitecture.of(own, new ClassFileImporter().importPackages(BAD));
+
+    for (String id : java.util.List.of("DCA-TAC-013", "DCA-TAC-016")) {
+      DcaRules.all(own).stream()
+          .filter(r -> r.id().equals(id))
+          .findFirst()
+          .orElseThrow()
+          .check(arch);
+    }
+
+    // and with the default suffix they still report, so the test is not vacuous
+    assertTrue(
+        Fixtures.violation(BAD, "DCA-TAC-016").violations().stream()
+            .anyMatch(v -> v.contains("Repository")),
+        "the default suffix still selects");
   }
 }

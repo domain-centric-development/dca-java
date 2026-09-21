@@ -9,7 +9,6 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
-import dev.domaincentric.dca.buildingblocks.application.TransactionBoundary;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -164,7 +163,7 @@ public final class LayeredRules implements DcaRuleSet {
                       .that()
                       .resideOutsideOfPackages(allowed)
                       .and()
-                      .areNotAssignableTo(TransactionBoundary.class)
+                      .areNotAssignableTo(arch.layout().markers().transactionBoundary())
                       .should()
                       .dependOnClassesThat(usesTransactionApi)
                       .allowEmptyShould(true),
@@ -179,13 +178,13 @@ public final class LayeredRules implements DcaRuleSet {
                       "a configured transaction manager or TransactionBoundary",
                       c ->
                           transactionManager.contains(c.getName())
-                              || c.isAssignableTo(TransactionBoundary.class));
+                              || c.isAssignableTo(arch.layout().markers().transactionBoundary()));
               violations.addAll(
                   noClasses()
                       .that()
                       .resideOutsideOfPackages(wiringAllowed.toArray(String[]::new))
                       .and()
-                      .areNotAssignableTo(TransactionBoundary.class)
+                      .areNotAssignableTo(arch.layout().markers().transactionBoundary())
                       .should()
                       .dependOnClassesThat(managerOrBoundary)
                       .allowEmptyShould(true),

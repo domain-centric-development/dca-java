@@ -3,6 +3,7 @@ package dev.domaincentric.dca.archunit.rules;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaCodeUnit;
 import com.tngtech.archunit.core.domain.JavaField;
@@ -12,20 +13,13 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
+import dev.domaincentric.dca.archunit.DcaMarkers;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
 import dev.domaincentric.dca.archunit.DcaRuleViolation;
 import dev.domaincentric.dca.archunit.FrameworkAnnotations;
-import dev.domaincentric.dca.buildingblocks.application.TransactionBoundary;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.AggregateRoot;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.Entity;
-import dev.domaincentric.dca.buildingblocks.ddd.tactical.Value;
-import dev.domaincentric.dca.buildingblocks.hexagonal.port.in.InputPort;
-import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.DomainEventPublisher;
-import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.IntegrationEventPublisher;
-import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.OutputPort;
-import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.Repository;
-import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.Store;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -111,12 +105,15 @@ public final class UseCaseRules implements DcaRuleSet {
                 classes()
                     .that()
                     .areInterfaces()
-                    .and()
-                    .haveSimpleName("InputPort")
+                    .and(
+                        JavaClass.Predicates.simpleName("InputPort")
+                            .or(JavaClass.Predicates.simpleName("IInputPort")))
                     .should()
                     .resideInAPackage(DcaLayout.BUILDING_BLOCKS_PORT_IN_PACKAGE)
                     .allowEmptyShould(true))
-        .selecting("Interfaces named InputPort anywhere on the classpath under scan.")
+        .selecting(
+            "Interfaces named InputPort or IInputPort anywhere on the classpath under scan - both"
+                + " spellings, so the rule means the same in both languages.")
         .checking(
             "The interface resides in the building-blocks package hexagonal.port.in - the generic contract is not redeclared in the project.");
   }
@@ -124,7 +121,7 @@ public final class UseCaseRules implements DcaRuleSet {
   public static DcaRule commandsResideInApplication(DcaLayout layout) {
     return DcaRule.of(
             "DCA-USE-002",
-            "Use Case Commands must end with 'Command' and reside in application package",
+            "Types named *Command reside in the application layer",
             "Use case commands should be in application layer (CQRS pattern)",
             arch ->
                 classes()
@@ -143,7 +140,7 @@ public final class UseCaseRules implements DcaRuleSet {
   public static DcaRule queriesResideInApplication(DcaLayout layout) {
     return DcaRule.of(
             "DCA-USE-003",
-            "Use Case Queries must end with 'Query' and reside in application package",
+            "Types named *Query reside in the application layer",
             "Use case queries should be in application layer (CQRS pattern)",
             arch ->
                 classes()
@@ -186,7 +183,7 @@ public final class UseCaseRules implements DcaRuleSet {
   public static DcaRule resultsResideInApplication(DcaLayout layout) {
     return DcaRule.of(
             "DCA-USE-006",
-            "Use Case Result Models must end with 'Result' and reside in application package",
+            "Types named *Result reside in the application layer",
             "Use case result models should be in application layer. Domain Value Objects with 'Result'"
                 + " in name are allowed in domain layer.",
             arch ->
@@ -196,7 +193,7 @@ public final class UseCaseRules implements DcaRuleSet {
                     .and()
                     .resideInAnyPackage(layout.basePackage() + "..")
                     .and()
-                    .doNotImplement(Value.class)
+                    .areNotAssignableTo(arch.layout().markers().value())
                     .should()
                     .resideInAnyPackage(arch.allApplicationPatterns())
                     .allowEmptyShould(true))
@@ -223,7 +220,7 @@ public final class UseCaseRules implements DcaRuleSet {
     // kernel's adapter where cross-cutting Response classes typically live.
     return DcaRule.of(
             "DCA-USE-008",
-            "HTTP Response Models must end with 'Response' and reside in adapter package",
+            "Types named *Response reside in an adapter",
             "HTTP response models should be in adapter layer",
             arch ->
                 classes()
@@ -260,20 +257,14 @@ public final class UseCaseRules implements DcaRuleSet {
                 + " clearDomainEvents(), separates dispatch from acknowledgement and is not accepted",
             arch ->
                 classes()
-                    .that()
-                    .resideInAnyPackage(arch.allApplicationPatterns())
-                    .and()
-                    .haveSimpleNameEndingWith(layout.useCaseSuffix())
-                    .or()
-                    .areAssignableTo(InputPort.class)
-                    .and()
-                    .areNotInterfaces()
+                    .that(useCases(arch, layout))
                     .should(publishAfterSaving(arch))
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes in <module>.application.. that implement InputPort or whose simple name ends with the configured use-case suffix.")
         .checking(
-            "Only a resolved Repository<T,ID> whose aggregate and every non-building-block superclass are scanned and have no registration call (including helpers) is exempt. Unresolved generics, partial scans or undecidable external helpers remain required. For every non-exempt method of the class that calls Repository.save, every entry point reaching it (a method callable from outside the class, or one nothing in the class calls) also reaches, through calls within the class, a call of DomainEventPublisher.publishAndClearEvents. Only publishAndClearEvents counts - publish(event), even followed by clearDomainEvents(), does not. A use case without a save (a query, a bulk delete) is selected but has nothing to check and passes.");
+            "Only a resolved Repository<T,ID> whose aggregate and every non-building-block superclass are scanned and have no registration call (including helpers) is exempt. Unresolved generics, partial scans or undecidable external helpers remain required. For every non-exempt method of the class that calls Repository.save, every entry point reaching it (a method callable from outside the class, or one nothing in the class calls) also reaches, through calls within the class, a call of DomainEventPublisher.publishAndClearEvents. Only publishAndClearEvents counts - publish(event), even followed by clearDomainEvents(), does not. A use case without a save (a query, a bulk delete) is selected but has nothing to check and passes. The method names are fixed and are not part of the marker roles: a vocabulary whose repository writes under another name is selected and then found to save nothing, so this rule passes over it.",
+            "call DomainEventPublisher.publishAndClearEvents(aggregate) after Repository.save(aggregate) on every path that saves");
   }
 
   public static DcaRule noDtosInDomain(DcaLayout layout) {
@@ -311,6 +302,32 @@ public final class UseCaseRules implements DcaRuleSet {
         .selecting("Classes in <module>.application.. of every module root.")
         .checking(
             "No dependency on a class whose simple name ends with Dto. Command, Query and Result models are not DTOs by this rule's definition - only the Dto suffix is checked.");
+  }
+
+  /**
+   * The documented use-case selection: a non-interface class in an application package that either
+   * carries the configured use-case suffix or implements the input-port role.
+   *
+   * <p>Spelled inline, ArchUnit joins {@code and}/{@code or} left to right, so {@code
+   * resideInAnyPackage(app).and().haveSimpleNameEndingWith(suffix).or().areAssignableTo(port)
+   * .and().areNotInterfaces()} reads {@code ((inApplication ∧ suffix) ∨ isInputPort) ∧ ¬interface}
+   * and selects every input-port implementation anywhere, adapters included — which is neither what
+   * the rule texts say nor what the .NET twin does.
+   */
+  private static DescribedPredicate<JavaClass> useCases(DcaArchitecture arch, DcaLayout layout) {
+    DescribedPredicate<JavaClass> inApplication =
+        JavaClass.Predicates.resideInAnyPackage(arch.allApplicationPatterns());
+    DescribedPredicate<JavaClass> named =
+        JavaClass.Predicates.simpleNameEndingWith(layout.useCaseSuffix());
+    DescribedPredicate<JavaClass> port =
+        JavaClass.Predicates.assignableTo(arch.layout().markers().inputPort());
+    return inApplication
+        .and(named.or(port))
+        .and(DescribedPredicate.not(JavaClass.Predicates.INTERFACES))
+        .as(
+            "non-interface classes in an application package that implement the input port or end"
+                + " with \"%s\"",
+            layout.useCaseSuffix());
   }
 
   private static com.tngtech.archunit.lang.ArchRule immutableApplicationModels(
@@ -352,16 +369,10 @@ public final class UseCaseRules implements DcaRuleSet {
                 + " placement stays a review check",
             arch ->
                 classes()
-                    .that()
-                    .resideInAnyPackage(arch.allApplicationPatterns())
-                    .and()
-                    .haveSimpleNameEndingWith(layout.useCaseSuffix())
-                    .or()
-                    .areAssignableTo(InputPort.class)
-                    .and()
-                    .areNotInterfaces()
+                    .that(useCases(arch, layout))
                     .should(
-                        beTransactionalWhenMutating(layout.frameworkAnnotations().transactional()))
+                        beTransactionalWhenMutating(
+                            layout.frameworkAnnotations().transactional(), layout.markers()))
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes in <module>.application.. that implement InputPort or whose simple name ends with the configured use-case suffix.")
@@ -371,11 +382,13 @@ public final class UseCaseRules implements DcaRuleSet {
                 + " class carries one of the configured transactional annotations, or every uncovered"
                 + " unit on the route is either annotated or calls TransactionBoundary.inTransaction."
                 + " A covered caller does not cover a second route to the same helper. With an empty"
-                + " transactional role only the explicit boundary counts. A use case that neither"
+                + " transactional role only the explicit boundary counts - which is the .NET default,"
+                + " where no preset configures a transactional attribute, while the Java presets"
+                + " configure the framework's own. A use case that neither"
                 + " saves, deletes nor publishes (a query, a Store write) is selected but has nothing"
                 + " to check and passes. Whether the save or publish call sits inside the"
                 + " inTransaction block is not checked - ArchUnit folds a lambda into its enclosing"
-                + " method.");
+                + " method. The method names are fixed and are not part of the marker roles: a vocabulary whose repository writes under another name is selected and then found to save nothing, so this rule passes over it.");
   }
 
   public static DcaRule transactionalUseCasesDoNotCallRemotePorts(DcaLayout layout) {
@@ -393,17 +406,10 @@ public final class UseCaseRules implements DcaRuleSet {
                 + " - or after it, as a reaction to an integration event",
             arch ->
                 classes()
-                    .that()
-                    .resideInAnyPackage(arch.allApplicationPatterns())
-                    .and()
-                    .haveSimpleNameEndingWith(layout.useCaseSuffix())
-                    .or()
-                    .areAssignableTo(InputPort.class)
-                    .and()
-                    .areNotInterfaces()
+                    .that(useCases(arch, layout))
                     .should(
                         notCallRemotePortsWhenTransactional(
-                            layout.frameworkAnnotations().transactional()))
+                            layout.frameworkAnnotations().transactional(), layout.markers()))
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes in <module>.application.. that implement InputPort or whose simple name ends with the configured use-case suffix.")
@@ -442,14 +448,15 @@ public final class UseCaseRules implements DcaRuleSet {
         .selecting(
             "Per module root: non-interface, non-abstract, non-nested classes below <module>.application that implement InputPort or whose simple name ends with the configured use-case suffix, excluding application.shared and everything below it.")
         .checking(
-            "After removing configured operationContainers segments, all of them sit at one depth: application.<usecase> (flat) or application.<feature>.<usecase> (grouped). Reported are a use case directly in the application package, one nested deeper than a feature, and a module mixing both depths. What a feature means is not checked.");
+            "After removing configured operationContainers segments, all of them sit at one depth: application.<usecase> (flat) or application.<feature>.<usecase> (grouped). Reported are a use case directly in the application package, one nested deeper than a feature, and a module mixing both depths. What a feature means is not checked.",
+            "keep every use case of the module at application.<usecase>, one package per use case");
   }
 
   private static void checkUseCaseDepth(DcaArchitecture arch, DcaLayout layout) {
     List<String> violations = new ArrayList<>();
     for (String root : arch.moduleRoots()) {
       String application = root + "." + layout.applicationSubpackage();
-      String shared = application + ".shared";
+      String shared = application + "." + layout.sharedSubpackage();
       // depth -> use case packages at that depth, both sorted for a stable message
       Map<Integer, TreeSet<String>> byDepth = new TreeMap<>();
       for (JavaClass candidate : arch.classes()) {
@@ -461,7 +468,7 @@ public final class UseCaseRules implements DcaRuleSet {
             || candidate.getModifiers().contains(JavaModifier.ABSTRACT)
             || candidate.isNestedClass()
             || candidate.isAnonymousClass()
-            || !(candidate.isAssignableTo(InputPort.class)
+            || !(candidate.isAssignableTo(arch.layout().markers().inputPort())
                 || candidate.getSimpleName().endsWith(layout.useCaseSuffix()))) {
           continue;
         }
@@ -541,9 +548,13 @@ public final class UseCaseRules implements DcaRuleSet {
                 + " the result binds them",
             arch -> checkResultsCarryNoIdentities(arch))
         .selecting(
-            "Non-interface, non-nested classes in <module>.application.. whose simple name ends with Result.")
+            "Non-interface, non-nested classes in <module>.application.. whose simple name ends"
+                + " with Result, types assignable to the value role excluded - a domain value"
+                + " object named *Result crosses the port as a value, as DCA-USE-006 already"
+                + " allows.")
         .checking(
-            "No instance field - inherited ones included, walked through raw type and generic type arguments, and transitively into every record that lives in an application package - involves a type assignable to AggregateRoot or Entity. Records outside the application layer (domain value objects, read models) are not walked. Every offending path is reported.");
+            "No instance field - inherited ones included, walked through raw type and generic type arguments, and transitively into every record that lives in an application package - involves a type assignable to AggregateRoot or Entity. Records outside the application layer (domain value objects, read models) are not walked. Every offending path is reported.",
+            "carry ids and primitives in a result, never an aggregate, an entity or a domain object");
   }
 
   private static void checkResultsCarryNoIdentities(DcaArchitecture arch) {
@@ -552,6 +563,7 @@ public final class UseCaseRules implements DcaRuleSet {
       if (result.isInterface()
           || result.isNestedClass()
           || !result.getSimpleName().endsWith("Result")
+          || result.isAssignableTo(arch.layout().markers().value())
           || !residesInAny(result, arch.allApplicationPatterns())) {
         continue;
       }
@@ -560,7 +572,8 @@ public final class UseCaseRules implements DcaRuleSet {
           result,
           result.getSimpleName(),
           new ArrayDeque<>(),
-          violations);
+          violations,
+          arch.layout().markers());
     }
     if (!violations.isEmpty()) {
       throw new DcaRuleViolation(
@@ -589,7 +602,8 @@ public final class UseCaseRules implements DcaRuleSet {
       JavaClass current,
       String path,
       Deque<String> recordsOnPath,
-      List<String> violations) {
+      List<String> violations,
+      DcaMarkers markers) {
     if (recordsOnPath.contains(current.getName())) {
       return;
     }
@@ -597,7 +611,7 @@ public final class UseCaseRules implements DcaRuleSet {
     for (JavaField field : TypeInspection.instanceFields(current)) {
       String fieldPath = path + "." + field.getName();
       for (JavaClass involved : TypeInspection.involvedTypes(field, current)) {
-        String identity = identityKind(involved);
+        String identity = identityKind(involved, markers);
         if (identity != null) {
           violations.add(fieldPath + " : " + involved.getSimpleName() + " (" + identity + ")");
         } else if (isPartRecord(involved, applicationPatterns)) {
@@ -606,7 +620,8 @@ public final class UseCaseRules implements DcaRuleSet {
               involved,
               fieldPath + " -> " + involved.getSimpleName(),
               recordsOnPath,
-              violations);
+              violations,
+              markers);
         }
       }
     }
@@ -614,14 +629,19 @@ public final class UseCaseRules implements DcaRuleSet {
   }
 
   /** The marker a class carries into the result, or null when it is a value or plain type. */
-  private static String identityKind(JavaClass javaClass) {
-    if (javaClass.isAssignableTo(AggregateRoot.class)) {
-      return "AggregateRoot";
+  private static String identityKind(JavaClass javaClass, DcaMarkers markers) {
+    if (javaClass.isAssignableTo(markers.aggregateRoot())) {
+      return simpleName(markers.aggregateRoot());
     }
-    if (javaClass.isAssignableTo(Entity.class)) {
-      return "Entity";
+    if (javaClass.isAssignableTo(markers.entity())) {
+      return simpleName(markers.entity());
     }
     return null;
+  }
+
+  /** The simple name of a configured marker, for a message a reader has to recognise. */
+  private static String simpleName(String fqn) {
+    return fqn.substring(fqn.lastIndexOf('.') + 1);
   }
 
   /**
@@ -633,17 +653,17 @@ public final class UseCaseRules implements DcaRuleSet {
     return candidate.isRecord() && residesInAny(candidate, applicationPatterns);
   }
 
-  private static boolean callsBoundary(JavaCodeUnit unit) {
+  private static boolean callsBoundary(JavaCodeUnit unit, DcaMarkers markers) {
     return unit.getMethodCallsFromSelf().stream()
-        .anyMatch(call -> call.getTargetOwner().isAssignableTo(TransactionBoundary.class));
+        .anyMatch(call -> call.getTargetOwner().isAssignableTo(markers.transactionBoundary()));
   }
 
-  private static boolean calls(JavaCodeUnit unit, Class<?> targetType) {
+  private static boolean calls(JavaCodeUnit unit, String targetType) {
     return unit.getMethodCallsFromSelf().stream()
         .anyMatch(call -> call.getTargetOwner().isAssignableTo(targetType));
   }
 
-  private static boolean calls(JavaCodeUnit unit, Class<?> targetType, String methodName) {
+  private static boolean calls(JavaCodeUnit unit, String targetType, String methodName) {
     return unit.getMethodCallsFromSelf().stream()
         .anyMatch(
             call ->
@@ -674,13 +694,15 @@ public final class UseCaseRules implements DcaRuleSet {
       JavaCodeUnit entry,
       JavaCodeUnit publisher,
       IntraClassCalls calls,
-      List<String> transactional) {
+      List<String> transactional,
+      DcaMarkers markers) {
     if (AnnotationRoles.isMetaAnnotatedWithAny(item, transactional)) {
       return true;
     }
     Predicate<JavaCodeUnit> uncovered =
         unit ->
-            !AnnotationRoles.isMetaAnnotatedWithAny(unit, transactional) && !callsBoundary(unit);
+            !AnnotationRoles.isMetaAnnotatedWithAny(unit, transactional)
+                && !callsBoundary(unit, markers);
     return !calls.reachableThrough(entry, uncovered).contains(publisher);
   }
 
@@ -692,15 +714,15 @@ public final class UseCaseRules implements DcaRuleSet {
   /**
    * Output ports that live inside the transaction; every other output port may leave the process.
    */
-  private static boolean isTransactionalResource(JavaClass owner) {
-    return owner.isAssignableTo(Repository.class)
-        || owner.isAssignableTo(Store.class)
-        || owner.isAssignableTo(DomainEventPublisher.class)
-        || owner.isAssignableTo(IntegrationEventPublisher.class);
+  private static boolean isTransactionalResource(JavaClass owner, DcaMarkers markers) {
+    return owner.isAssignableTo(markers.repository())
+        || owner.isAssignableTo(markers.store())
+        || owner.isAssignableTo(markers.domainEventPublisher())
+        || owner.isAssignableTo(markers.integrationEventPublisher());
   }
 
   private static ArchCondition<JavaClass> notCallRemotePortsWhenTransactional(
-      List<String> transactional) {
+      List<String> transactional, DcaMarkers markers) {
     return new ArchCondition<>("not call remote-capable output ports while transactional") {
       @Override
       public void check(JavaClass item, ConditionEvents events) {
@@ -712,8 +734,8 @@ public final class UseCaseRules implements DcaRuleSet {
           List<String> remotePorts =
               unit.getMethodCallsFromSelf().stream()
                   .map(call -> call.getTargetOwner())
-                  .filter(owner -> owner.isAssignableTo(OutputPort.class))
-                  .filter(owner -> !isTransactionalResource(owner))
+                  .filter(owner -> owner.isAssignableTo(markers.outputPort()))
+                  .filter(owner -> !isTransactionalResource(owner, markers))
                   .map(JavaClass::getSimpleName)
                   .distinct()
                   .sorted()
@@ -737,19 +759,20 @@ public final class UseCaseRules implements DcaRuleSet {
     };
   }
 
-  private static ArchCondition<JavaClass> beTransactionalWhenMutating(List<String> transactional) {
+  private static ArchCondition<JavaClass> beTransactionalWhenMutating(
+      List<String> transactional, DcaMarkers markers) {
     return new ArchCondition<>(
         "be transactional when saving an aggregate or publishing domain events") {
       @Override
       public void check(JavaClass item, ConditionEvents events) {
         IntraClassCalls calls = new IntraClassCalls(item);
         for (JavaCodeUnit unit : item.getCodeUnits()) {
-          String effect = transactionalEffectOf(unit);
+          String effect = transactionalEffectOf(unit, markers);
           if (effect == null) {
             continue;
           }
           for (JavaCodeUnit entry : calls.entryPointsOf(unit)) {
-            if (pathIsTransactional(item, entry, unit, calls, transactional)) {
+            if (pathIsTransactional(item, entry, unit, calls, transactional, markers)) {
               continue;
             }
             events.add(
@@ -775,10 +798,10 @@ public final class UseCaseRules implements DcaRuleSet {
    * The effect of a code unit that needs a transaction, worded for the violation, or {@code null}
    * when the unit neither writes through a Repository nor publishes domain events.
    */
-  private static String transactionalEffectOf(JavaCodeUnit unit) {
-    boolean saves = calls(unit, Repository.class, "save");
-    boolean deletes = calls(unit, Repository.class, "deleteById");
-    boolean publishes = calls(unit, DomainEventPublisher.class);
+  private static String transactionalEffectOf(JavaCodeUnit unit, DcaMarkers markers) {
+    boolean saves = calls(unit, markers.repository(), "save");
+    boolean deletes = calls(unit, markers.repository(), "deleteById");
+    boolean publishes = calls(unit, markers.domainEventPublisher());
     if (!saves && !deletes && !publishes) {
       return null;
     }
@@ -805,14 +828,20 @@ public final class UseCaseRules implements DcaRuleSet {
               .filter(
                   c ->
                       c.getTarget().getName().equals("save")
-                          && c.getTargetOwner().isAssignableTo(Repository.class))
+                          && c.getTargetOwner()
+                              .isAssignableTo(arch.layout().markers().repository()))
               .allMatch(c -> EventFreeAggregate.repository(c.getTargetOwner(), arch))) {
             continue;
           }
           for (JavaCodeUnit entry : calls.entryPointsOf(unit)) {
             boolean publishes =
                 calls.reachableFrom(entry).stream()
-                    .anyMatch(u -> calls(u, DomainEventPublisher.class, "publishAndClearEvents"));
+                    .anyMatch(
+                        u ->
+                            calls(
+                                u,
+                                arch.layout().markers().domainEventPublisher(),
+                                "publishAndClearEvents"));
             if (!publishes) {
               events.add(
                   SimpleConditionEvent.violated(

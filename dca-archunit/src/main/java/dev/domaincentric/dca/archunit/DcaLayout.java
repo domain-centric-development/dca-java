@@ -2,6 +2,7 @@ package dev.domaincentric.dca.archunit;
 
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.relationships.Upstream;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -41,19 +42,17 @@ import java.util.function.Consumer;
  */
 public final class DcaLayout {
 
-  /** Package of the dca-building-blocks markers, as an ArchUnit pattern. */
-  public static final String BUILDING_BLOCKS_PACKAGE = "dev.domaincentric.dca.buildingblocks..";
-
-  public static final String BUILDING_BLOCKS_TACTICAL_PACKAGE =
-      "dev.domaincentric.dca.buildingblocks.ddd.tactical..";
-  public static final String BUILDING_BLOCKS_STRATEGIC_PACKAGE =
-      "dev.domaincentric.dca.buildingblocks.ddd.strategic..";
-  public static final String BUILDING_BLOCKS_PORT_PACKAGE =
-      "dev.domaincentric.dca.buildingblocks.hexagonal.port..";
   public static final String BUILDING_BLOCKS_PORT_IN_PACKAGE =
       "dev.domaincentric.dca.buildingblocks.hexagonal.port.in..";
   public static final String BUILDING_BLOCKS_PORT_OUT_PACKAGE =
       "dev.domaincentric.dca.buildingblocks.hexagonal.port.out..";
+
+  private static final List<String> DEFAULT_TIMESTAMP_TYPES =
+      List.of(
+          "java.time.Instant",
+          "java.time.OffsetDateTime",
+          "java.time.ZonedDateTime",
+          "java.time.LocalDateTime");
 
   private static final List<String> DEFAULT_THIRD_PARTY_ALLOWED_IN_DOMAIN =
       List.of(
@@ -68,9 +67,11 @@ public final class DcaLayout {
   private final String domainSubpackage;
   private final String modelSubpackage;
   private final String applicationSubpackage;
+  private final String sharedSubpackage;
   private final String adapterSubpackage;
   private final String incomingSubpackage;
   private final String incomingEventSubpackage;
+  private final String webSubpackage;
   private final String outgoingSubpackage;
   private final String infrastructureSubpackage;
   private final String apiSubpackage;
@@ -79,7 +80,14 @@ public final class DcaLayout {
   private final List<String> operationContainers;
   private final String controllerSuffix;
   private final String restControllerSuffix;
+  private final String aggregateRootSuffix;
+  private final String repositorySuffix;
+  private final String storeSuffix;
+  private final String factorySuffix;
+  private final String specificationSuffix;
+  private final List<String> timestampTypes;
   private final List<String> thirdPartyPackagesAllowedInDomain;
+  private final DcaMarkers markers;
   private final FrameworkAnnotations frameworkAnnotations;
   private final FrameworkAnnotationsOrigin frameworkAnnotationsOrigin;
   private final List<String> frameworkCandidates;
@@ -104,10 +112,12 @@ public final class DcaLayout {
     this.modelSubpackage = requireSegment(settings.modelSubpackage, "modelSubpackage");
     this.applicationSubpackage =
         requireSegment(settings.applicationSubpackage, "applicationSubpackage");
+    this.sharedSubpackage = requireSegment(settings.sharedSubpackage, "sharedSubpackage");
     this.adapterSubpackage = requireSegment(settings.adapterSubpackage, "adapterSubpackage");
     this.incomingSubpackage = requireSegment(settings.incomingSubpackage, "incomingSubpackage");
     this.incomingEventSubpackage =
         requireSegment(settings.incomingEventSubpackage, "incomingEventSubpackage");
+    this.webSubpackage = requireSegment(settings.webSubpackage, "webSubpackage");
     this.outgoingSubpackage = requireSegment(settings.outgoingSubpackage, "outgoingSubpackage");
     this.infrastructureSubpackage =
         requireSegment(settings.infrastructureSubpackage, "infrastructureSubpackage");
@@ -118,14 +128,27 @@ public final class DcaLayout {
           "apiSubpackage and eventsSubpackage must differ, both are '" + apiSubpackage + "'");
     }
     this.operationContainers = List.copyOf(settings.operationContainers);
+    if (this.operationContainers.contains(this.sharedSubpackage)) {
+      throw new IllegalArgumentException(
+          "The shared sub-package '"
+              + this.sharedSubpackage
+              + "' may not also be an operation container");
+    }
     this.useCaseSuffix = requireSuffix(settings.useCaseSuffix, "useCaseSuffix");
     this.controllerSuffix = requireSuffix(settings.controllerSuffix, "controllerSuffix");
     this.restControllerSuffix =
         requireSuffix(settings.restControllerSuffix, "restControllerSuffix");
+    this.aggregateRootSuffix = requireSuffix(settings.aggregateRootSuffix, "aggregateRootSuffix");
+    this.repositorySuffix = requireSuffix(settings.repositorySuffix, "repositorySuffix");
+    this.storeSuffix = requireSuffix(settings.storeSuffix, "storeSuffix");
+    this.factorySuffix = requireSuffix(settings.factorySuffix, "factorySuffix");
+    this.specificationSuffix = requireSuffix(settings.specificationSuffix, "specificationSuffix");
+    this.timestampTypes = requireTypeNames(settings.timestampTypes, "timestampTypes");
     this.thirdPartyPackagesAllowedInDomain =
         List.copyOf(
             Objects.requireNonNull(
                 settings.thirdPartyPackagesAllowedInDomain, "thirdPartyPackagesAllowedInDomain"));
+    this.markers = Objects.requireNonNull(settings.markers, "markers");
     this.frameworkAnnotations =
         Objects.requireNonNull(settings.frameworkAnnotations, "frameworkAnnotations");
     this.frameworkAnnotationsOrigin =
@@ -146,9 +169,11 @@ public final class DcaLayout {
     defaults.domainSubpackage = "domain";
     defaults.modelSubpackage = "model";
     defaults.applicationSubpackage = "application";
+    defaults.sharedSubpackage = "shared";
     defaults.adapterSubpackage = "adapter";
     defaults.incomingSubpackage = "incoming";
     defaults.incomingEventSubpackage = "event";
+    defaults.webSubpackage = "web";
     defaults.outgoingSubpackage = "outgoing";
     defaults.infrastructureSubpackage = "infrastructure";
     defaults.apiSubpackage = "api";
@@ -156,7 +181,14 @@ public final class DcaLayout {
     defaults.useCaseSuffix = "UseCase";
     defaults.controllerSuffix = "Controller";
     defaults.restControllerSuffix = "Resource";
+    defaults.aggregateRootSuffix = "AggregateRoot";
+    defaults.repositorySuffix = "Repository";
+    defaults.storeSuffix = "Store";
+    defaults.factorySuffix = "Factory";
+    defaults.specificationSuffix = "Specification";
+    defaults.timestampTypes = DEFAULT_TIMESTAMP_TYPES;
     defaults.thirdPartyPackagesAllowedInDomain = DEFAULT_THIRD_PARTY_ALLOWED_IN_DOMAIN;
+    defaults.markers = DcaMarkers.dca();
     FrameworkAnnotations.Detection detection = FrameworkAnnotations.detect();
     defaults.frameworkAnnotations = detection.annotations();
     defaults.frameworkAnnotationsOrigin =
@@ -186,6 +218,16 @@ public final class DcaLayout {
           name + " must be a single package segment, was '" + value + "'");
     }
     return value;
+  }
+
+  /** A non-empty list of fully qualified type names, none of them blank. */
+  private static List<String> requireTypeNames(List<String> values, String name) {
+    Objects.requireNonNull(values, name);
+    if (values.isEmpty()) {
+      throw new IllegalArgumentException(name + " must name at least one type");
+    }
+    values.forEach(value -> requireNotBlank(value, name));
+    return List.copyOf(values);
   }
 
   /** A class-name suffix: part of a Java identifier. */
@@ -243,6 +285,15 @@ public final class DcaLayout {
     return copy(settings -> settings.applicationSubpackage = value);
   }
 
+  /**
+   * Sub-package of the application layer that holds the output ports shared by the use cases of one
+   * context - e.g. {@code "shared"} (default), {@code "ports"} or {@code "spi"}. The name is
+   * reserved: it may not be used as an operation container.
+   */
+  public DcaLayout withSharedSubpackage(String value) {
+    return copy(settings -> settings.sharedSubpackage = value);
+  }
+
   public DcaLayout withAdapterSubpackage(String value) {
     return copy(settings -> settings.adapterSubpackage = value);
   }
@@ -260,6 +311,15 @@ public final class DcaLayout {
    */
   public DcaLayout withIncomingEventSubpackage(String value) {
     return copy(settings -> settings.incomingEventSubpackage = value);
+  }
+
+  /**
+   * Sub-package of the incoming adapters that holds the web adapter - e.g. {@code "web"} (default),
+   * {@code "ui"} or {@code "mvc"}. Only {@code DCA-NAM-011} reads it: a ViewModel belongs below
+   * {@code <module>.adapter.incoming.<web>..}.
+   */
+  public DcaLayout withWebSubpackage(String value) {
+    return copy(settings -> settings.webSubpackage = value);
   }
 
   /**
@@ -294,7 +354,9 @@ public final class DcaLayout {
   /** Organisational package segments ignored when measuring operation depth; empty by default. */
   public DcaLayout withOperationContainers(String... names) {
     for (String name : names) {
-      if (name == null || !name.matches("[a-zA-Z_][a-zA-Z0-9_]*") || name.equals("shared")) {
+      if (name == null
+          || !name.matches("[a-zA-Z_][a-zA-Z0-9_]*")
+          || name.equals(sharedSubpackage)) {
         throw new IllegalArgumentException("Invalid operation container: " + name);
       }
     }
@@ -327,6 +389,52 @@ public final class DcaLayout {
   }
 
   /**
+   * Suffix by which {@code DCA-TAC-001} finds a project's aggregate roots by name - {@code
+   * "AggregateRoot"} by default. Only the suffix selects: an aggregate root named otherwise is
+   * never reported by that rule, and the role is what every other tactical rule selects on.
+   */
+  public DcaLayout withAggregateRootSuffix(String value) {
+    return copy(settings -> settings.aggregateRootSuffix = value);
+  }
+
+  /**
+   * Suffix of a repository port, {@code "Repository"} by default - read by {@code DCA-TAC-013} and
+   * {@code DCA-TAC-016}, which also requires the name to be the bound aggregate plus this suffix.
+   */
+  public DcaLayout withRepositorySuffix(String value) {
+    return copy(settings -> settings.repositorySuffix = value);
+  }
+
+  /** Suffix of a store port, {@code "Store"} by default - read by {@code DCA-TAC-018}. */
+  public DcaLayout withStoreSuffix(String value) {
+    return copy(settings -> settings.storeSuffix = value);
+  }
+
+  /** Suffix of a factory, {@code "Factory"} by default - read by {@code DCA-ADV-013}. */
+  public DcaLayout withFactorySuffix(String value) {
+    return copy(settings -> settings.factorySuffix = value);
+  }
+
+  /**
+   * Suffix by which a specification is found when it carries no marker, {@code "Specification"} by
+   * default - read by {@code DCA-ADV-017} and {@code DCA-ADV-018} alongside the specification role.
+   */
+  public DcaLayout withSpecificationSuffix(String value) {
+    return copy(settings -> settings.specificationSuffix = value);
+  }
+
+  /**
+   * Types a domain event may store its occurrence time in, by fully qualified name. Replaces the
+   * default list ({@code java.time.Instant}, {@code OffsetDateTime}, {@code ZonedDateTime}, {@code
+   * LocalDateTime}) - a project whose own event vocabulary wraps the timestamp in a value object
+   * names that type here instead of excluding {@code DCA-ADV-008}. At least one name is required:
+   * an empty list would report every event.
+   */
+  public DcaLayout withTimestampTypes(String... typeNames) {
+    return copy(settings -> settings.timestampTypes = List.of(typeNames));
+  }
+
+  /**
    * Third-party packages the domain layer may depend on (ArchUnit patterns). Replaces the default
    * list ({@code java..}, {@code lombok..}, commons-lang3, commons-collections4, jspecify).
    */
@@ -339,6 +447,16 @@ public final class DcaLayout {
     var merged = new java.util.ArrayList<>(thirdPartyPackagesAllowedInDomain);
     merged.addAll(List.of(patterns));
     return withThirdPartyPackagesAllowedInDomain(merged);
+  }
+
+  /**
+   * The building-block types the rules select on, by role — {@link DcaMarkers#dca()} by default, or
+   * a vocabulary pointed at the project's own markers. The rules then select what carries those
+   * types instead of the library's, so a code base with an established vocabulary needs no rule
+   * exclusions.
+   */
+  public DcaLayout withMarkers(DcaMarkers value) {
+    return copy(settings -> settings.markers = value);
   }
 
   /**
@@ -392,9 +510,11 @@ public final class DcaLayout {
     settings.domainSubpackage = domainSubpackage;
     settings.modelSubpackage = modelSubpackage;
     settings.applicationSubpackage = applicationSubpackage;
+    settings.sharedSubpackage = sharedSubpackage;
     settings.adapterSubpackage = adapterSubpackage;
     settings.incomingSubpackage = incomingSubpackage;
     settings.incomingEventSubpackage = incomingEventSubpackage;
+    settings.webSubpackage = webSubpackage;
     settings.outgoingSubpackage = outgoingSubpackage;
     settings.infrastructureSubpackage = infrastructureSubpackage;
     settings.apiSubpackage = apiSubpackage;
@@ -403,7 +523,14 @@ public final class DcaLayout {
     settings.operationContainers = operationContainers;
     settings.controllerSuffix = controllerSuffix;
     settings.restControllerSuffix = restControllerSuffix;
+    settings.aggregateRootSuffix = aggregateRootSuffix;
+    settings.repositorySuffix = repositorySuffix;
+    settings.storeSuffix = storeSuffix;
+    settings.factorySuffix = factorySuffix;
+    settings.specificationSuffix = specificationSuffix;
+    settings.timestampTypes = timestampTypes;
     settings.thirdPartyPackagesAllowedInDomain = thirdPartyPackagesAllowedInDomain;
+    settings.markers = markers;
     settings.frameworkAnnotations = frameworkAnnotations;
     settings.frameworkAnnotationsOrigin = frameworkAnnotationsOrigin;
     settings.frameworkCandidates = frameworkCandidates;
@@ -418,9 +545,11 @@ public final class DcaLayout {
     String domainSubpackage;
     String modelSubpackage;
     String applicationSubpackage;
+    String sharedSubpackage;
     String adapterSubpackage;
     String incomingSubpackage;
     String incomingEventSubpackage;
+    String webSubpackage;
     String outgoingSubpackage;
     String infrastructureSubpackage;
     String apiSubpackage;
@@ -429,7 +558,14 @@ public final class DcaLayout {
     List<String> operationContainers = List.of();
     String controllerSuffix;
     String restControllerSuffix;
+    String aggregateRootSuffix;
+    String repositorySuffix;
+    String storeSuffix;
+    String factorySuffix;
+    String specificationSuffix;
+    List<String> timestampTypes;
     List<String> thirdPartyPackagesAllowedInDomain;
+    DcaMarkers markers;
     FrameworkAnnotations frameworkAnnotations;
     FrameworkAnnotationsOrigin frameworkAnnotationsOrigin;
     List<String> frameworkCandidates = List.of();
@@ -460,6 +596,11 @@ public final class DcaLayout {
     return applicationSubpackage;
   }
 
+  /** The shared-output-port sub-package of the application layer, {@code shared} by default. */
+  public String sharedSubpackage() {
+    return sharedSubpackage;
+  }
+
   public String adapterSubpackage() {
     return adapterSubpackage;
   }
@@ -471,6 +612,11 @@ public final class DcaLayout {
   /** The event-consumer sub-package of the incoming adapters, {@code event} by default. */
   public String incomingEventSubpackage() {
     return incomingEventSubpackage;
+  }
+
+  /** The web sub-package of the incoming adapters, {@code web} by default. */
+  public String webSubpackage() {
+    return webSubpackage;
   }
 
   public String outgoingSubpackage() {
@@ -510,8 +656,43 @@ public final class DcaLayout {
     return restControllerSuffix;
   }
 
+  /** Name suffix of an aggregate root, {@code AggregateRoot} by default. */
+  public String aggregateRootSuffix() {
+    return aggregateRootSuffix;
+  }
+
+  /** Name suffix of a repository port, {@code Repository} by default. */
+  public String repositorySuffix() {
+    return repositorySuffix;
+  }
+
+  /** Name suffix of a store port, {@code Store} by default. */
+  public String storeSuffix() {
+    return storeSuffix;
+  }
+
+  /** Name suffix of a factory, {@code Factory} by default. */
+  public String factorySuffix() {
+    return factorySuffix;
+  }
+
+  /** Name suffix of a specification, {@code Specification} by default. */
+  public String specificationSuffix() {
+    return specificationSuffix;
+  }
+
+  /** Types a domain event may store its occurrence time in, read by {@code DCA-ADV-008}. */
+  public List<String> timestampTypes() {
+    return timestampTypes;
+  }
+
   public List<String> thirdPartyPackagesAllowedInDomain() {
     return thirdPartyPackagesAllowedInDomain;
+  }
+
+  /** The building-block types the rules select on, by role. */
+  public DcaMarkers markers() {
+    return markers;
   }
 
   public FrameworkAnnotations frameworkAnnotations() {
@@ -614,9 +795,11 @@ public final class DcaLayout {
     return basePackage + ".*." + applicationSubpackage + "..";
   }
 
-  /** {@code base.*.application.shared..} — output ports shared by the use cases of one context. */
+  /**
+   * {@code base.*.application.<shared>..} — output ports shared by the use cases of one context.
+   */
   public String sharedOutputPortPattern() {
-    return basePackage + ".*." + applicationSubpackage + ".shared..";
+    return basePackage + ".*." + applicationSubpackage + "." + sharedSubpackage + "..";
   }
 
   /** {@code base.*.adapter..} */
@@ -654,7 +837,7 @@ public final class DcaLayout {
   }
 
   public String sharedOutputPortPattern(String contextPackage) {
-    return contextPackage + "." + applicationSubpackage + ".shared..";
+    return contextPackage + "." + applicationSubpackage + "." + sharedSubpackage + "..";
   }
 
   public String adapterPattern(String contextPackage) {
@@ -683,12 +866,35 @@ public final class DcaLayout {
     return contextPackage + "." + adapterSubpackage + "." + outgoingSubpackage + "..";
   }
 
+  /**
+   * One line for the report: {@code dca (library default)} while every role names the building
+   * blocks' own marker, or the vocabulary's name and the roles that differ, so a reader sees which
+   * types the rules actually selected on — {@code company (aggregateRoot=com.company.ddd.Root,
+   * repository=com.company.ddd.Store)}.
+   */
+  public String markersReport() {
+    if (markers.isDefault()) {
+      return markers.name() + " (library default)";
+    }
+    Map<String, String> defaults = DcaMarkers.dca().roles();
+    List<String> changed =
+        markers.roles().entrySet().stream()
+            .filter(role -> !role.getValue().equals(defaults.get(role.getKey())))
+            .map(role -> role.getKey() + "=" + role.getValue())
+            .toList();
+    return changed.isEmpty()
+        ? markers.name()
+        : markers.name() + " (" + String.join(", ", changed) + ")";
+  }
+
   @Override
   public String toString() {
     return "DcaLayout["
         + basePackage
         + ", frameworkAnnotations="
         + frameworkAnnotationsReport()
+        + ", markers="
+        + markersReport()
         + "]";
   }
 }

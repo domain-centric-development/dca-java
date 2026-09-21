@@ -2,6 +2,7 @@ package dev.domaincentric.dca.archunit.rules;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.lang.ArchCondition;
@@ -9,17 +10,11 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
+import dev.domaincentric.dca.archunit.DcaMarkers;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
 import dev.domaincentric.dca.archunit.DcaRuleViolation;
-import dev.domaincentric.dca.buildingblocks.ddd.tactical.DomainEvent;
-import dev.domaincentric.dca.buildingblocks.ddd.tactical.DomainService;
-import dev.domaincentric.dca.buildingblocks.ddd.tactical.Factory;
-import dev.domaincentric.dca.buildingblocks.ddd.tactical.IntegrationEvent;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.IntegrationEventType;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -51,7 +46,6 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             integrationEventsHaveNoVersionField(),
             domainOnlyEventsHaveNoVersionField(),
             domainEventsHaveTimestampField(),
-            domainServicesResideInDomainService(),
             domainServicesResideInDomain(),
             domainServicesHaveNoFrameworkAnnotations(),
             domainServicesAreStateless(),
@@ -86,7 +80,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             arch ->
                 classes()
                     .that()
-                    .implement(DomainEvent.class)
+                    .areAssignableTo(arch.layout().markers().domainEvent())
                     .and()
                     .areNotInterfaces()
                     .should(TypeInspection.haveImmutableShape())
@@ -107,7 +101,9 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             arch ->
                 classes()
                     .that()
-                    .implement(DomainEvent.class)
+                    .areAssignableTo(arch.layout().markers().domainEvent())
+                    .and()
+                    .areNotInterfaces()
                     .should()
                     .resideInAnyPackage(arch.allDomainPatterns())
                     .allowEmptyShould(true))
@@ -116,34 +112,6 @@ public final class AdvancedPatternRules implements DcaRuleSet {
         .checking(
             "Each resides in a domain package of some module root (<module>.domain..). An event in an"
                 + " application, adapter or infrastructure package is reported. An empty selection passes.");
-  }
-
-  public DcaRule domainEventsAreImmutable() {
-    return DcaRule.of(
-            "DCA-ADV-003",
-            "Domain Events should be immutable (final or records)",
-            "Domain events should be immutable (final classes or records)",
-            arch ->
-                classes()
-                    .that()
-                    .resideInAnyPackage(arch.allDomainPatterns())
-                    .and()
-                    .implement(DomainEvent.class)
-                    .and()
-                    .areNotInterfaces()
-                    .and()
-                    .areNotEnums()
-                    .and()
-                    .areNotRecords()
-                    .should()
-                    .haveModifier(JavaModifier.FINAL)
-                    .allowEmptyShould(true))
-        .selecting(
-            "Non-interface, non-enum, non-record classes in <module>.domain.. of every module root that are"
-                + " assignable to DomainEvent.")
-        .checking(
-            "The class is final. Records and enums are not selected, so a record event always passes here."
-                + " An empty selection passes.");
   }
 
   public DcaRule domainEventsHaveNoFrameworkAnnotations() {
@@ -168,7 +136,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             arch ->
                 classes()
                     .that()
-                    .areAssignableTo(IntegrationEvent.class)
+                    .areAssignableTo(arch.layout().markers().integrationEvent())
                     .and()
                     .areNotInterfaces()
                     .should()
@@ -192,7 +160,9 @@ public final class AdvancedPatternRules implements DcaRuleSet {
               List<String> violations =
                   violations(
                       arch,
-                      c -> c.isAssignableTo(IntegrationEvent.class) && !c.isInterface(),
+                      c ->
+                          c.isAssignableTo(arch.layout().markers().integrationEvent())
+                              && !c.isInterface(),
                       AdvancedPatternRules::hasVersionField,
                       c ->
                           c.getName()
@@ -221,8 +191,8 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                   violations(
                       arch,
                       c ->
-                          c.isAssignableTo(DomainEvent.class)
-                              && !c.isAssignableTo(IntegrationEvent.class)
+                          c.isAssignableTo(arch.layout().markers().domainEvent())
+                              && !c.isAssignableTo(arch.layout().markers().integrationEvent())
                               && !c.isInterface(),
                       AdvancedPatternRules::hasVersionField,
                       c ->
@@ -251,8 +221,10 @@ public final class AdvancedPatternRules implements DcaRuleSet {
               List<String> violations =
                   violations(
                       arch,
-                      c -> c.isAssignableTo(DomainEvent.class) && !c.isInterface(),
-                      c -> !hasTimestampField(c),
+                      c ->
+                          c.isAssignableTo(arch.layout().markers().domainEvent())
+                              && !c.isInterface(),
+                      c -> !hasTimestampField(c, arch.layout().timestampTypes()),
                       c -> c.getName() + " does not have a timestamp field");
               failIfAny(
                   violations,
@@ -264,39 +236,18 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                 + " also implements DomainEvent.")
         .checking(
             "At least one field - declared by the class or inherited from a supertype, static or not, of any"
-                + " name - has the raw type java.time.Instant, java.time.LocalDateTime or java.time.ZonedDateTime;"
-                + " a record component of one of these types counts. OffsetDateTime, LocalDate, long or Date"
-                + " fields do not satisfy it, and a timestamp method without a backing field does not either."
-                + " Every offender is reported in one violation; an empty selection passes.");
+                + " name - has one of the configured timestamp types, by default java.time.Instant,"
+                + " OffsetDateTime, ZonedDateTime or LocalDateTime; a record component of one of these types"
+                + " counts. LocalDate, long or Date fields do not satisfy it, and a timestamp method without a"
+                + " backing field does not either - which is what the rule is for, because the marker already"
+                + " forces the accessor. A project whose own event vocabulary wraps the timestamp in a value"
+                + " object names that type with withTimestampTypes. Every offender is reported in one"
+                + " violation; an empty selection passes.");
   }
 
   // ============================================================================
   // DOMAIN SERVICES PATTERN
   // ============================================================================
-
-  public DcaRule domainServicesResideInDomainService() {
-    return DcaRule.of(
-            "DCA-ADV-009",
-            "Marked domain services reside in the configured domain service segment",
-            "Domain services implement DomainService marker and reside in domain.service packages"
-                + " (named descriptively, e.g., PricingService, CartTotalCalculator)",
-            arch ->
-                classes()
-                    .that()
-                    .implement(DomainService.class)
-                    .and()
-                    .areNotInterfaces()
-                    .should()
-                    .resideInAPackage(".." + layout.domainSubpackage() + ".service..")
-                    .allowEmptyShould(true))
-        .selecting(
-            "Non-interface classes anywhere on the classpath under scan that are assignable to"
-                + " DomainService.")
-        .checking(
-            "Each resides in a package matching ..<domain subpackage>.service.. - the configured domain"
-                + " subpackage followed by service, anywhere in the package path, not tied to a module root. A"
-                + " domain service directly in domain or in domain.model is reported. An empty selection passes.");
-  }
 
   public DcaRule domainServicesResideInDomain() {
     return DcaRule.of(
@@ -306,7 +257,9 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             arch ->
                 classes()
                     .that()
-                    .implement(DomainService.class)
+                    .areAssignableTo(arch.layout().markers().domainService())
+                    .and()
+                    .areNotInterfaces()
                     .should()
                     .resideInAnyPackage(arch.allDomainPatterns())
                     .allowEmptyShould(true))
@@ -338,7 +291,9 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             arch ->
                 classes()
                     .that()
-                    .implement(DomainService.class)
+                    .areAssignableTo(arch.layout().markers().domainService())
+                    .and()
+                    .areNotInterfaces()
                     .and()
                     .resideInAnyPackage(arch.allDomainPatterns())
                     .should(haveOnlyFinalFieldsIncludingInherited())
@@ -359,14 +314,18 @@ public final class AdvancedPatternRules implements DcaRuleSet {
   public DcaRule factoriesAreNamedFactory() {
     return DcaRule.of(
             "DCA-ADV-013",
-            "Factories should implement Factory Marker Interface",
-            "Classes implementing Factory marker should have 'Factory' in their name",
+            "Types carrying the factory role are named *Factory",
+            "A factory is found by its role, and read by its name: a type that creates aggregates"
+                + " and is not called one makes the creation site hard to find in review and in a"
+                + " search",
             arch ->
                 classes()
                     .that()
-                    .implement(Factory.class)
+                    .areAssignableTo(arch.layout().markers().factory())
+                    .and()
+                    .areNotInterfaces()
                     .should()
-                    .haveSimpleNameEndingWith("Factory")
+                    .haveSimpleNameEndingWith(arch.layout().factorySuffix())
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes anywhere on the classpath under scan that are assignable to Factory.")
@@ -382,7 +341,9 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             arch ->
                 classes()
                     .that()
-                    .implement(Factory.class)
+                    .areAssignableTo(arch.layout().markers().factory())
+                    .and()
+                    .areNotInterfaces()
                     .should()
                     .resideInAnyPackage(arch.allDomainPatterns())
                     .allowEmptyShould(true))
@@ -413,7 +374,9 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             arch ->
                 classes()
                     .that()
-                    .implement(Factory.class)
+                    .areAssignableTo(arch.layout().markers().factory())
+                    .and()
+                    .areNotInterfaces()
                     .and()
                     .resideInAnyPackage(arch.allDomainPatterns())
                     .should(haveOnlyFinalFieldsIncludingInherited())
@@ -433,26 +396,27 @@ public final class AdvancedPatternRules implements DcaRuleSet {
   public DcaRule specificationsResideInDomain() {
     return DcaRule.of(
             "DCA-ADV-017",
-            "Specifications must end with 'Specification'",
-            "Specification implementations are part of the domain layer",
+            "Specifications reside in the domain layer",
+            "A specification is a rule of the model expressed as a predicate; it belongs where the"
+                + " model is, not in the layer that happens to ask the question",
             arch ->
                 classes()
-                    .that()
-                    .haveSimpleNameEndingWith("Specification")
-                    .and()
-                    .areNotInterfaces()
-                    .and()
-                    .doNotHaveSimpleName("Specification")
+                    .that(
+                        specifications(
+                            arch.layout().markers(), arch.layout().specificationSuffix()))
                     .should()
                     .resideInAnyPackage(arch.allDomainPatterns())
                     .allowEmptyShould(true))
         .selecting(
-            "Non-interface classes anywhere on the classpath under scan whose simple name ends with"
-                + " Specification, excluding a class named exactly Specification. No marker is involved - only"
-                + " the name selects.")
+            "Non-interface classes anywhere on the classpath under scan that are assignable to the"
+                + " configured specification role or whose simple name ends with Specification, the"
+                + " role's own type and a class named exactly Specification excluded. The marker"
+                + " and the name both select, so a specification named after the predicate it"
+                + " expresses is governed too.")
         .checking(
             "Each resides in a domain package of some module root (<module>.domain..). An empty selection"
-                + " passes.");
+                + " passes.",
+            "move the specification into the module's domain package");
   }
 
   public DcaRule specificationsHaveNoFrameworkAnnotations() {
@@ -462,7 +426,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             "Domain objects carry no metadata for container management, persistence or transaction coordination",
             arch -> DomainMetadata.check(arch, "DCA-ADV-018"))
         .selecting(
-            "Non-interface specifications in domain packages. Metadata ownership is exclusive: events, services, factories, specifications, then domain.model types.")
+            "Non-interface types in domain packages that are assignable to the configured specification role or whose simple name ends with Specification. Metadata ownership is exclusive: events, services, factories, specifications, then domain.model types.")
         .checking(
             "Direct or meta-annotations: types prohibit injectable, persistenceEntity and transactional roles; fields prohibit injectionSite and persistenceMapping; methods prohibit transactional and eventListener, plus injectionSite except on events; constructors prohibit injectionSite. Unclassified annotations are allowed by this check. Empty configured roles select no metadata; wiring is not established.");
   }
@@ -470,6 +434,26 @@ public final class AdvancedPatternRules implements DcaRuleSet {
   // ============================================================================
   // HELPERS
   // ============================================================================
+
+  /**
+   * A specification: assignable to the configured role, or named after the pattern. Both select,
+   * because a project may carry the marker without the suffix — as both reference samples do — or
+   * the suffix without the marker.
+   */
+  private static DescribedPredicate<JavaClass> specifications(DcaMarkers markers, String suffix) {
+    DescribedPredicate<JavaClass> byRole =
+        JavaClass.Predicates.assignableTo(markers.specification());
+    DescribedPredicate<JavaClass> byName = JavaClass.Predicates.simpleNameEndingWith(suffix);
+    return byRole
+        .or(byName)
+        .and(DescribedPredicate.not(JavaClass.Predicates.INTERFACES))
+        .and(DescribedPredicate.not(JavaClass.Predicates.simpleName(suffix)))
+        .and(
+            DescribedPredicate.not(
+                DescribedPredicate.describe(
+                    "the role's own type", c -> c.getName().equals(markers.specification()))))
+        .as("specifications");
+  }
 
   /**
    * Like ArchUnit's {@code haveOnlyFinalFields()}, but over {@code getAllFields()}: a mutable field
@@ -502,13 +486,9 @@ public final class AdvancedPatternRules implements DcaRuleSet {
     return eventClass.getAllFields().stream().anyMatch(f -> SCHEMA_FIELDS.contains(f.getName()));
   }
 
-  private static boolean hasTimestampField(JavaClass eventClass) {
+  private static boolean hasTimestampField(JavaClass eventClass, List<String> timestampTypes) {
     return eventClass.getAllFields().stream()
-        .anyMatch(
-            f ->
-                f.getRawType().isEquivalentTo(Instant.class)
-                    || f.getRawType().isEquivalentTo(LocalDateTime.class)
-                    || f.getRawType().isEquivalentTo(ZonedDateTime.class));
+        .anyMatch(f -> timestampTypes.contains(f.getRawType().getName()));
   }
 
   private static List<String> violations(

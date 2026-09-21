@@ -41,7 +41,10 @@ public final class DcaRuleExecution {
     if (violations.isEmpty()) {
       return new DcaRuleOutcome(rule.id(), DcaRuleOutcome.Status.PASSED, null);
     }
-    String message = withReason(violations.get(), selection.reasonFor(rule.id()));
+    String message =
+        withRuleId(
+            withReason(withRemedy(violations.get(), rule.remedy()), selection.reasonFor(rule.id())),
+            rule.id());
     return severity == DcaSeverity.WARN
         ? new DcaRuleOutcome(rule.id(), DcaRuleOutcome.Status.WARNED, message)
         : new DcaRuleOutcome(rule.id(), DcaRuleOutcome.Status.FAILED, message);
@@ -148,6 +151,32 @@ public final class DcaRuleExecution {
         return delegate.getViolations(rule);
       }
     };
+  }
+
+  /**
+   * Prefixes every line of a violation report with the rule id.
+   *
+   * <p>ArchUnit names the rule in its report header only, and a rule that collects its violations
+   * itself names it nowhere. The id is what a reader switches off through {@link DcaRuleSelection},
+   * what a review cites and what an agent matches a report line on — the rule title is not, because
+   * it changes with a configured suffix. A line that already carries the id is left alone.
+   */
+  private static String withRuleId(String report, String id) {
+    String prefix = "[" + id + "] ";
+    List<String> prefixed = new ArrayList<>();
+    for (String line : report.split("\n", -1)) {
+      prefixed.add(line.isBlank() || line.contains(prefix) ? line : prefix + line);
+    }
+    return String.join("\n", prefixed);
+  }
+
+  /**
+   * Appends the rule's remedy as a {@code Fix:} line, the way .NET's {@code
+   * DcaRuleViolationException} formats its {@code fix} - one line about the rule, not one per
+   * violation. It is added before the id is prefixed, so that line carries the id too.
+   */
+  private static String withRemedy(String violations, Optional<String> remedy) {
+    return remedy.map(text -> violations + "\n\nFix: " + text).orElse(violations);
   }
 
   private static String withReason(String violations, Optional<String> reason) {

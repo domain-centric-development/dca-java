@@ -205,6 +205,47 @@ class DcaRuleExecutionTest {
     assertEquals(DcaRuleOutcome.Status.PASSED, outcome.status(), outcome.message());
   }
 
+  /**
+   * Every line of a report carries the rule id, so that a reader can switch the rule off, a review
+   * can cite it and an agent can map the line back to its catalog entry. The title cannot serve
+   * that purpose because it changes with a configured suffix.
+   */
+  @Test
+  void everyReportLineCarriesTheRuleId() {
+    DcaRuleOutcome outcome = execute(BAD, ARCH_RULE, DcaRuleSelection.all());
+
+    assertEquals(DcaRuleOutcome.Status.FAILED, outcome.status());
+    assertEveryLineCarries(ARCH_RULE, outcome.message());
+  }
+
+  /** The same holds for a rule that collects its violations itself. */
+  @Test
+  void aSelfCollectingRuleAlsoCarriesTheRuleIdOnEveryLine() {
+    DcaRuleOutcome outcome = execute(TACTICAL_BAD, CUSTOM_RULE, DcaRuleSelection.all());
+
+    assertEquals(DcaRuleOutcome.Status.FAILED, outcome.status());
+    assertEveryLineCarries(CUSTOM_RULE, outcome.message());
+  }
+
+  /** The id appears once per line, never twice, whatever the rule already wrote into its text. */
+  @Test
+  void theRuleIdIsNotRepeatedOnALineThatAlreadyCarriesIt() {
+    DcaRuleOutcome outcome = execute(BAD, ARCH_RULE, DcaRuleSelection.all());
+
+    for (String line : outcome.message().split("\n")) {
+      assertFalse(
+          line.indexOf("[" + ARCH_RULE + "]") != line.lastIndexOf("[" + ARCH_RULE + "]"), line);
+    }
+  }
+
+  private static void assertEveryLineCarries(String ruleId, String message) {
+    for (String line : message.split("\n")) {
+      if (!line.isBlank()) {
+        assertTrue(line.contains("[" + ruleId + "]"), "line without the rule id: " + line);
+      }
+    }
+  }
+
   @Test
   void aRuleWithoutASingleArchUnitRuleCannotBeFrozen() {
     IllegalArgumentException failure =
@@ -214,5 +255,33 @@ class DcaRuleExecutionTest {
 
     assertTrue(failure.getMessage().contains(CUSTOM_RULE), failure.getMessage());
     assertTrue(failure.getMessage().contains("WARN"), "points at the alternative");
+  }
+
+  /**
+   * A rule that names its remedy gets it appended as one {@code Fix:} line, the counterpart of the
+   * {@code fix} argument .NET's {@code DcaRule.Fail} has always taken. The line carries the rule id
+   * like every other, so a grep for the id finds the advice with the finding.
+   */
+  @Test
+  void aRuleWithARemedyAppendsOneFixLine() {
+    DcaRuleOutcome outcome = execute(BAD, ARCH_RULE, DcaRuleSelection.all());
+
+    assertEquals(DcaRuleOutcome.Status.FAILED, outcome.status());
+    assertEquals(
+        1,
+        outcome.message().lines().filter(line -> line.contains("Fix: ")).count(),
+        outcome.message());
+    assertTrue(
+        outcome.message().contains("[DCA-NAM-001] Fix: rename the class to *UseCase"),
+        outcome.message());
+  }
+
+  /** A rule that names none is unchanged: no empty Fix line. */
+  @Test
+  void aRuleWithoutARemedyAppendsNothing() {
+    DcaRuleOutcome outcome = execute(BAD, "DCA-NAM-011", DcaRuleSelection.all());
+
+    assertEquals(DcaRuleOutcome.Status.FAILED, outcome.status());
+    assertFalse(outcome.message().contains("Fix: "), outcome.message());
   }
 }

@@ -4,6 +4,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import dev.domaincentric.dca.archunit.DcaLayout;
+import dev.domaincentric.dca.archunit.DcaMarkers;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
 import java.util.ArrayList;
@@ -67,12 +68,15 @@ public final class OnionRules implements DcaRuleSet {
             "Domain should be framework-independent (Dependency Inversion Principle)",
             arch -> {
               // The domain packages of every module root - the shared kernel among them when it
-              // owns a domain package - plus the two building-blocks packages a domain may use:
-              // the tactical markers and the output ports. Strategic annotations and input ports
-              // are deliberately not on the list.
+              // owns a domain package - plus the packages the marker vocabulary declares the
+              // domain-facing roles in: the tactical markers and the outgoing ports. Derived from
+              // the roles rather than hard-wired, so a project that points the roles at its own
+              // markers is not reported as depending on a foreign library inside its own domain.
+              // Strategic annotations, the application-layer roles and input ports are
+              // deliberately not on the list.
               List<String> domainPackageList = new ArrayList<>(List.of(arch.allDomainPatterns()));
-              domainPackageList.add(DcaLayout.BUILDING_BLOCKS_TACTICAL_PACKAGE);
-              domainPackageList.add(DcaLayout.BUILDING_BLOCKS_PORT_OUT_PACKAGE);
+              domainPackageList.addAll(
+                  layout.markers().declaringPackagePatternsOf(DcaMarkers.DOMAIN_FACING_ROLES));
               String[] domainPackages = domainPackageList.toArray(String[]::new);
               List<String> allowed = new ArrayList<>(layout.thirdPartyPackagesAllowedInDomain());
               allowed.addAll(List.of(domainPackages));
@@ -85,16 +89,25 @@ public final class OnionRules implements DcaRuleSet {
                   .allowEmptyShould(true);
             })
         .selecting(
-            "Classes in <module>.domain.. of every module root, plus the classes of the"
-                + " building-blocks packages ddd.tactical.. and hexagonal.port.out.. when they are"
-                + " on the classpath under scan.")
+            "Classes in <module>.domain.. of every module root, plus the classes of the packages"
+                + " the configured marker vocabulary declares its domain-facing roles in — the"
+                + " tactical roles and the outgoing ports — when they are on the classpath under"
+                + " scan. With the default vocabulary those are the building-blocks packages"
+                + " ddd.tactical.. and hexagonal.port.out..; with a project's own markers they are"
+                + " the packages those markers live in.")
         .checking(
             "Every dependency targets a class in one of those same packages or in an allowed"
                 + " third-party package: by default java.., lombok.., org.apache.commons.lang3..,"
-                + " org.apache.commons.collections4.. and org.jspecify.annotations.., plus"
-                + " whatever the layout adds. The building-blocks strategic and port.in packages"
-                + " are not on the list, nor is the shared kernel unless it is a module root with a"
-                + " domain layer of its own. A dependency on any other package is reported.");
+                + " org.apache.commons.collections4.. and org.jspecify.annotations... A logging"
+                + " facade is deliberately not among them - which logging, validation or utility"
+                + " library a domain model may see is a project decision, made with"
+                + " withThirdPartyPackagesAllowedInDomain(...). The vocabulary's own packages are on the list"
+                + " because they are derived from the roles, so pointing a role at another"
+                + " library's type does not make that library a reported dependency. The"
+                + " application-layer roles and the incoming ports are not on the list, nor are"
+                + " the strategic annotations, nor the shared kernel unless it is a module root"
+                + " with a domain layer of its own. A dependency on any other package is"
+                + " reported.");
   }
 
   public DcaRule domainModelsMustNotHaveFrameworkAnnotations() {

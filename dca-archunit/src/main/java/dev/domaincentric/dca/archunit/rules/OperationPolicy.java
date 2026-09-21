@@ -3,7 +3,7 @@ package dev.domaincentric.dca.archunit.rules;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaModifier;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
-import dev.domaincentric.dca.buildingblocks.hexagonal.port.in.InputPort;
+import dev.domaincentric.dca.archunit.DcaMarkers;
 import java.lang.reflect.*;
 import java.util.*;
 
@@ -16,7 +16,7 @@ final class OperationPolicy {
         && !type.isNestedClass()
         && !type.getModifiers().contains(JavaModifier.ABSTRACT)
         && JavaClass.Predicates.resideInAnyPackage(arch.allApplicationPatterns()).test(type)
-        && (type.isAssignableTo(InputPort.class)
+        && (type.isAssignableTo(arch.layout().markers().inputPort())
             || type.getSimpleName().endsWith(arch.layout().useCaseSuffix()));
   }
 
@@ -45,7 +45,7 @@ final class OperationPolicy {
     for (var dep : current.getDirectDependenciesFromSelf()) {
       var target = dep.getTargetClass();
       if (own.contains(target)) continue;
-      if (target.isAssignableTo(InputPort.class) || operation(target, arch)) {
+      if (target.isAssignableTo(arch.layout().markers().inputPort()) || operation(target, arch)) {
         violations.add(
             caller.getName()
                 + " -> "
@@ -72,7 +72,7 @@ final class OperationPolicy {
       Class<?> runtime = type.reflect();
       Set<String> contracts = new HashSet<>();
       Map<TypeVariable<?>, Type> effectiveBindings = new HashMap<>();
-      contracts(runtime, effectiveBindings, contracts);
+      contracts(runtime, effectiveBindings, contracts, arch.layout().markers());
       Set<String> objectMethods = new HashSet<>();
       for (Method method : Object.class.getMethods())
         objectMethods.add(signature(method, Map.of()));
@@ -89,7 +89,7 @@ final class OperationPolicy {
   }
 
   private static void contracts(
-      Type type, Map<TypeVariable<?>, Type> inherited, Set<String> signatures) {
+      Type type, Map<TypeVariable<?>, Type> inherited, Set<String> signatures, DcaMarkers markers) {
     if (type == null) return;
     Class<?> raw;
     Map<TypeVariable<?>, Type> bindings = new HashMap<>(inherited);
@@ -100,12 +100,23 @@ final class OperationPolicy {
         bindings.put(raw.getTypeParameters()[i], resolve(args[i], inherited));
     } else if (type instanceof Class<?> clazz) raw = clazz;
     else return;
-    if (raw.isInterface() && InputPort.class.isAssignableFrom(raw))
+    if (raw.isInterface() && isAssignableToByName(raw, markers.inputPort()))
       for (Method method : raw.getDeclaredMethods())
         if (!Modifier.isStatic(method.getModifiers())) signatures.add(signature(method, bindings));
-    for (Type parent : raw.getGenericInterfaces()) contracts(parent, bindings, signatures);
-    contracts(raw.getGenericSuperclass(), bindings, signatures);
+    for (Type parent : raw.getGenericInterfaces()) contracts(parent, bindings, signatures, markers);
+    contracts(raw.getGenericSuperclass(), bindings, signatures, markers);
     inherited.putAll(bindings);
+  }
+
+  /**
+   * Whether a reflected type is the named one or carries it, walking interfaces and super classes.
+   * The role names a type rather than a {@code Class}, so assignability is asked by name.
+   */
+  private static boolean isAssignableToByName(Class<?> raw, String fqn) {
+    if (raw == null) return false;
+    if (raw.getName().equals(fqn)) return true;
+    for (Class<?> parent : raw.getInterfaces()) if (isAssignableToByName(parent, fqn)) return true;
+    return isAssignableToByName(raw.getSuperclass(), fqn);
   }
 
   private static Type resolve(Type type, Map<TypeVariable<?>, Type> bindings) {

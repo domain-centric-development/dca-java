@@ -101,11 +101,31 @@ public final class RuleCatalog {
   }
 
   /**
+   * The version of {@code dca-archunit} this catalog describes, so that a consumer of {@code
+   * rules.json} — the knowledge catalog, an agent, a rendered rule list — can tell which release a
+   * rule text belongs to. The Gradle task passes the artifact's version; a run without it says so
+   * rather than inventing a number.
+   */
+  private static String version() {
+    String configured = System.getProperty("dca.catalog.version");
+    if (configured != null && !configured.isBlank()) {
+      return configured;
+    }
+    String packaged = RuleCatalog.class.getPackage().getImplementationVersion();
+    return packaged == null || packaged.isBlank() ? "unspecified" : packaged;
+  }
+
+  /**
    * The catalog as JSON: {@code [{"set":…,"id":…,"title":…,"rationale":…,"selects":…,"checks":…},
    * …]}.
    */
   public static String json() {
-    StringBuilder sb = new StringBuilder("{\n\"rules\": [\n");
+    StringBuilder sb =
+        new StringBuilder("{\n\"library\": ")
+            .append(quote("dca-archunit"))
+            .append(",\n\"version\": ")
+            .append(quote(version()))
+            .append(",\n\"rules\": [\n");
     boolean first = true;
     for (DcaRuleSet set : DcaRules.ruleSets(PLACEHOLDER_LAYOUT)) {
       for (DcaRule rule : set.rules()) {

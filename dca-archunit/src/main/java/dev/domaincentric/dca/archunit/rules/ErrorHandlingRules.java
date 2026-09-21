@@ -4,12 +4,12 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 
 import com.tngtech.archunit.core.domain.JavaClass;
 import dev.domaincentric.dca.archunit.DcaLayout;
+import dev.domaincentric.dca.archunit.DcaMarkers;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
 import dev.domaincentric.dca.archunit.FrameworkAnnotations;
 import dev.domaincentric.dca.buildingblocks.application.UseCaseException;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.DomainException;
-import dev.domaincentric.dca.buildingblocks.hexagonal.port.in.InputPort;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -70,7 +70,7 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                     .and()
                     .areAssignableTo(Throwable.class)
                     .should()
-                    .beAssignableTo(DomainException.class)
+                    .beAssignableTo(arch.layout().markers().domainException())
                     .allowEmptyShould(true))
         .selecting(
             "Classes in <module>.domain.. of every module root that are assignable to Throwable -"
@@ -93,13 +93,14 @@ public final class ErrorHandlingRules implements DcaRuleSet {
             arch -> {
               CollectedViolations collected =
                   CollectedViolations.withHeader(
-                      "DCA-ERR-002: an exception resides outside the layer its base type names");
+                      "An exception resides outside the layer its base type names");
               collected.addAll(
                   classes()
                       .that()
-                      .areAssignableTo(DomainException.class)
+                      .areAssignableTo(arch.layout().markers().domainException())
                       .and()
-                      .resideOutsideOfPackage(DcaLayout.BUILDING_BLOCKS_PACKAGE)
+                      .resideOutsideOfPackages(
+                          arch.layout().markers().declaringPackagePatterns().toArray(String[]::new))
                       .should()
                       .resideInAnyPackage(arch.allDomainPatterns())
                       .allowEmptyShould(true),
@@ -108,9 +109,10 @@ public final class ErrorHandlingRules implements DcaRuleSet {
               collected.addAll(
                   classes()
                       .that()
-                      .areAssignableTo(UseCaseException.class)
+                      .areAssignableTo(arch.layout().markers().useCaseException())
                       .and()
-                      .resideOutsideOfPackage(DcaLayout.BUILDING_BLOCKS_PACKAGE)
+                      .resideOutsideOfPackages(
+                          arch.layout().markers().declaringPackagePatterns().toArray(String[]::new))
                       .should()
                       .resideInAnyPackage(arch.allApplicationPatterns())
                       .allowEmptyShould(true),
@@ -119,9 +121,10 @@ public final class ErrorHandlingRules implements DcaRuleSet {
               collected.throwIfAny();
             })
         .selecting(
-            "Classes anywhere on the classpath under scan that are assignable to DomainException or"
-                + " to UseCaseException, except the two base types themselves and anything else in"
-                + " the building-blocks package.")
+            "Classes anywhere on the classpath under scan that are assignable to the domain-exception"
+                + " or the use-case-exception role, except the vocabulary's own code: the packages the"
+                + " configured role types live in are excluded, so a project's own base class is not"
+                + " reported as residing outside a layer it never claimed.")
         .checking(
             "A subtype of DomainException resides in <module>.domain.. of some module root, a"
                 + " subtype of UseCaseException in <module>.application... Both findings are"
@@ -142,18 +145,22 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                     .resideInAnyPackage(arch.allApplicationPatterns())
                     .and()
                     .areAssignableTo(Throwable.class)
+                    .and()
+                    .areNotAssignableTo(arch.layout().markers().domainException())
                     .should()
-                    .beAssignableTo(UseCaseException.class)
+                    .beAssignableTo(arch.layout().markers().useCaseException())
                     .allowEmptyShould(true))
         .selecting(
             "Classes in <module>.application.. of every module root that are assignable to Throwable"
-                + " - the exception types the application layer declares itself. The base type"
-                + " UseCaseException lives in the building blocks and is not selected.")
+                + " and not to DomainException - the exception types the application layer declares"
+                + " itself. The base type UseCaseException lives in the building blocks and is not"
+                + " selected. A subtype of DomainException declared in an application package is"
+                + " not selected either: it is misplaced rather than mis-based, and DCA-ERR-002"
+                + " owns that case with the remedy that fits it - move the failure to the domain,"
+                + " do not change its base type.")
         .checking(
-            "Each extends UseCaseException, directly or through an intermediate base class. A"
-                + " subtype of DomainException declared in an application package is reported here"
-                + " as well: a failure of the model belongs to the model. An empty selection"
-                + " passes.");
+            "Each extends UseCaseException, directly or through an intermediate base class. An"
+                + " empty selection passes.");
   }
 
   public DcaRule exceptionsCarryNoFrameworkMetadata(DcaLayout layout) {
@@ -162,14 +169,15 @@ public final class ErrorHandlingRules implements DcaRuleSet {
             "Domain and use-case exceptions must not carry prohibited framework metadata",
             "An exception of an inner layer that carries container, persistence or protocol"
                 + " metadata has decided how the outside answers it, which is the incoming"
-                + " adapter's decision and only its",
+                + " adapter's decision and only its; an annotation that fixes the answer's status"
+                + " decides it for every protocol at once, including the ones the exception knows"
+                + " nothing about",
             arch -> {
               FrameworkAnnotations roles = layout.frameworkAnnotations();
               CollectedViolations collected =
-                  CollectedViolations.withHeader(
-                      "DCA-ERR-004: prohibited metadata on an inner-layer exception");
+                  CollectedViolations.withHeader("Prohibited metadata on an inner-layer exception");
               for (JavaClass type : arch.classes()) {
-                if (!isProjectException(type)) {
+                if (!isProjectException(type, arch.layout().markers())) {
                   continue;
                 }
                 for (List<String> role :
@@ -179,7 +187,8 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                         roles.transactional(),
                         roles.webController(),
                         roles.restController(),
-                        roles.eventListener())) {
+                        roles.eventListener(),
+                        roles.transportStatus())) {
                   for (String annotation : role) {
                     collected.require(
                         !type.isAnnotatedWith(annotation) && !type.isMetaAnnotatedWith(annotation),
@@ -194,10 +203,13 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                 + " to UseCaseException, the building-blocks package excluded.")
         .checking(
             "The type carries none of the configured injectable, persistence-entity, transactional,"
-                + " web-controller, REST-controller or event-listener annotations, directly or as a"
-                + " meta-annotation. Fields and methods are not inspected, and an annotation the"
-                + " layout classifies into no role is allowed. With those roles empty the rule"
-                + " selects no metadata and passes.");
+                + " web-controller, REST-controller, event-listener or transport-status"
+                + " annotations, directly or as a meta-annotation. The transport-status role is the"
+                + " one that fixes the protocol answer on the exception itself; where the framework"
+                + " answers through a mapper class instead of an annotation the role is empty and"
+                + " nothing is selected for it. Fields and methods are not inspected, and an"
+                + " annotation the layout classifies into no role is allowed. With those roles"
+                + " empty the rule selects no metadata and passes.");
   }
 
   public DcaRule exceptionsNameNoTransportConcept() {
@@ -210,9 +222,9 @@ public final class ErrorHandlingRules implements DcaRuleSet {
             arch -> {
               CollectedViolations collected =
                   CollectedViolations.withHeader(
-                      "DCA-ERR-005: a technical or transport word in an exception name");
+                      "A technical or transport word in an exception name");
               for (JavaClass type : arch.classes()) {
-                if (!isProjectException(type)) {
+                if (!isProjectException(type, arch.layout().markers())) {
                   continue;
                 }
                 String name = type.getSimpleName();
@@ -234,9 +246,11 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                 + " to UseCaseException, the building-blocks package excluded.")
         .checking(
             "The simple name ends with none of Error, Fault, Failure and contains none of Http,"
-                + " Status, Response. Whether the remaining name is a term of the Ubiquitous"
-                + " Language is not decidable here and stays with review. An empty selection"
-                + " passes.");
+                + " StatusCode, ResponseStatus, ResponseEntity. The bare words Status and"
+                + " Response are not matched: they are transport words and domain words, and"
+                + " the name alone does not tell them apart, so OrderStatusInvalidException"
+                + " passes. Whether the remaining name is a term of the Ubiquitous Language is"
+                + " not decidable here and stays with review. An empty selection passes.");
   }
 
   public DcaRule adaptersWithoutTranslation() {
@@ -255,11 +269,12 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                     .test(type)) {
                   continue;
                 }
-                if (dependsOnAssignableTo(type, DomainException.class)
-                    || dependsOnAssignableTo(type, UseCaseException.class)) {
+                if (dependsOnAssignableTo(type, arch.layout().markers().domainException())
+                    || dependsOnAssignableTo(type, arch.layout().markers().useCaseException())) {
                   packagesThatName.add(type.getPackageName());
                 }
-                if (!type.isInterface() && dependsOnAssignableTo(type, InputPort.class)) {
+                if (!type.isInterface()
+                    && dependsOnAssignableTo(type, arch.layout().markers().inputPort())) {
                   drivingByPackage
                       .computeIfAbsent(type.getPackageName(), pkg -> new ArrayList<>())
                       .add(type);
@@ -294,18 +309,17 @@ public final class ErrorHandlingRules implements DcaRuleSet {
 
   private static final List<String> FORBIDDEN_SUFFIXES = List.of("Error", "Fault", "Failure");
 
-  private static final List<String> FORBIDDEN_WORDS = List.of("Http", "Status", "Response");
+  private static final List<String> FORBIDDEN_WORDS =
+      List.of("Http", "StatusCode", "ResponseStatus", "ResponseEntity");
 
   /** A project's own exception type: assignable to a base type, outside the building blocks. */
-  private static boolean isProjectException(JavaClass type) {
-    return (type.isAssignableTo(DomainException.class)
-            || type.isAssignableTo(UseCaseException.class))
-        && !type.getPackageName().startsWith(BUILDING_BLOCKS_PREFIX);
+  private static boolean isProjectException(JavaClass type, DcaMarkers markers) {
+    return (type.isAssignableTo(markers.domainException())
+            || type.isAssignableTo(markers.useCaseException()))
+        && !markers.declaresTypesIn(type.getPackageName());
   }
 
-  private static final String BUILDING_BLOCKS_PREFIX = "dev.domaincentric.dca.buildingblocks";
-
-  private static boolean dependsOnAssignableTo(JavaClass type, Class<?> target) {
+  private static boolean dependsOnAssignableTo(JavaClass type, String target) {
     return type.getDirectDependenciesFromSelf().stream()
         .anyMatch(dependency -> dependency.getTargetClass().isAssignableTo(target));
   }

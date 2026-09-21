@@ -6,22 +6,19 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaModifier;
+import com.tngtech.archunit.core.domain.JavaParameterizedType;
+import com.tngtech.archunit.core.domain.JavaType;
+import com.tngtech.archunit.core.domain.JavaTypeVariable;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
+import dev.domaincentric.dca.archunit.DcaMarkers;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
 import dev.domaincentric.dca.archunit.DcaRuleViolation;
-import dev.domaincentric.dca.buildingblocks.ddd.tactical.AggregateRoot;
-import dev.domaincentric.dca.buildingblocks.ddd.tactical.Entity;
-import dev.domaincentric.dca.buildingblocks.ddd.tactical.Factory;
-import dev.domaincentric.dca.buildingblocks.ddd.tactical.Id;
-import dev.domaincentric.dca.buildingblocks.ddd.tactical.Value;
-import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.OutputPort;
-import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.Repository;
-import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.Store;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -36,9 +33,12 @@ import java.util.stream.Collectors;
  */
 public final class TacticalPatternRules implements DcaRuleSet {
 
-  private static final String REPOSITORY_SUFFIX = "Repository";
-  private static final String STORE_SUFFIX = "Store";
-  private static final Set<String> REPOSITORY_METHOD_NAMES = Set.of("save", "deleteById", "delete");
+  /**
+   * Write vocabulary a Store must not declare, compared case-insensitively so that the same six
+   * names are matched in both languages - {@code save} and {@code SaveAsync} are the same name.
+   */
+  private static final Set<String> REPOSITORY_METHOD_NAMES =
+      Set.of("save", "deletebyid", "delete", "saveasync", "deletebyidasync", "deleteasync");
 
   private final DcaLayout layout;
   private final List<DcaRule> rules;
@@ -99,20 +99,21 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .that()
                     .resideInAnyPackage(arch.allDomainModelPatterns())
                     .and()
-                    .haveSimpleNameEndingWith("AggregateRoot")
+                    .haveSimpleNameEndingWith(layout.aggregateRootSuffix())
                     .and()
                     .areNotInterfaces()
                     .and()
-                    .doNotHaveSimpleName("AggregateRoot")
+                    .doNotHaveSimpleName(layout.aggregateRootSuffix())
                     .should()
-                    .implement(AggregateRoot.class)
+                    .beAssignableTo(arch.layout().markers().aggregateRoot())
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes in <module>.domain.model.. of every module root whose "
-                + "simple name ends with AggregateRoot, the marker interface AggregateRoot itself "
-                + "excluded.")
+                + "simple name ends with AggregateRoot, the marker of the aggregate-root role "
+                + "itself excluded.")
         .checking(
-            "The class implements the AggregateRoot marker. Only the name suffix triggers "
+            "The class is assignable to the aggregate-root role - through the marker or an "
+                + "intermediate base class. Only the name suffix triggers "
                 + "selection - an aggregate root not named *AggregateRoot is never reported, and "
                 + "an empty selection passes.");
   }
@@ -125,11 +126,12 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 + " in domain services over supplied snapshots. Review callback parameters manually; this field check cannot prove semantic responsibility",
             arch -> {
               List<String> violations = new ArrayList<>();
-              for (JavaClass aggregate : concreteClassesAssignableTo(arch, AggregateRoot.class)) {
+              for (JavaClass aggregate :
+                  concreteClassesAssignableTo(arch, arch.layout().markers().aggregateRoot())) {
                 for (JavaField field : aggregate.getAllFields()) {
                   JavaClass fieldType = field.getRawType();
-                  if (fieldType.isAssignableTo(Repository.class)
-                      || fieldType.isAssignableTo(OutputPort.class)) {
+                  if (fieldType.isAssignableTo(arch.layout().markers().repository())
+                      || fieldType.isAssignableTo(arch.layout().markers().outputPort())) {
                     violations.add(
                         aggregate.getName()
                             + " has field '"
@@ -159,14 +161,15 @@ public final class TacticalPatternRules implements DcaRuleSet {
     return DcaRule.check(
             "DCA-TAC-003",
             "Aggregate Roots must not have fields with other Aggregate Root types",
-            "Vernon's Aggregate Design Rule #2: reference other Aggregates by identity to keep"
+            "Vernon's Aggregate Design Rule #3: reference other Aggregates by identity to keep"
                 + " aggregate boundaries and transactional consistency intact",
             arch -> {
               List<String> violations = new ArrayList<>();
-              for (JavaClass aggregate : concreteClassesAssignableTo(arch, AggregateRoot.class)) {
+              for (JavaClass aggregate :
+                  concreteClassesAssignableTo(arch, arch.layout().markers().aggregateRoot())) {
                 for (JavaField field : TypeInspection.instanceFields(aggregate)) {
                   for (JavaClass involved : TypeInspection.involvedTypes(field, aggregate)) {
-                    if (isConcreteAggregateRoot(involved)) {
+                    if (isConcreteAggregateRoot(involved, arch.layout().markers())) {
                       violations.add(
                           fieldDescription(aggregate, field, involved)
                               + " which is another aggregate root");
@@ -175,7 +178,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 }
               }
               fail(
-                  "Aggregates must reference other aggregates by ID only (Vernon's Rule #2).",
+                  "Aggregates must reference other aggregates by ID only (Vernon's Rule #3).",
                   violations);
             })
         .selecting(
@@ -196,18 +199,19 @@ public final class TacticalPatternRules implements DcaRuleSet {
             "An Entity is defined by its identity, which is a value object implementing the Id marker",
             arch -> {
               List<String> violations = new ArrayList<>();
-              for (JavaClass entity : concreteClassesAssignableTo(arch, Entity.class)) {
+              for (JavaClass entity :
+                  concreteClassesAssignableTo(arch, arch.layout().markers().entity())) {
                 if (entity.getModifiers().contains(JavaModifier.ABSTRACT)) {
                   continue;
                 }
                 boolean hasIdField =
                     entity.getAllFields().stream()
-                        .anyMatch(f -> f.getRawType().isAssignableTo(Id.class));
+                        .anyMatch(f -> f.getRawType().isAssignableTo(arch.layout().markers().id()));
                 if (!hasIdField) {
                   violations.add(
                       entity.getName()
                           + " has no field whose type implements "
-                          + Id.class.getSimpleName());
+                          + simpleName(arch.layout().markers().id()));
                 }
               }
               fail(
@@ -244,10 +248,9 @@ public final class TacticalPatternRules implements DcaRuleSet {
                             && (caller.getPackageName().equals(domain)
                                 || caller.getPackageName().startsWith(domain + "."));
                     boolean role =
-                        caller.isAssignableTo(AggregateRoot.class)
-                            || caller.isAssignableTo(Entity.class)
-                            || caller.isAssignableTo(
-                                dev.domaincentric.dca.buildingblocks.ddd.tactical.Factory.class);
+                        caller.isAssignableTo(arch.layout().markers().aggregateRoot())
+                            || caller.isAssignableTo(arch.layout().markers().entity())
+                            || caller.isAssignableTo(arch.layout().markers().factory());
                     if (!caller.equals(entity) && !(sameDomain && role)) {
                       violations.add(
                           caller.getName()
@@ -275,7 +278,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 + " ubiquitous language, never through public setters",
             arch -> {
               List<String> violations = new ArrayList<>();
-              for (JavaClass domainClass : concreteClassesAssignableTo(arch, Entity.class)) {
+              for (JavaClass domainClass :
+                  concreteClassesAssignableTo(arch, arch.layout().markers().entity())) {
                 for (JavaMethod method : domainClass.getAllMethods()) {
                   if (isSetter(method) && method.getModifiers().contains(JavaModifier.PUBLIC)) {
                     violations.add(
@@ -309,7 +313,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
               for (JavaClass entity : nonRootEntities(arch)) {
                 for (JavaField field : TypeInspection.instanceFields(entity)) {
                   for (JavaClass involved : TypeInspection.involvedTypes(field, entity)) {
-                    if (isConcreteAggregateRoot(involved)) {
+                    if (isConcreteAggregateRoot(involved, arch.layout().markers())) {
                       violations.add(
                           fieldDescription(entity, field, involved)
                               + " which is an aggregate root");
@@ -340,15 +344,16 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 + " it a lifecycle it must not have",
             arch -> {
               List<String> violations = new ArrayList<>();
-              for (JavaClass valueObject : concreteClassesAssignableTo(arch, Value.class)) {
+              for (JavaClass valueObject :
+                  concreteClassesAssignableTo(arch, arch.layout().markers().value())) {
                 for (JavaField field : TypeInspection.instanceFields(valueObject)) {
                   for (JavaClass involved : TypeInspection.involvedTypes(field, valueObject)) {
-                    if (isConcreteAggregateRoot(involved)) {
+                    if (isConcreteAggregateRoot(involved, arch.layout().markers())) {
                       violations.add(
                           fieldDescription(valueObject, field, involved)
                               + " which is an aggregate root");
                     }
-                    if (isConcreteNonRootEntity(involved)) {
+                    if (isConcreteNonRootEntity(involved, arch.layout().markers())) {
                       violations.add(
                           fieldDescription(valueObject, field, involved) + " which is an entity");
                     }
@@ -376,20 +381,24 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .that()
                     .resideInAnyPackage(arch.allDomainModelPatterns())
                     .and()
-                    .implement(Value.class)
+                    .areAssignableTo(arch.layout().markers().value())
                     .and()
                     .areNotInterfaces()
                     .and()
                     .areNotRecords()
+                    .and()
+                    .areNotEnums()
                     .should()
                     .haveModifier(JavaModifier.FINAL)
                     .allowEmptyShould(true))
         .selecting(
-            "Non-interface, non-record classes in <module>.domain.model.. of every module "
-                + "root that are assignable to Value; enums included.")
+            "Non-interface, non-record, non-enum classes in <module>.domain.model.. of every "
+                + "module root that are assignable to Value.")
         .checking(
-            "The class carries the final modifier. Records and interfaces are not selected, "
-                + "so a record value object always passes; a value object outside "
+            "The class carries the final modifier. Records, interfaces and enums are not "
+                + "selected, so a record value object always passes and an enum value object is "
+                + "never reported - an enum with constant-specific class bodies is compiled "
+                + "abstract and cannot be made final. A value object outside "
                 + "<module>.domain.model.. is never reported, and an empty selection passes.");
   }
 
@@ -401,7 +410,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 + " value class must make every instance field final itself",
             arch -> {
               List<String> violations = new ArrayList<>();
-              for (JavaClass valueObject : concreteClassesAssignableTo(arch, Value.class)) {
+              for (JavaClass valueObject :
+                  concreteClassesAssignableTo(arch, arch.layout().markers().value())) {
                 if (valueObject.isRecord() || valueObject.isEnum()) {
                   continue;
                 }
@@ -434,7 +444,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
             "Value Objects are immutable; state changes produce a new instance instead of mutating",
             arch -> {
               List<String> violations = new ArrayList<>();
-              for (JavaClass valueObject : concreteClassesAssignableTo(arch, Value.class)) {
+              for (JavaClass valueObject :
+                  concreteClassesAssignableTo(arch, arch.layout().markers().value())) {
                 for (JavaMethod method : valueObject.getAllMethods()) {
                   if (isSetter(method)) {
                     violations.add(
@@ -464,7 +475,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 + " override equals and hashCode itself to compare by its attributes",
             arch -> {
               List<String> violations = new ArrayList<>();
-              for (JavaClass valueObject : concreteClassesAssignableTo(arch, Value.class)) {
+              for (JavaClass valueObject :
+                  concreteClassesAssignableTo(arch, arch.layout().markers().value())) {
                 if (valueObject.isRecord() || valueObject.isEnum()) {
                   continue;
                 }
@@ -505,11 +517,11 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .and()
                     .areInterfaces()
                     .and()
-                    .haveSimpleNameEndingWith(REPOSITORY_SUFFIX)
+                    .haveSimpleNameEndingWith(arch.layout().repositorySuffix())
                     .and()
-                    .doNotHaveSimpleName(REPOSITORY_SUFFIX)
+                    .doNotHaveSimpleName(arch.layout().repositorySuffix())
                     .should()
-                    .beAssignableTo(Repository.class)
+                    .beAssignableTo(arch.layout().markers().repository())
                     .allowEmptyShould(true))
         .selecting(
             "Interfaces in <module>.application.. of every module root whose simple name "
@@ -531,9 +543,9 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .that()
                     .areInterfaces()
                     .and()
-                    .areAssignableTo(Repository.class)
+                    .areAssignableTo(arch.layout().markers().repository())
                     .and()
-                    .doNotHaveSimpleName(REPOSITORY_SUFFIX)
+                    .doNotHaveSimpleName(arch.layout().repositorySuffix())
                     .should()
                     .resideInAnyPackage(arch.allApplicationPatterns())
                     .allowEmptyShould(true))
@@ -556,7 +568,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .that()
                     .areNotInterfaces()
                     .and()
-                    .areAssignableTo(Repository.class)
+                    .areAssignableTo(arch.layout().markers().repository())
                     .should()
                     .resideInAnyPackage(arch.allOutgoingAdapterPatterns())
                     .allowEmptyShould(true))
@@ -566,7 +578,10 @@ public final class TacticalPatternRules implements DcaRuleSet {
         .checking(
             "The class resides in <module>.adapter.outgoing.. of some module root. An "
                 + "implementation in any other package under scan - a test double, say - is "
-                + "reported; an empty selection passes.");
+                + "reported; an empty selection passes. An implementation that carries the "
+                + "repository role and is also named *Repository is reported by DCA-HEX-008 as "
+                + "well: that rule finds unmarked implementations by name, and the two "
+                + "populations overlap where a project does both.");
   }
 
   public static DcaRule repositoriesOnlyForAggregateRoots() {
@@ -579,11 +594,40 @@ public final class TacticalPatternRules implements DcaRuleSet {
               List<String> violations = new ArrayList<>();
               for (JavaClass repository : repositoryInterfaces(arch)) {
                 String repoName = repository.getSimpleName();
-                if (!repoName.endsWith(REPOSITORY_SUFFIX)) {
+                if (!repoName.endsWith(arch.layout().repositorySuffix())) {
+                  continue;
+                }
+                Optional<JavaType> bound =
+                    boundAggregateArgument(repository, arch.layout().markers().repository());
+                if (bound.isPresent()) {
+                  if (bound.get() instanceof JavaTypeVariable) {
+                    // A generic intermediate port binds no aggregate of its own.
+                    continue;
+                  }
+                  JavaClass aggregate = bound.get().toErasure();
+                  if (!aggregate.isAssignableTo(arch.layout().markers().aggregateRoot())) {
+                    violations.add(
+                        repository.getName()
+                            + " binds "
+                            + aggregate.getName()
+                            + " which does not implement AggregateRoot");
+                  } else if (!repoName.equals(
+                      aggregate.getSimpleName() + arch.layout().repositorySuffix())) {
+                    violations.add(
+                        repository.getName()
+                            + " binds "
+                            + aggregate.getName()
+                            + " but is named "
+                            + repoName
+                            + " - name it "
+                            + aggregate.getSimpleName()
+                            + arch.layout().repositorySuffix());
+                  }
                   continue;
                 }
                 String aggregateName =
-                    repoName.substring(0, repoName.length() - REPOSITORY_SUFFIX.length());
+                    repoName.substring(
+                        0, repoName.length() - arch.layout().repositorySuffix().length());
                 String context = arch.rootContextPackage(repository.getPackageName());
                 List<JavaClass> candidates =
                     arch.classes().stream()
@@ -604,7 +648,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                   continue;
                 }
                 for (JavaClass candidate : candidates) {
-                  if (!candidate.isAssignableTo(AggregateRoot.class)) {
+                  if (!candidate.isAssignableTo(arch.layout().markers().aggregateRoot())) {
                     violations.add(
                         repository.getName()
                             + " exists for "
@@ -621,13 +665,21 @@ public final class TacticalPatternRules implements DcaRuleSet {
             "Interfaces anywhere under scan assignable to Repository whose simple name ends "
                 + "with Repository, the marker Repository itself excluded.")
         .checking(
-            "The aggregate name is the interface's simple name minus 'Repository'. Among "
-                + "all classes under scan with exactly that simple name and in the same context - "
-                + "the nearest enclosing package annotated with @BoundedContext or @SharedKernel, "
-                + "falling back to the first segment below the base package; anywhere when the "
-                + "interface lies outside the base package - at least one must exist and every "
-                + "one must be assignable to AggregateRoot. No such class and a class that is not "
-                + "an aggregate root are both reported; the interface's methods play no role.");
+            "The aggregate is read from the type argument the interface binds: the first argument"
+                + " of the parameterised Repository marker it extends, or of an intermediate port"
+                + " that is itself assignable to the marker. That type must be assignable to"
+                + " AggregateRoot, and the interface's simple name must be that type's simple name"
+                + " plus 'Repository' - so a repository bound to one aggregate and named after"
+                + " another is reported. An unresolved type argument is skipped: a generic"
+                + " intermediate port such as AuditedRepository<T, ID> binds no aggregate of its"
+                + " own. When the marker is not generic or is used raw, the aggregate is resolved"
+                + " by name instead: among all classes under scan with the interface's simple name"
+                + " minus 'Repository' and in the same context - the nearest enclosing package"
+                + " annotated with @BoundedContext or @SharedKernel, falling back to the first"
+                + " segment below the base package; anywhere when the interface lies outside the"
+                + " base package - at least one must exist and every one must be assignable to"
+                + " AggregateRoot. The interface's methods play no role.",
+            "name the repository after the aggregate root it binds");
   }
 
   public static DcaRule repositoriesReturnNoNonRootEntities() {
@@ -641,8 +693,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
               for (JavaClass repository : repositoryInterfaces(arch)) {
                 for (JavaMethod method : repository.getMethods()) {
                   for (JavaClass type : TypeInspection.involvedTypes(method.getReturnType())) {
-                    if (type.isAssignableTo(Entity.class)
-                        && !type.isAssignableTo(AggregateRoot.class)) {
+                    if (type.isAssignableTo(arch.layout().markers().entity())
+                        && !type.isAssignableTo(arch.layout().markers().aggregateRoot())) {
                       violations.add(
                           repository.getName()
                               + "."
@@ -684,13 +736,13 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .that()
                     .areInterfaces()
                     .and()
-                    .haveSimpleNameEndingWith(STORE_SUFFIX)
+                    .haveSimpleNameEndingWith(arch.layout().storeSuffix())
                     .and()
-                    .doNotHaveSimpleName(STORE_SUFFIX)
+                    .doNotHaveSimpleName(arch.layout().storeSuffix())
                     .should()
-                    .beAssignableTo(Store.class)
+                    .beAssignableTo(arch.layout().markers().store())
                     .andShould()
-                    .notBeAssignableTo(Repository.class)
+                    .notBeAssignableTo(arch.layout().markers().repository())
                     .allowEmptyShould(true))
         .selecting(
             "Interfaces anywhere under scan whose simple name ends with Store, the marker "
@@ -711,9 +763,9 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .that()
                     .areInterfaces()
                     .and()
-                    .areAssignableTo(Store.class)
+                    .areAssignableTo(arch.layout().markers().store())
                     .and()
-                    .doNotHaveSimpleName(STORE_SUFFIX)
+                    .doNotHaveSimpleName(arch.layout().storeSuffix())
                     .should()
                     .resideInAnyPackage(arch.allApplicationPatterns())
                     .allowEmptyShould(true))
@@ -736,7 +788,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .that()
                     .areNotInterfaces()
                     .and()
-                    .areAssignableTo(Store.class)
+                    .areAssignableTo(arch.layout().markers().store())
                     .should()
                     .resideInAnyPackage(arch.allOutgoingAdapterPatterns())
                     .allowEmptyShould(true))
@@ -758,7 +810,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
               List<String> violations = new ArrayList<>();
               for (JavaClass store : storeInterfaces(arch)) {
                 for (JavaMethod method : store.getMethods()) {
-                  if (REPOSITORY_METHOD_NAMES.contains(method.getName())) {
+                  if (REPOSITORY_METHOD_NAMES.contains(
+                      method.getName().toLowerCase(java.util.Locale.ROOT))) {
                     violations.add(
                         store.getFullName()
                             + "."
@@ -777,51 +830,21 @@ public final class TacticalPatternRules implements DcaRuleSet {
             "Interfaces anywhere under scan assignable to Store, the marker Store itself "
                 + "excluded.")
         .checking(
-            "No method declared on the interface itself is named save, deleteById "
-                + "or delete - matched by name alone, parameters and return type disregarded. "
-                + "Inherited methods are not inspected, and no particular vocabulary (record, "
-                + "count, exists) is required.");
-  }
-
-  // ---------------------------------------------------------------------------------------------
-  // Enriched domain model pattern
-  // ---------------------------------------------------------------------------------------------
-
-  public static DcaRule enrichedModelsAreValueRecords(DcaLayout layout) {
-    return DcaRule.of(
-            "DCA-TAC-022",
-            "Enriched Domain Models must be Value Object records",
-            "Enriched domain models are immutable read projections and must be records implementing"
-                + " Value",
-            arch ->
-                classes()
-                    .that()
-                    .haveSimpleNameStartingWith("Enriched")
-                    .and()
-                    .resideInAnyPackage(arch.allDomainModelPatterns())
-                    .and()
-                    .doNotImplement(Factory.class)
-                    .should()
-                    .beRecords()
-                    .andShould()
-                    .beAssignableTo(Value.class)
-                    .allowEmptyShould(true))
-        .selecting(
-            "Classes in <module>.domain.model.. of every module root whose simple name "
-                + "starts with Enriched and that do not implement Factory; interfaces included.")
-        .checking(
-            "The class is a record and is assignable to Value; both must hold. An "
-                + "Enriched*Factory is excluded because it implements Factory; an interface named "
-                + "Enriched* is selected and reported since it is not a record. An empty "
-                + "selection passes.");
+            "No method declared on the interface itself is named save, deleteById, delete "
+                + "or one of their asynchronous forms saveAsync, deleteByIdAsync, "
+                + "deleteAsync - matched by name alone, parameters and return type "
+                + "disregarded and case ignored, so both languages match the same six names. Inherited methods "
+                + "are not inspected, and no particular vocabulary (record, count, exists) "
+                + "is required. The six names are fixed and are not part of the marker "
+                + "roles: a vocabulary that writes under another name is selected and then "
+                + "found to declare no write.");
   }
 
   // ---------------------------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------------------------
 
-  private static List<JavaClass> concreteClassesAssignableTo(
-      DcaArchitecture arch, Class<?> marker) {
+  private static List<JavaClass> concreteClassesAssignableTo(DcaArchitecture arch, String marker) {
     return classesMatching(arch, c -> c.isAssignableTo(marker) && !c.isInterface());
   }
 
@@ -829,27 +852,52 @@ public final class TacticalPatternRules implements DcaRuleSet {
     return classesMatching(
         arch,
         c ->
-            c.isAssignableTo(Entity.class)
-                && !c.isAssignableTo(AggregateRoot.class)
+            c.isAssignableTo(arch.layout().markers().entity())
+                && !c.isAssignableTo(arch.layout().markers().aggregateRoot())
                 && !c.isInterface());
+  }
+
+  /**
+   * The aggregate type a repository interface binds: the first type argument of the parameterised
+   * repository marker it extends, or of an intermediate port that is itself assignable to the
+   * marker. Empty when the marker is not generic, when it is used raw, or when the binding only
+   * becomes concrete further up a chain that substitutes type parameters - the rule then falls back
+   * to resolving the aggregate by name.
+   */
+  private static Optional<JavaType> boundAggregateArgument(JavaClass type, String markerName) {
+    for (JavaType candidate : type.getInterfaces()) {
+      JavaClass erasure = candidate.toErasure();
+      boolean isMarker = erasure.getName().equals(markerName) || erasure.isAssignableTo(markerName);
+      if (isMarker
+          && candidate instanceof JavaParameterizedType parameterized
+          && !parameterized.getActualTypeArguments().isEmpty()) {
+        return Optional.of(parameterized.getActualTypeArguments().get(0));
+      }
+    }
+    return Optional.empty();
   }
 
   private static List<JavaClass> repositoryInterfaces(DcaArchitecture arch) {
     return classesMatching(
         arch,
         c ->
-            c.isAssignableTo(Repository.class)
+            c.isAssignableTo(arch.layout().markers().repository())
                 && c.isInterface()
-                && !c.getSimpleName().equals(REPOSITORY_SUFFIX));
+                && !c.getSimpleName().equals(arch.layout().repositorySuffix()));
   }
 
   private static List<JavaClass> storeInterfaces(DcaArchitecture arch) {
     return classesMatching(
         arch,
         c ->
-            c.isAssignableTo(Store.class)
+            c.isAssignableTo(arch.layout().markers().store())
                 && c.isInterface()
-                && !c.getSimpleName().equals(STORE_SUFFIX));
+                && !c.getSimpleName().equals(arch.layout().storeSuffix()));
+  }
+
+  /** The simple name of a configured marker, for a message a reader has to recognise. */
+  private static String simpleName(String fqn) {
+    return fqn.substring(fqn.lastIndexOf('.') + 1);
   }
 
   private static List<JavaClass> classesMatching(
@@ -857,12 +905,12 @@ public final class TacticalPatternRules implements DcaRuleSet {
     return arch.classes().stream().filter(filter).collect(Collectors.toList());
   }
 
-  private static boolean isConcreteAggregateRoot(JavaClass type) {
-    return type.isAssignableTo(AggregateRoot.class);
+  private static boolean isConcreteAggregateRoot(JavaClass type, DcaMarkers markers) {
+    return type.isAssignableTo(markers.aggregateRoot());
   }
 
-  private static boolean isConcreteNonRootEntity(JavaClass type) {
-    return type.isAssignableTo(Entity.class) && !type.isAssignableTo(AggregateRoot.class);
+  private static boolean isConcreteNonRootEntity(JavaClass type, DcaMarkers markers) {
+    return type.isAssignableTo(markers.entity()) && !type.isAssignableTo(markers.aggregateRoot());
   }
 
   private static boolean isSetter(JavaMethod method) {

@@ -4,7 +4,268 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+**Every name a rule matches on is configurable.** `withAggregateRootSuffix`,
+`withRepositorySuffix`, `withStoreSuffix`, `withFactorySuffix` and `withSpecificationSuffix` join
+the use-case and controller suffixes, so `DCA-TAC-001`, `DCA-TAC-013`, `DCA-TAC-016`, `DCA-TAC-018`,
+`DCA-ADV-013` and `DCA-ADV-017` follow the project's names instead of the library's. A code base whose ports are called `*Gateway`
+configures the layout; it no longer has to switch the ids off. Defaults unchanged.
+
+**`DCA-ADV-009` is retired; `DCA-ADV-010` keeps the layer.** Both selected the same population —
+non-interface types assignable to the domain-service marker — and differed only in what they
+required of the package: `..domain.service..` anywhere versus the domain layer of a module. A
+misplaced domain service was reported twice, and the stricter half asked for something the guide
+itself does not ask for (`topics/domain-services-with-data-dependencies.md` allows `..domain..`). A
+domain service is part of the model; whether it gets its own segment inside the domain layer is the
+team's decision, per project. `DCA-ADV-010` continues to keep it out of the application layer.
+`withDomainServiceSubpackage` goes with it — `DCA-ADV-009` was its only reader, and it was never
+released.
+
+**`DCA-ADV-008` follows a configurable list of timestamp types**, `withTimestampTypes(...)`, and
+`java.time.OffsetDateTime` joins the default beside `Instant`, `ZonedDateTime` and `LocalDateTime`.
+The rule asks that a domain event *stores* its occurrence time rather than computing it — the
+marker already forces the accessor, so a record that returns `Instant.EPOCH` from `occurredOn()`
+satisfies the compiler and loses the fact. With the shipped markers the list can never bite,
+because `DomainEvent` declares `Instant occurredOn()`. It bites a project that points the
+`domainEvent` role at its own marker and wraps the timestamp in a value object, which had no exit
+but excluding the id — and excluding it gave up the one thing the rule checks. A fixture proves
+both directions: the event is reported under the default list and passes once its own type is
+named.
+
+**`DCA-STR-009` is retired.** It selected on three hard-coded suffixes — `*EventTranslator`,
+`*ACL`, `*AntiCorruptionLayer` — and demanded an `..acl..` segment. Neither reference sample contains
+a class of any of those names or an `acl` package, so the rule selected nothing in the project's own
+code. An anti-corruption layer lives in the incoming adapter, which the onion and hexagonal sets
+already govern; whether it gets an own segment there is a filing decision. No replacement id: the
+pattern stays in the guide and the catalog. The good fixture moves out of its `acl` package, where it
+now proves that a translator directly in the incoming adapter passes.
+
+**The retirement reason of `DCA-TAC-022` is corrected.** It read "Value model already covered" with
+`DCA-TAC-008..012` as replacement, which promised a coverage that does not exist: those rules select
+types that already carry the value role, while `TAC-022` selected by name and required the type to
+*be* a value record. The entry now names the reason the identity was actually given up — the
+selection matched `Enriched*`, the sample's own pattern name, which a general rule may not carry.
+
+**`DCA-ADV-013` and `DCA-ADV-017` are titled after what they check.** "Factories should implement
+Factory Marker Interface" selected the marked types and checked the *name*; "Specifications must end
+with 'Specification'" selected by the name and checked the *placement* — and since the specification
+role was added it does not require the suffix at all. They are now "Types carrying the factory role
+are named *Factory" and "Specifications reside in the domain layer", with rationales that argue the
+check rather than the selection. Open since the review of 2026-09-09.
+
+**`DCA-TAC-015` names its overlap with `DCA-HEX-008`.** An implementation that carries the
+repository role and is also named `*Repository` is reported by both; the two populations are
+different, and the `checks` text says so now.
+
+**The READMEs have a "smallest DCA" and an "own vocabulary" section.** Seven building blocks and one
+`@BoundedContext` are enough for the catalog to say something useful; every other marker switches on
+the rules that govern it when the project introduces the concept. `DcaMarkers` appeared in no README
+at all, although keeping an existing vocabulary is the library's main adoption argument — it is
+documented now, together with the one caveat (`withOutputPort` once any port role is set) and with
+the note that the aggregate-root marker's event API is inherited whether or not a project models
+events.
+
+**`DCA-TAC-016` reads the aggregate the repository binds, and the name must name it.** The rule
+resolved the aggregate from the interface name alone and never looked at the type argument, so
+`CategoryRepository extends Repository<Order, OrderId>` passed. It now takes the first type argument
+of the parameterised marker, requires it to be an aggregate root, and requires the interface's simple
+name to be that type plus `Repository`. A generic intermediate port — `AuditedRepository<T, ID>` —
+binds a type variable and is skipped instead of reported as "no class named Audited". Where the
+marker is not generic or is used raw, the old name resolution still applies. Decision R3 is withdrawn
+and replaced: both, not either.
+
+**`Specification` is a role, not only a suffix.** `DcaMarkers` gains `specification`;
+`DCA-ADV-017` (placement) and `DCA-ADV-018` (metadata ownership) select through the marker **or** the
+name. Both reference samples name their specifications after the predicate they express —
+`HasMinTotal`, `ActiveCart` — and carry the marker through an intermediate interface, so under
+name-only selection neither rule saw them and a container stereotype on one was reported by nothing.
+`DomainGateway` stays vocabulary; no rule reads it, and the marker says so.
+
+**Every violation can carry a remedy, and eleven more rules do.** See the entry above; with this
+release `DCA-TAC-016` names its remedy too.
+
+**Dead public API is gone while the version is unpublished.** Four unused package constants
+(`BUILDING_BLOCKS_PACKAGE`, `_TACTICAL_`, `_STRATEGIC_`, `_PORT_`) and the two public factory methods
+for the retired `DCA-ADV-003` and `DCA-TAC-022` are removed — the methods produced rule ids that
+`DcaRuleSelection` refuses and the report cannot place. `BUILDING_BLOCKS_PORT_IN_PACKAGE` and
+`…_PORT_OUT_PACKAGE` stay; they carry `DCA-USE-001` and `DCA-LAY-005`. A new test asserts that no rule
+set offers a retired id.
+
+**`DCA-NAM-003` and `DCA-HEX-009` say what they presume.** `DCA-NAM-003` states that the `I` prefix is
+a platform convention checked only in .NET. `DCA-HEX-009` and the `DcaMarkers` javadoc state that
+`withOutputPort` must be set whenever any other port role is, and that a vocabulary without a common
+port root should switch the id off rather than point the role at an unrelated type.
+
+**One more hard-wired segment.** `DCA-USE-014`'s depth check still read a literal `shared`; it reads
+the configured segment now, like the rest.
+
+**Every violation can carry a remedy, in both languages.** `DcaRule` gained `remedy()` and
+`checking(checks, remedy)`; `DcaRuleExecution` appends it as one `Fix:` line under the violations,
+prefixed with the rule id like every other line. Eleven rules name theirs — `DCA-CYC-005`,
+`DCA-HEX-012`, `DCA-NAM-001`, `-003`, `-004`, `-005`, `-006`, `DCA-STR-008`, `DCA-USE-009`, `-014`
+and `-015` — the same wording the .NET twins have carried in `DcaRule.Fail` since 0.4.0. Unlike
+.NET's, the parameter works for rules built with `DcaRule.of(...)` too, whose ArchUnit report says
+only what is wrong.
+
+**`DCA-TAC-009` no longer reports an enum value object.** An `enum Currency implements Value` with
+constant-specific class bodies is compiled abstract, so the rule demanded a `final` modifier the
+language forbids — a false positive with no fix. Enums are no longer selected, as the .NET twin
+never selected them. A fixture proves it.
+
+**`DCA-ERR-005` no longer rejects Ubiquitous-Language names.** The word list matched `Status` and
+`Response` as substrings, so `OrderStatusInvalidException` and `PaymentResponseMissingException`
+failed the rule that exists to protect the language. It now matches the compound transport words —
+`Http`, `StatusCode`, `ResponseStatus`, `ResponseEntity` — in both languages. `Http` as a substring
+was and stays safe.
+
+**`DCA-TAC-021` matches the same six write names in both languages.** Java knew `save`, `deleteById`
+and `delete`; .NET additionally knew their `Async` forms, so a Java store declaring
+`CompletableFuture<Void> saveAsync(Entry)` passed where its C# twin failed. Both now match the three
+names and their asynchronous forms, compared case-insensitively.
+
+**`DCA-USE-001` matches both spellings of the reserved contract name.** Java caught `InputPort`
+only, .NET `InputPort` and `IInputPort`. A Java project that declares `IInputPort` is now caught too.
+
+**`DCA-USE-015` exempts the value role, as .NET always has.** A domain value object whose name ends
+in `Result` and which lives in an application package was walked in Java and skipped in .NET.
+`DCA-USE-006` already lets such a type cross the port; the content walk now agrees.
+
+**Four `DCA-USE` titles say what the rule checks.** `DCA-USE-002`, `-003`, `-006` and `-008` were
+titled "must end with 'Command' and reside in application package", but the suffix is the
+*selection* — the rule never requires anything to be named that way. They are now "Types named
+`*Command` reside in the application layer" and so on. Titles are not ids; nothing breaks.
+
+**The web adapter and shared segments are configurable.** `withWebSubpackage(...)` and
+`withSharedSubpackage(...)` join the other segments. `web` was hard-wired in `DCA-NAM-011`, so a
+project whose web adapter is `adapter.incoming.ui` had every ViewModel reported with no
+configuration exit; `shared` was hard-wired in the shared-output-port patterns and in the cycle
+slicing. The defaults are unchanged, and the shared segment stays reserved against the operation
+containers whatever it is called.
+
+**`DCA-STR-008` cites the right reason.** Its rationale attributed the immutability of a published
+contract to event sourcing, which DCA prescribes nowhere. It now argues from the contract: once
+another context has read an integration event, its shape may only grow.
+
+**Four fixture comments described behaviour that no longer exists** — `DCA-TAC-003`'s tolerated
+self-reference (it is reported), a retired id, and two use-case-local output ports still marked as
+`DCA-TAC-014` / `DCA-TAC-019` negatives, which R3 made legal.
+
+**Six `DCA-ADV` rules and `DCA-STR-007` / `DCA-STR-008` no longer report an intermediate marker
+interface.** `DCA-ADV-002`, `-010`, `-012`, `-013`, `-014`, `-016`, `DCA-STR-007` and `DCA-STR-008`
+selected every type assignable to their marker role, interfaces included, while both `rules.json`
+files said "Non-interface classes" and the .NET twins excluded them. A context that groups several
+domain events behind a shared contract interface, or its integration events behind a published-language
+interface, was reported in Java and passed in .NET — and `DCA-STR-008` asked that interface to be
+"final with final instance fields", which no interface can be. The eight rules now select concrete
+types only, as their texts always said. The concrete events are checked exactly as before. This can
+turn a red build green, never the other way round.
+
+**`DCA-ERR-002` and `DCA-ERR-003` no longer both report the same exception.** A subtype of
+`DomainException` declared in an application package was reported twice, with contradictory remedies:
+`DCA-ERR-002` says move it to the domain, `DCA-ERR-003` says give it another base type — which would
+turn a broken rule of the model into a use-case failure. `DCA-ERR-002` owns the case now;
+`DCA-ERR-003` no longer selects domain-exception subtypes and says so in its `selects` text.
+
+**No logging library in the domain by default, and the allow-list is how you change that.** The two
+`DCA-ONI-002` allow-lists were not translations of each other: Java forbade SLF4J, .NET permitted
+`Microsoft.Extensions.Logging.Abstractions`. Decided on 2026-09-21: by default neither, in both
+languages — which logging, validation or utility library a domain model may see is a project decision,
+made with `withThirdPartyPackagesAllowedInDomain(...)`. The Java default is unchanged; the rule text now
+says the facade is deliberately absent and names the way to add it.
+
+**The four fixed method names are written down.** `save`, `deleteById`, `publishAndClearEvents` and
+`registerEvent` are matched by name and are not marker roles, so a vocabulary whose repository writes
+under another name is selected and then found to save nothing — `DCA-USE-009`, `DCA-USE-012` and
+`DCA-TAC-021` pass over it. The three `checks` texts and the `DcaMarkers` javadoc now say so instead of
+leaving a reader to assume the roles cover it. No new configuration point: roles name types.
+
+**The tree names the version it will ship as, and `rules.json` says which release its texts belong to.**
+`archunitVersion` is `0.5.0-SNAPSHOT` and `buildingBlocksVersion` `0.3.0-SNAPSHOT` until the release
+pins them, so a locally built jar can no longer be mistaken for the released artifact of the same
+number. `rules.json` gained `library` and `version` at the top; the reader that takes `rules["rules"]`
+is unaffected. The README now states the public API surface, the versioning promise after 1.0 — a new
+or tightened rule is a major bump, not a minor one — and the exact rule counts, taken from the
+generated catalog rather than typed in.
+
+**The README states what the library runs on.** A compatibility table now names the minimum and the
+tested versions of Java, JUnit Jupiter, ArchUnit, Spring Boot and Spring Modulith. It also states that
+`dca-spring` needs Spring Boot 4: its auto-configuration ordering does not exist on Boot 3.x and
+nothing fails loudly there.
+
+**New rule `DCA-STR-012` — at least one module owns a DCA layer.** The third guard of the same kind as
+an empty import and an undeclared bounded context. A code base whose layers are named `core` and `usecases`
+instead of the configured segments yields no module root, so every rule that selects over the layers — the
+whole use-case set among them — matched nothing and the suite was green. The violation names the configured
+segments, the packages it did see, and the way out. This is the most likely first run of a code base that has
+not configured the layout, so **it can turn a green build red**; switch it off with a recorded reason if the
+code base deliberately has no layered module.
+
+**`DCA-USE-009`, `DCA-USE-012` and `DCA-USE-013` select what their texts say.** The three selections
+were spelled as a chain of `and`/`or`, which ArchUnit joins left to right, so they read
+`((inApplication ∧ suffix) ∨ isInputPort) ∧ ¬interface` and reported every input-port
+implementation anywhere — a composition-root decorator or a test double in an adapter included.
+The .NET twin never did. The selection is now one predicate matching the documented wording:
+a non-interface class in an application package that carries the use-case suffix or implements the
+input-port role.
+
+**A use case over a generic input port is reported once.** The compiler writes a bridge method
+`execute(Object)` beside `execute(Command)`; nothing inside the class calls it, so the "nothing
+calls it" fallback made it a second entry point and `DCA-USE-009` and `DCA-USE-012` reported the
+same violation twice, the second time as `execute (via execute)`. Synthetic and bridge units are
+never entry points now. This is the ordinary shape of a Java use case, so the change halves the
+violation count a team sees on its first run.
+
+**`DCA-ONI-002` no longer reports a project's own marker vocabulary.** The rule named the two
+building-blocks packages directly, so a project that pointed the roles at its own markers — the
+adoption path `DcaMarkers`'s own javadoc shows — was told its aggregate root was a forbidden
+third-party dependency inside its own domain, once per aggregate, value object and domain exception,
+on the first run. The allowed packages are now derived from the configured roles
+(`DcaMarkers.declaringPackagePatternsOf(DcaMarkers.DOMAIN_FACING_ROLES)`). With the default roles
+this yields exactly the two packages that were written in by hand, so nothing changes for a project
+on the building blocks. The application-layer roles and the incoming ports stay off the list: a
+domain class reaching for one of them is what the rule exists to report.
+
+**Every violation now names its rule.** A report line used to carry the offending element and, for six of the
+rules, the id; the other rules named it nowhere, so the only thing a reader could match on was the rule title —
+which changes as soon as a suffix is configured. `DcaRuleExecution` now prefixes every line of every report with
+`[DCA-XXX-nnn]`, in both languages. Nothing about a rule's selection, check or severity changes, and a frozen
+baseline stays valid because the prefix is added after the evaluation. A consumer that parses report text sees
+the new prefix.
+
 **What can turn a green build red:**
+
+- `DCA-ERR-004` also forbids the new `transportStatus` role — the annotation that fixes the protocol answer
+  of the type it sits on (`@ResponseStatus` in the Spring preset, `@Status` in the Micronaut one; empty in
+  the Jakarta and Quarkus presets, where the framework answers through a mapper class instead). A domain or
+  use-case exception carrying one turns red: which status a failure earns is the incoming adapter's
+  decision, and an annotation on the failure decides it for every protocol at once. `withTransportStatus(…)`
+  adjusts the role, and the twin setting in `DomainCentric.ArchRules` is `TransportStatusAttributeTypes`.
+
+- **The rules no longer reference the building-block markers as types.** Every selection that used to name
+  `AggregateRoot`, `Entity`, `Value`, `Id`, `DomainEvent`, `IntegrationEvent`, `DomainService`, `Factory`,
+  `DomainException`, `UseCaseException`, `TransactionBoundary`, `InputPort`, `UseCase`, `OutputPort`,
+  `Repository`, `Store`, `DomainEventPublisher` or `IntegrationEventPublisher` now asks the layout for that
+  *role*, resolved by fully qualified name through the new `DcaMarkers`. `DcaLayout` defaults to
+  `DcaMarkers.dca()`, so nothing changes for a project on the building blocks; a project with its own
+  markers or jMolecules points the roles at its own types
+  (`withMarkers(DcaMarkers.dca().withAggregateRoot("org.jmolecules.ddd.types.AggregateRoot")…)`) and is
+  governed by the whole catalog instead of excluding the affected rule ids. A role must name a type — an
+  empty one is refused rather than silently selecting nothing. What the roles do not cover are the
+  strategic annotations: the rules read their members, and a name does not carry members.
+- Correcting the first cut of this change, found in review: `DomainMetadata` (which assigns `DCA-ADV-004`,
+  `DCA-ADV-011`, `DCA-ADV-015` and `DCA-ONI-003` their exclusive owner) still matched the library's own marker
+  names, so the two languages would have classified differently under one configuration; the rules that select
+  a marker used ArchUnit's `implement(...)`, which matches an implemented interface only, so a vocabulary whose
+  marker is an abstract base class selected nothing and reported success — they now select by assignability,
+  which is what their `selects` texts always said; and the exclusion of the vocabulary's own code in
+  `DCA-ERR-001…005` was hard-wired to this library's package, which reported a project's own exception base
+  class as "a domain exception outside the domain layer". The exclusion is now derived from the packages the
+  configured role types live in.
+- `DcaArchitectureTest` prints the vocabulary as a second diagnostic case — `building block markers: dca
+  (library default)`, or the name and the roles that differ. `DcaLayout.markersReport()` is the same line
+  without JUnit.
+- `DCA-USE-015` and `DCA-TAC-004` name the configured roles in their violations instead of the literal
+  `AggregateRoot` / `Entity` / `Id`, so the message stays true under a project's own vocabulary. The
+  wording is unchanged for the default roles.
 
 - The `errors` rule set is new, `DCA-ERR-001` … `DCA-ERR-006`, and pins the two new building blocks
   `DomainException` and `UseCaseException`. A project that declares its own exception types in the domain or

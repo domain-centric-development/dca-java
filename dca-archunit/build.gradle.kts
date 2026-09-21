@@ -43,5 +43,7 @@ tasks.register<JavaExec>("rulesCatalog") {
     description = "Writes RULES.md and rules.json from the rule catalog"
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("dev.domaincentric.dca.archunit.catalog.RuleCatalog")
+    // The catalog records which release its rule texts belong to; without this it says "unspecified".
+    systemProperty("dca.catalog.version", project.version.toString())
     args(rootProject.layout.projectDirectory.asFile.absolutePath)
 }
