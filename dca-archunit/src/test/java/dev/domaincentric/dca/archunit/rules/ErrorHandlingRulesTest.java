@@ -68,6 +68,15 @@ class ErrorHandlingRulesTest {
   }
 
   @Test
+  @DisplayName("DCA-ERR-004 reports the annotation that fixes the protocol answer")
+  void transportStatusOnAnExceptionIsReported() {
+    String message = Fixtures.failure(FIXTURES + ".bad", "DCA-ERR-004").getMessage();
+
+    assertTrue(message.contains("ReservationWindowClosedException"), message);
+    assertTrue(message.contains("ResponseStatus"), message);
+  }
+
+  @Test
   @DisplayName("DCA-ERR-005 reports the transport word in an exception name")
   void transportVocabularyInAnExceptionNameIsReported() {
     String message = Fixtures.failure(FIXTURES + ".bad", "DCA-ERR-005").getMessage();

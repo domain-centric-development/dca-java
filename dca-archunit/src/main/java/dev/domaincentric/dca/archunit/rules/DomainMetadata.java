@@ -3,6 +3,7 @@ package dev.domaincentric.dca.archunit.rules;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.properties.CanBeAnnotated;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
+import dev.domaincentric.dca.archunit.DcaMarkers;
 import dev.domaincentric.dca.archunit.FrameworkAnnotations;
 import java.util.ArrayList;
 import java.util.List;
@@ -11,11 +12,10 @@ import java.util.List;
 final class DomainMetadata {
   private DomainMetadata() {}
 
-  static String owner(JavaClass type) {
-    String tactical = "dev.domaincentric.dca.buildingblocks.ddd.tactical.";
-    if (type.isAssignableTo(tactical + "DomainEvent")) return "DCA-ADV-004";
-    if (type.isAssignableTo(tactical + "DomainService")) return "DCA-ADV-011";
-    if (type.isAssignableTo(tactical + "Factory")) return "DCA-ADV-015";
+  static String owner(JavaClass type, DcaMarkers markers) {
+    if (type.isAssignableTo(markers.domainEvent())) return "DCA-ADV-004";
+    if (type.isAssignableTo(markers.domainService())) return "DCA-ADV-011";
+    if (type.isAssignableTo(markers.factory())) return "DCA-ADV-015";
     if (type.getSimpleName().endsWith("Specification")) return "DCA-ADV-018";
     return "DCA-ONI-003";
   }
@@ -25,7 +25,7 @@ final class DomainMetadata {
     List<String> violations = new ArrayList<>();
     for (JavaClass type : arch.classes()) {
       if (type.isInterface()
-          || !owner(type).equals(id)
+          || !owner(type, arch.layout().markers()).equals(id)
           || !JavaClass.Predicates.resideInAnyPackage(arch.allDomainPatterns()).test(type))
         continue;
       if (id.equals("DCA-ONI-003")

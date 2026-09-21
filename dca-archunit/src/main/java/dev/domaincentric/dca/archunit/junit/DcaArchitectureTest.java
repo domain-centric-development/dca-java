@@ -181,8 +181,9 @@ public abstract class DcaArchitectureTest {
   }
 
   /**
-   * One passing test per fact of the layout worth seeing in the report - today the framework preset
-   * the rules resolved their annotations with.
+   * One passing test per fact of the layout worth seeing in the report: the framework preset the
+   * rules resolved their annotations with, and the vocabulary they resolved their building blocks
+   * with.
    */
   private DynamicContainer layoutDiagnostics(DcaLayout layout) {
     return DynamicContainer.dynamicContainer(
@@ -192,6 +193,11 @@ public abstract class DcaArchitectureTest {
                 "framework annotations: " + layout.frameworkAnnotationsReport(),
                 () -> {
                   // diagnostic only - the preset in use, named in the report
+                }),
+            DynamicTest.dynamicTest(
+                "building block markers: " + layout.markersReport(),
+                () -> {
+                  // diagnostic only - the vocabulary the rules select on, named in the report
                 })));
   }
 

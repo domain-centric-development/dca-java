@@ -7,8 +7,6 @@ import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
-import dev.domaincentric.dca.buildingblocks.hexagonal.port.in.InputPort;
-import dev.domaincentric.dca.buildingblocks.hexagonal.port.in.UseCase;
 import java.util.List;
 
 /**
@@ -62,17 +60,18 @@ public final class NamingRules implements DcaRuleSet {
                     .and()
                     .areNotRecords()
                     .and()
-                    .implement(UseCase.class)
+                    .areAssignableTo(arch.layout().markers().useCase())
                     .should()
                     .haveSimpleNameEndingWith(layout.useCaseSuffix())
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface, non-record classes in <module>.application.. of every module root that"
-                + " implement UseCase.")
+                + " are assignable to the configured use-case role - through the interface or an"
+                + " intermediate base class.")
         .checking(
             "The simple name ends with the configured use-case suffix. Interfaces and records are"
-                + " not selected; a class implementing only InputPort without UseCase is not"
-                + " selected either. An empty selection passes.");
+                + " not selected; a class assignable only to the input-port role without the"
+                + " use-case role is not selected either. An empty selection passes.");
   }
 
   public static DcaRule useCasesAreServices(DcaLayout layout) {
@@ -90,7 +89,7 @@ public final class NamingRules implements DcaRuleSet {
                     && com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage(
                             arch.allApplicationPatterns())
                         .test(type)
-                    && (type.isAssignableTo(InputPort.class)
+                    && (type.isAssignableTo(arch.layout().markers().inputPort())
                         || type.getSimpleName().endsWith(layout.useCaseSuffix()))
                     && !AnnotationRoles.annotatedWithAny(injectable).test(type)
                     && !AnnotationRoles.isMetaAnnotatedWithAny(type, injectable)) {
@@ -121,7 +120,7 @@ public final class NamingRules implements DcaRuleSet {
                     .and()
                     .areInterfaces()
                     .and()
-                    .areAssignableTo(InputPort.class)
+                    .areAssignableTo(arch.layout().markers().inputPort())
                     .and()
                     .doNotHaveSimpleName("InputPort")
                     .and()

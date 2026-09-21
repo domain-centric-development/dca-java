@@ -6,6 +6,40 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 **What can turn a green build red:**
 
+- `DCA-ERR-004` also forbids the new `transportStatus` role — the annotation that fixes the protocol answer
+  of the type it sits on (`@ResponseStatus` in the Spring preset, `@Status` in the Micronaut one; empty in
+  the Jakarta and Quarkus presets, where the framework answers through a mapper class instead). A domain or
+  use-case exception carrying one turns red: which status a failure earns is the incoming adapter's
+  decision, and an annotation on the failure decides it for every protocol at once. `withTransportStatus(…)`
+  adjusts the role, and the twin setting in `DomainCentric.ArchRules` is `TransportStatusAttributeTypes`.
+
+- **The rules no longer reference the building-block markers as types.** Every selection that used to name
+  `AggregateRoot`, `Entity`, `Value`, `Id`, `DomainEvent`, `IntegrationEvent`, `DomainService`, `Factory`,
+  `DomainException`, `UseCaseException`, `TransactionBoundary`, `InputPort`, `UseCase`, `OutputPort`,
+  `Repository`, `Store`, `DomainEventPublisher` or `IntegrationEventPublisher` now asks the layout for that
+  *role*, resolved by fully qualified name through the new `DcaMarkers`. `DcaLayout` defaults to
+  `DcaMarkers.dca()`, so nothing changes for a project on the building blocks; a project with its own
+  markers or jMolecules points the roles at its own types
+  (`withMarkers(DcaMarkers.dca().withAggregateRoot("org.jmolecules.ddd.types.AggregateRoot")…)`) and is
+  governed by the whole catalog instead of excluding the affected rule ids. A role must name a type — an
+  empty one is refused rather than silently selecting nothing. What the roles do not cover are the
+  strategic annotations: the rules read their members, and a name does not carry members.
+- Correcting the first cut of this change, found in review: `DomainMetadata` (which assigns `DCA-ADV-004`,
+  `DCA-ADV-011`, `DCA-ADV-015` and `DCA-ONI-003` their exclusive owner) still matched the library's own marker
+  names, so the two languages would have classified differently under one configuration; the rules that select
+  a marker used ArchUnit's `implement(...)`, which matches an implemented interface only, so a vocabulary whose
+  marker is an abstract base class selected nothing and reported success — they now select by assignability,
+  which is what their `selects` texts always said; and the exclusion of the vocabulary's own code in
+  `DCA-ERR-001…005` was hard-wired to this library's package, which reported a project's own exception base
+  class as "a domain exception outside the domain layer". The exclusion is now derived from the packages the
+  configured role types live in.
+- `DcaArchitectureTest` prints the vocabulary as a second diagnostic case — `building block markers: dca
+  (library default)`, or the name and the roles that differ. `DcaLayout.markersReport()` is the same line
+  without JUnit.
+- `DCA-USE-015` and `DCA-TAC-004` name the configured roles in their violations instead of the literal
+  `AggregateRoot` / `Entity` / `Id`, so the message stays true under a project's own vocabulary. The
+  wording is unchanged for the default roles.
+
 - The `errors` rule set is new, `DCA-ERR-001` … `DCA-ERR-006`, and pins the two new building blocks
   `DomainException` and `UseCaseException`. A project that declares its own exception types in the domain or
   application layer will see `DCA-ERR-001` / `DCA-ERR-003` until those types extend the base type of their layer;

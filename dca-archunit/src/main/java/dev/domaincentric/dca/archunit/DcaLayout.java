@@ -2,6 +2,7 @@ package dev.domaincentric.dca.archunit;
 
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.relationships.Upstream;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -80,6 +81,7 @@ public final class DcaLayout {
   private final String controllerSuffix;
   private final String restControllerSuffix;
   private final List<String> thirdPartyPackagesAllowedInDomain;
+  private final DcaMarkers markers;
   private final FrameworkAnnotations frameworkAnnotations;
   private final FrameworkAnnotationsOrigin frameworkAnnotationsOrigin;
   private final List<String> frameworkCandidates;
@@ -126,6 +128,7 @@ public final class DcaLayout {
         List.copyOf(
             Objects.requireNonNull(
                 settings.thirdPartyPackagesAllowedInDomain, "thirdPartyPackagesAllowedInDomain"));
+    this.markers = Objects.requireNonNull(settings.markers, "markers");
     this.frameworkAnnotations =
         Objects.requireNonNull(settings.frameworkAnnotations, "frameworkAnnotations");
     this.frameworkAnnotationsOrigin =
@@ -157,6 +160,7 @@ public final class DcaLayout {
     defaults.controllerSuffix = "Controller";
     defaults.restControllerSuffix = "Resource";
     defaults.thirdPartyPackagesAllowedInDomain = DEFAULT_THIRD_PARTY_ALLOWED_IN_DOMAIN;
+    defaults.markers = DcaMarkers.dca();
     FrameworkAnnotations.Detection detection = FrameworkAnnotations.detect();
     defaults.frameworkAnnotations = detection.annotations();
     defaults.frameworkAnnotationsOrigin =
@@ -342,6 +346,16 @@ public final class DcaLayout {
   }
 
   /**
+   * The building-block types the rules select on, by role — {@link DcaMarkers#dca()} by default, or
+   * a vocabulary pointed at the project's own markers. The rules then select what carries those
+   * types instead of the library's, so a code base with an established vocabulary needs no rule
+   * exclusions.
+   */
+  public DcaLayout withMarkers(DcaMarkers value) {
+    return copy(settings -> settings.markers = value);
+  }
+
+  /**
    * The framework annotations the rules look for, by role — a preset such as {@link
    * FrameworkAnnotations#jakarta()} or an adjusted one. Overrides whatever {@link
    * #forBasePackage(String)} detected; the report shows the preset as {@code (explicit)}.
@@ -404,6 +418,7 @@ public final class DcaLayout {
     settings.controllerSuffix = controllerSuffix;
     settings.restControllerSuffix = restControllerSuffix;
     settings.thirdPartyPackagesAllowedInDomain = thirdPartyPackagesAllowedInDomain;
+    settings.markers = markers;
     settings.frameworkAnnotations = frameworkAnnotations;
     settings.frameworkAnnotationsOrigin = frameworkAnnotationsOrigin;
     settings.frameworkCandidates = frameworkCandidates;
@@ -430,6 +445,7 @@ public final class DcaLayout {
     String controllerSuffix;
     String restControllerSuffix;
     List<String> thirdPartyPackagesAllowedInDomain;
+    DcaMarkers markers;
     FrameworkAnnotations frameworkAnnotations;
     FrameworkAnnotationsOrigin frameworkAnnotationsOrigin;
     List<String> frameworkCandidates = List.of();
@@ -512,6 +528,11 @@ public final class DcaLayout {
 
   public List<String> thirdPartyPackagesAllowedInDomain() {
     return thirdPartyPackagesAllowedInDomain;
+  }
+
+  /** The building-block types the rules select on, by role. */
+  public DcaMarkers markers() {
+    return markers;
   }
 
   public FrameworkAnnotations frameworkAnnotations() {
@@ -683,12 +704,35 @@ public final class DcaLayout {
     return contextPackage + "." + adapterSubpackage + "." + outgoingSubpackage + "..";
   }
 
+  /**
+   * One line for the report: {@code dca (library default)} while every role names the building
+   * blocks' own marker, or the vocabulary's name and the roles that differ, so a reader sees which
+   * types the rules actually selected on — {@code company (aggregateRoot=com.company.ddd.Root,
+   * repository=com.company.ddd.Store)}.
+   */
+  public String markersReport() {
+    if (markers.isDefault()) {
+      return markers.name() + " (library default)";
+    }
+    Map<String, String> defaults = DcaMarkers.dca().roles();
+    List<String> changed =
+        markers.roles().entrySet().stream()
+            .filter(role -> !role.getValue().equals(defaults.get(role.getKey())))
+            .map(role -> role.getKey() + "=" + role.getValue())
+            .toList();
+    return changed.isEmpty()
+        ? markers.name()
+        : markers.name() + " (" + String.join(", ", changed) + ")";
+  }
+
   @Override
   public String toString() {
     return "DcaLayout["
         + basePackage
         + ", frameworkAnnotations="
         + frameworkAnnotationsReport()
+        + ", markers="
+        + markersReport()
         + "]";
   }
 }

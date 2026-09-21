@@ -67,6 +67,11 @@ import java.util.WeakHashMap;
  *   <li>{@link #persistenceEntity()} — an ORM's mapping annotations for a persistent class (JPA
  *       {@code @Entity}/{@code @Table}). Forbidden on domain models: the domain is mapped in an
  *       outgoing adapter, not annotated.
+ *   <li>{@link #transportStatus()} — an annotation that fixes the protocol answer a type is
+ *       translated into (Spring's {@code @ResponseStatus}, Micronaut's {@code @Status}). Forbidden
+ *       on the exceptions of the domain and application layers: which status a failure earns is the
+ *       incoming adapter's decision, and a second adapter on another protocol has no use for it.
+ *       Empty where the framework answers through a mapper class instead of an annotation.
  * </ul>
  *
  * @param name the preset's name, shown in the test report so a reader knows which vocabulary the
@@ -85,6 +90,7 @@ import java.util.WeakHashMap;
  *     matched as class dependencies rather than as annotations
  * @param transactionManager types a composition root declares or wires (transaction managers),
  *     matched as class dependencies rather than as annotations
+ * @param transportStatus annotations that fix the protocol answer of the type they sit on
  */
 public record FrameworkAnnotations(
     String name,
@@ -99,7 +105,8 @@ public record FrameworkAnnotations(
     List<String> injectionSite,
     List<String> persistenceMapping,
     List<String> transactionApi,
-    List<String> transactionManager) {
+    List<String> transactionManager,
+    List<String> transportStatus) {
 
   public FrameworkAnnotations {
     if (name == null || name.isBlank()) {
@@ -117,6 +124,39 @@ public record FrameworkAnnotations(
     persistenceMapping = role(persistenceMapping, "persistenceMapping");
     transactionApi = role(transactionApi, "transactionApi");
     transactionManager = role(transactionManager, "transactionManager");
+    transportStatus = role(transportStatus, "transportStatus");
+  }
+
+  /** Compatibility constructor for presets without the transport-status role (empty). */
+  public FrameworkAnnotations(
+      String name,
+      List<String> injectable,
+      List<String> webController,
+      List<String> restController,
+      List<String> transactional,
+      List<String> eventListener,
+      List<String> moduleDeclaration,
+      List<String> publishedInterface,
+      List<String> persistenceEntity,
+      List<String> injectionSite,
+      List<String> persistenceMapping,
+      List<String> transactionApi,
+      List<String> transactionManager) {
+    this(
+        name,
+        injectable,
+        webController,
+        restController,
+        transactional,
+        eventListener,
+        moduleDeclaration,
+        publishedInterface,
+        persistenceEntity,
+        injectionSite,
+        persistenceMapping,
+        transactionApi,
+        transactionManager,
+        List.of());
   }
 
   /** Compatibility constructor for presets without the transaction-manager role (empty). */
@@ -259,7 +299,8 @@ public record FrameworkAnnotations(
             "org.springframework.transaction.PlatformTransactionManager",
             "org.springframework.transaction.TransactionManager",
             "org.springframework.transaction.ReactiveTransactionManager",
-            "jakarta.transaction.TransactionManager"));
+            "jakarta.transaction.TransactionManager"),
+        List.of("org.springframework.web.bind.annotation.ResponseStatus"));
   }
 
   /**
@@ -293,7 +334,8 @@ public record FrameworkAnnotations(
             "jakarta.persistence.Transient",
             "jakarta.persistence.Version"),
         List.of("jakarta.transaction.UserTransaction"),
-        List.of("jakarta.transaction.TransactionManager"));
+        List.of("jakarta.transaction.TransactionManager"),
+        List.of());
   }
 
   /**
@@ -329,7 +371,8 @@ public record FrameworkAnnotations(
             "jakarta.persistence.Version"),
         List.of(
             "jakarta.transaction.UserTransaction", "io.quarkus.narayana.jta.QuarkusTransaction"),
-        List.of("jakarta.transaction.TransactionManager"));
+        List.of("jakarta.transaction.TransactionManager"),
+        List.of());
   }
 
   /**
@@ -375,7 +418,8 @@ public record FrameworkAnnotations(
             "io.micronaut.transaction.TransactionOperations",
             "io.micronaut.transaction.SynchronousTransactionManager",
             "jakarta.transaction.UserTransaction"),
-        List.of("jakarta.transaction.TransactionManager"));
+        List.of("jakarta.transaction.TransactionManager"),
+        List.of("io.micronaut.http.annotation.Status"));
   }
 
   /**
@@ -387,7 +431,7 @@ public record FrameworkAnnotations(
   public static FrameworkAnnotations none() {
     return new FrameworkAnnotations(
         "none", List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
-        List.of(), List.of(), List.of(), List.of(), List.of());
+        List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -731,7 +775,31 @@ public record FrameworkAnnotations(
         injectionSite,
         List.of(annotationNames),
         transactionApi,
-        transactionManager);
+        transactionManager,
+        transportStatus);
+  }
+
+  /**
+   * The same preset with a different transport-status role — the annotations that fix the protocol
+   * answer of the type they sit on. {@code DCA-ERR-004} forbids them on the exceptions of the
+   * domain and application layers. Pass no name to clear the role.
+   */
+  public FrameworkAnnotations withTransportStatus(String... annotationNames) {
+    return new FrameworkAnnotations(
+        name,
+        injectable,
+        webController,
+        restController,
+        transactional,
+        eventListener,
+        moduleDeclaration,
+        publishedInterface,
+        persistenceEntity,
+        injectionSite,
+        persistenceMapping,
+        transactionApi,
+        transactionManager,
+        List.of(annotationNames));
   }
 
   // Queries

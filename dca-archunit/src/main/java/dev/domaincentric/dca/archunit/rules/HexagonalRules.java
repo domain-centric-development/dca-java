@@ -7,12 +7,10 @@ import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.lang.ArchRule;
 import dev.domaincentric.dca.archunit.DcaLayout;
+import dev.domaincentric.dca.archunit.DcaMarkers;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
-import dev.domaincentric.dca.buildingblocks.ddd.tactical.DomainService;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.in.InputPort;
-import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.OutputPort;
-import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.Repository;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -123,7 +121,7 @@ public final class HexagonalRules implements DcaRuleSet {
                             layout.frameworkAnnotations().restController()))
                     .should()
                     .dependOnClassesThat()
-                    .areAssignableTo(Repository.class)
+                    .areAssignableTo(arch.layout().markers().repository())
                     .allowEmptyShould(true))
         .selecting(
             "Classes anywhere on the classpath under scan whose simple name ends with the"
@@ -320,7 +318,7 @@ public final class HexagonalRules implements DcaRuleSet {
                     .and()
                     .haveSimpleNameNotEndingWith("package-info")
                     .should()
-                    .beAssignableTo(OutputPort.class)
+                    .beAssignableTo(arch.layout().markers().outputPort())
                     .allowEmptyShould(true))
         .selecting(
             "Top-level interfaces in <module>.application.shared.. of every module root,"
@@ -346,7 +344,7 @@ public final class HexagonalRules implements DcaRuleSet {
                     .that()
                     .resideInAnyPackage(arch.allIncomingAdapterPatterns())
                     .should()
-                    .dependOnClassesThat(useCaseImplementations())
+                    .dependOnClassesThat(useCaseImplementations(arch.layout().markers()))
                     .allowEmptyShould(true))
         .selecting(
             "Classes in <module>.adapter.incoming.. of every module root, event consumers"
@@ -359,11 +357,11 @@ public final class HexagonalRules implements DcaRuleSet {
   }
 
   /** A use case implementation: a class (never an interface) behind an {@link InputPort}. */
-  private static DescribedPredicate<JavaClass> useCaseImplementations() {
+  private static DescribedPredicate<JavaClass> useCaseImplementations(DcaMarkers markers) {
     return new DescribedPredicate<>("are use case implementations rather than input ports") {
       @Override
       public boolean test(JavaClass javaClass) {
-        return !javaClass.isInterface() && javaClass.isAssignableTo(InputPort.class);
+        return !javaClass.isInterface() && javaClass.isAssignableTo(markers.inputPort());
       }
     };
   }
@@ -377,7 +375,7 @@ public final class HexagonalRules implements DcaRuleSet {
             arch ->
                 noClasses()
                     .that()
-                    .areAssignableTo(OutputPort.class)
+                    .areAssignableTo(arch.layout().markers().outputPort())
                     .and()
                     .areInterfaces()
                     .should()
@@ -411,7 +409,7 @@ public final class HexagonalRules implements DcaRuleSet {
                     .resideInAnyPackage(arch.allIncomingAdapterPatterns())
                     .should()
                     .dependOnClassesThat()
-                    .areAssignableTo(DomainService.class)
+                    .areAssignableTo(arch.layout().markers().domainService())
                     .allowEmptyShould(true))
         .selecting(
             "Classes in <module>.adapter.incoming.. of every module root, event consumers"

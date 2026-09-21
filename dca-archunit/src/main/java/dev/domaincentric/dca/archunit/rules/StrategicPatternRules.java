@@ -13,7 +13,6 @@ import dev.domaincentric.dca.archunit.DcaRuleSet;
 import dev.domaincentric.dca.archunit.DcaRuleViolation;
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.BoundedContext;
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.relationships.OpenHostService;
-import dev.domaincentric.dca.buildingblocks.ddd.tactical.IntegrationEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -327,7 +326,7 @@ public final class StrategicPatternRules implements DcaRuleSet {
             arch ->
                 classes()
                     .that()
-                    .implement(IntegrationEvent.class)
+                    .areAssignableTo(arch.layout().markers().integrationEvent())
                     .should()
                     .resideInAnyPackage(".." + layout.eventsSubpackage() + "..")
                     .allowEmptyShould(true))
@@ -349,7 +348,7 @@ public final class StrategicPatternRules implements DcaRuleSet {
             arch ->
                 classes()
                     .that()
-                    .implement(IntegrationEvent.class)
+                    .areAssignableTo(arch.layout().markers().integrationEvent())
                     .should(TypeInspection.haveImmutableShape())
                     .allowEmptyShould(true))
         .selecting(

@@ -12,10 +12,6 @@ import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
 import dev.domaincentric.dca.archunit.DcaRuleViolation;
-import dev.domaincentric.dca.buildingblocks.ddd.tactical.DomainEvent;
-import dev.domaincentric.dca.buildingblocks.ddd.tactical.DomainService;
-import dev.domaincentric.dca.buildingblocks.ddd.tactical.Factory;
-import dev.domaincentric.dca.buildingblocks.ddd.tactical.IntegrationEvent;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.IntegrationEventType;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -86,7 +82,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             arch ->
                 classes()
                     .that()
-                    .implement(DomainEvent.class)
+                    .areAssignableTo(arch.layout().markers().domainEvent())
                     .and()
                     .areNotInterfaces()
                     .should(TypeInspection.haveImmutableShape())
@@ -107,7 +103,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             arch ->
                 classes()
                     .that()
-                    .implement(DomainEvent.class)
+                    .areAssignableTo(arch.layout().markers().domainEvent())
                     .should()
                     .resideInAnyPackage(arch.allDomainPatterns())
                     .allowEmptyShould(true))
@@ -128,7 +124,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                     .that()
                     .resideInAnyPackage(arch.allDomainPatterns())
                     .and()
-                    .implement(DomainEvent.class)
+                    .areAssignableTo(arch.layout().markers().domainEvent())
                     .and()
                     .areNotInterfaces()
                     .and()
@@ -168,7 +164,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             arch ->
                 classes()
                     .that()
-                    .areAssignableTo(IntegrationEvent.class)
+                    .areAssignableTo(arch.layout().markers().integrationEvent())
                     .and()
                     .areNotInterfaces()
                     .should()
@@ -192,7 +188,9 @@ public final class AdvancedPatternRules implements DcaRuleSet {
               List<String> violations =
                   violations(
                       arch,
-                      c -> c.isAssignableTo(IntegrationEvent.class) && !c.isInterface(),
+                      c ->
+                          c.isAssignableTo(arch.layout().markers().integrationEvent())
+                              && !c.isInterface(),
                       AdvancedPatternRules::hasVersionField,
                       c ->
                           c.getName()
@@ -221,8 +219,8 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                   violations(
                       arch,
                       c ->
-                          c.isAssignableTo(DomainEvent.class)
-                              && !c.isAssignableTo(IntegrationEvent.class)
+                          c.isAssignableTo(arch.layout().markers().domainEvent())
+                              && !c.isAssignableTo(arch.layout().markers().integrationEvent())
                               && !c.isInterface(),
                       AdvancedPatternRules::hasVersionField,
                       c ->
@@ -251,7 +249,9 @@ public final class AdvancedPatternRules implements DcaRuleSet {
               List<String> violations =
                   violations(
                       arch,
-                      c -> c.isAssignableTo(DomainEvent.class) && !c.isInterface(),
+                      c ->
+                          c.isAssignableTo(arch.layout().markers().domainEvent())
+                              && !c.isInterface(),
                       c -> !hasTimestampField(c),
                       c -> c.getName() + " does not have a timestamp field");
               failIfAny(
@@ -283,7 +283,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             arch ->
                 classes()
                     .that()
-                    .implement(DomainService.class)
+                    .areAssignableTo(arch.layout().markers().domainService())
                     .and()
                     .areNotInterfaces()
                     .should()
@@ -306,7 +306,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             arch ->
                 classes()
                     .that()
-                    .implement(DomainService.class)
+                    .areAssignableTo(arch.layout().markers().domainService())
                     .should()
                     .resideInAnyPackage(arch.allDomainPatterns())
                     .allowEmptyShould(true))
@@ -338,7 +338,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             arch ->
                 classes()
                     .that()
-                    .implement(DomainService.class)
+                    .areAssignableTo(arch.layout().markers().domainService())
                     .and()
                     .resideInAnyPackage(arch.allDomainPatterns())
                     .should(haveOnlyFinalFieldsIncludingInherited())
@@ -364,7 +364,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             arch ->
                 classes()
                     .that()
-                    .implement(Factory.class)
+                    .areAssignableTo(arch.layout().markers().factory())
                     .should()
                     .haveSimpleNameEndingWith("Factory")
                     .allowEmptyShould(true))
@@ -382,7 +382,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             arch ->
                 classes()
                     .that()
-                    .implement(Factory.class)
+                    .areAssignableTo(arch.layout().markers().factory())
                     .should()
                     .resideInAnyPackage(arch.allDomainPatterns())
                     .allowEmptyShould(true))
@@ -413,7 +413,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             arch ->
                 classes()
                     .that()
-                    .implement(Factory.class)
+                    .areAssignableTo(arch.layout().markers().factory())
                     .and()
                     .resideInAnyPackage(arch.allDomainPatterns())
                     .should(haveOnlyFinalFieldsIncludingInherited())
