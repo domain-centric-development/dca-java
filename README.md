@@ -9,7 +9,7 @@ Hexagonal Architecture and Clean Architecture.
 | Artifact | What it is | Dependencies |
 |----------|------------|--------------|
 | `dev.domaincentric:dca-building-blocks` | The building blocks your code implements: DDD tactical markers (`AggregateRoot`, `Entity`, `Value`, `DomainEvent`, …), strategic annotations (`@BoundedContext`, `@SharedKernel`, `@Upstream`, `@Partnership`, …) and hexagonal port interfaces (`UseCase`, `Repository`, `Store`, …), the application-layer `TransactionBoundary` and the two exception base types (`DomainException`, `UseCaseException`) | none |
-| `dev.domaincentric:dca-archunit` | The governance rules: 121 ArchUnit rules pinned to those building blocks, plus an executable context map | `dca-building-blocks`, ArchUnit |
+| `dev.domaincentric:dca-archunit` | The governance rules: 119 ArchUnit rules pinned to those building blocks, plus an executable context map | `dca-building-blocks`, ArchUnit |
 | `dev.domaincentric:dca-spring` | The runtime adapters the rules demand: `SpringDomainEventPublisher` (over `ApplicationEventPublisher`), `SpringTransactionBoundary` (over `TransactionTemplate`), an `InMemoryTransactionBoundary` for tests, and a Spring Boot auto-configuration | `dca-building-blocks`; Spring `compileOnly` — your Boot BOM pins the version |
 | `dev.domaincentric:dca-archunit-spring-modulith` | Spring Modulith's module verification as a DCA test: `DcaSpringModulithTest` next to `DcaArchitectureTest`, with the test-class exclusion Modulith needs | `dca-archunit`; `spring-modulith-core` `compileOnly` |
 
