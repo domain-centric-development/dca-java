@@ -4,6 +4,14 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+**New rule `DCA-STR-012` — at least one module owns a DCA layer.** The third guard of the same kind as
+an empty import and an undeclared bounded context. A code base whose layers are named `core` and `usecases`
+instead of the configured segments yields no module root, so every rule that selects over the layers — the
+whole use-case set among them — matched nothing and the suite was green. The violation names the configured
+segments, the packages it did see, and the way out. This is the most likely first run of a code base that has
+not configured the layout, so **it can turn a green build red**; switch it off with a recorded reason if the
+code base deliberately has no layered module.
+
 **`DCA-USE-009`, `DCA-USE-012` and `DCA-USE-013` select what their texts say.** The three selections
 were spelled as a chain of `and`/`or`, which ArchUnit joins left to right, so they read
 `((inApplication ∧ suffix) ∨ isInputPort) ∧ ¬interface` and reported every input-port

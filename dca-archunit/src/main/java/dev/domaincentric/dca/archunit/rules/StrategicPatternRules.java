@@ -5,6 +5,7 @@ import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyP
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.lang.ArchRule;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
@@ -14,6 +15,7 @@ import dev.domaincentric.dca.archunit.DcaRuleViolation;
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.BoundedContext;
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.relationships.OpenHostService;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -45,7 +47,8 @@ public final class StrategicPatternRules implements DcaRuleSet {
             integrationEventsAreRecords(),
             antiCorruptionLayerComponentsResideInAclPackages(),
             eventListenersUseAntiCorruptionLayer(),
-            atLeastOneBoundedContextIsDeclared());
+            atLeastOneBoundedContextIsDeclared(),
+            atLeastOneModuleOwnsALayer());
   }
 
   @Override
@@ -398,6 +401,58 @@ public final class StrategicPatternRules implements DcaRuleSet {
             "Nothing is asserted. Whether a consumed integration event is translated into the"
                 + " consuming context's own language before it reaches the domain is a code-review"
                 + " check.");
+  }
+
+  /** DCA-STR-012. */
+  public static DcaRule atLeastOneModuleOwnsALayer() {
+    return DcaRule.check(
+            "DCA-STR-012",
+            "At least one module owns a DCA layer",
+            "Without a discovered module root every rule that selects over the layers matches"
+                + " nothing and reports success over an empty model",
+            arch -> {
+              if (!arch.moduleRoots().isEmpty()) {
+                return;
+              }
+              List<String> segments = new ArrayList<>(arch.layerSegments());
+              Collections.sort(segments);
+              List<String> observed =
+                  arch.classes().stream()
+                      .map(JavaClass::getPackageName)
+                      .distinct()
+                      .sorted()
+                      .limit(10)
+                      .toList();
+              throw new DcaRuleViolation(
+                  "No package below the base package '"
+                      + arch.layout().basePackage()
+                      + "' carries one of the configured layer segments "
+                      + segments
+                      + ", so no module root was discovered and every rule that selects over the"
+                      + " layers - the whole use-case set among them - passes without having"
+                      + " looked at anything. Packages seen"
+                      + (observed.size() < 10 ? "" : " (first ten)")
+                      + ": "
+                      + observed
+                      + ".",
+                  List.of(
+                      "Name the segments this code base uses: withDomainSubpackage(...),"
+                          + " withApplicationSubpackage(...) and withAdapterSubpackage(...) on the"
+                          + " layout, or the matching dca.layout.* properties.",
+                      "Check that the base package passed to DcaLayout.forBasePackage is the one"
+                          + " the modules live under, and that the import covers them.",
+                      "A code base that deliberately has no layered module switches this rule off"
+                          + " with a recorded reason."));
+            })
+        .selecting(
+            "The packages of the imported classes, as a whole - no individual class is reported."
+                + " A module root is any package that has a subpackage named after one of the"
+                + " configured layer segments, at any depth below the base package.")
+        .checking(
+            "At least one module root was discovered. The rule says nothing about how many"
+                + " modules there should be or how they are cut; it only establishes that the"
+                + " layer-selecting rules have something to look at. It is the third guard of the"
+                + " same kind as an empty import and an undeclared bounded context.");
   }
 
   /** DCA-STR-011. */

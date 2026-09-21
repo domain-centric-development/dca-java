@@ -1,8 +1,8 @@
 # DCA rule catalog
 
-Generated from `dca-archunit` — do not edit. 120 rules in 11 sets.
+Generated from `dca-archunit` — do not edit. 121 rules in 11 sets.
 
-114 enforced, 6 informational, 3 retired, 0 n/a
+115 enforced, 6 informational, 3 retired, 0 n/a
 
 ## `layered`
 
@@ -80,6 +80,7 @@ Generated from `dca-archunit` — do not edit. 120 rules in 11 sets.
 | `DCA-STR-009` | Anti-Corruption Layer components must be in acl packages | Anti-Corruption Layer components must be in 'acl' packages for clear architectural intent (DDD Strategic Pattern) | Classes anywhere on the classpath under scan whose simple name ends with EventTranslator, ACL or AntiCorruptionLayer - selected by name alone, no marker or annotation is read. | Each resides in a package whose path contains an acl segment (..acl..), at any depth. A translation class named otherwise is neither selected nor checked. |
 | `DCA-STR-010` | Event Listeners consuming integration events should use Anti-Corruption Layer (informational) | Consumed integration events are translated into the consuming context's own language before they reach its domain — verified by code review, not statically | Informational - selects nothing and never fails; it carries doctrine only. | Nothing is asserted. Whether a consumed integration event is translated into the consuming context's own language before it reaches the domain is a code-review check. |
 | `DCA-STR-011` | At least one bounded context is declared | Without a declared context the context-map and isolation rules select nothing and report success over an empty model | The declared bounded contexts of the imported classes — every package whose package-info carries @BoundedContext, at any depth below the base package. No individual class is reported. | At least one such package exists. The rule says nothing about how many contexts there should be, about their boundaries, or about modules that own a layer without declaring a context — those are governed structurally and are not a substitute for the declaration. |
+| `DCA-STR-012` | At least one module owns a DCA layer | Without a discovered module root every rule that selects over the layers matches nothing and reports success over an empty model | The packages of the imported classes, as a whole - no individual class is reported. A module root is any package that has a subpackage named after one of the configured layer segments, at any depth below the base package. | At least one module root was discovered. The rule says nothing about how many modules there should be or how they are cut; it only establishes that the layer-selecting rules have something to look at. It is the third guard of the same kind as an empty import and an undeclared bounded context. |
 
 ## `contextmap`
 
