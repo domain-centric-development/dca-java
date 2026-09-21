@@ -4,6 +4,13 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+**Every violation now names its rule.** A report line used to carry the offending element and, for six of the
+rules, the id; the other rules named it nowhere, so the only thing a reader could match on was the rule title —
+which changes as soon as a suffix is configured. `DcaRuleExecution` now prefixes every line of every report with
+`[DCA-XXX-nnn]`, in both languages. Nothing about a rule's selection, check or severity changes, and a frozen
+baseline stays valid because the prefix is added after the evaluation. A consumer that parses report text sees
+the new prefix.
+
 **What can turn a green build red:**
 
 - `DCA-ERR-004` also forbids the new `transportStatus` role — the annotation that fixes the protocol answer

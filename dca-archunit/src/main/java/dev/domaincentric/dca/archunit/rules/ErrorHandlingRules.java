@@ -93,7 +93,7 @@ public final class ErrorHandlingRules implements DcaRuleSet {
             arch -> {
               CollectedViolations collected =
                   CollectedViolations.withHeader(
-                      "DCA-ERR-002: an exception resides outside the layer its base type names");
+                      "An exception resides outside the layer its base type names");
               collected.addAll(
                   classes()
                       .that()
@@ -171,8 +171,7 @@ public final class ErrorHandlingRules implements DcaRuleSet {
             arch -> {
               FrameworkAnnotations roles = layout.frameworkAnnotations();
               CollectedViolations collected =
-                  CollectedViolations.withHeader(
-                      "DCA-ERR-004: prohibited metadata on an inner-layer exception");
+                  CollectedViolations.withHeader("Prohibited metadata on an inner-layer exception");
               for (JavaClass type : arch.classes()) {
                 if (!isProjectException(type, arch.layout().markers())) {
                   continue;
@@ -219,7 +218,7 @@ public final class ErrorHandlingRules implements DcaRuleSet {
             arch -> {
               CollectedViolations collected =
                   CollectedViolations.withHeader(
-                      "DCA-ERR-005: a technical or transport word in an exception name");
+                      "A technical or transport word in an exception name");
               for (JavaClass type : arch.classes()) {
                 if (!isProjectException(type, arch.layout().markers())) {
                   continue;

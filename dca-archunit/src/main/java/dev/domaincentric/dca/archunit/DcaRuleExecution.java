@@ -41,7 +41,8 @@ public final class DcaRuleExecution {
     if (violations.isEmpty()) {
       return new DcaRuleOutcome(rule.id(), DcaRuleOutcome.Status.PASSED, null);
     }
-    String message = withReason(violations.get(), selection.reasonFor(rule.id()));
+    String message =
+        withReason(withRuleId(violations.get(), rule.id()), selection.reasonFor(rule.id()));
     return severity == DcaSeverity.WARN
         ? new DcaRuleOutcome(rule.id(), DcaRuleOutcome.Status.WARNED, message)
         : new DcaRuleOutcome(rule.id(), DcaRuleOutcome.Status.FAILED, message);
@@ -148,6 +149,23 @@ public final class DcaRuleExecution {
         return delegate.getViolations(rule);
       }
     };
+  }
+
+  /**
+   * Prefixes every line of a violation report with the rule id.
+   *
+   * <p>ArchUnit names the rule in its report header only, and a rule that collects its violations
+   * itself names it nowhere. The id is what a reader switches off through {@link DcaRuleSelection},
+   * what a review cites and what an agent matches a report line on — the rule title is not, because
+   * it changes with a configured suffix. A line that already carries the id is left alone.
+   */
+  private static String withRuleId(String report, String id) {
+    String prefix = "[" + id + "] ";
+    List<String> prefixed = new ArrayList<>();
+    for (String line : report.split("\n", -1)) {
+      prefixed.add(line.isBlank() || line.contains(prefix) ? line : prefix + line);
+    }
+    return String.join("\n", prefixed);
   }
 
   private static String withReason(String violations, Optional<String> reason) {
