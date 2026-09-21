@@ -1,7 +1,6 @@
 package dev.domaincentric.dca.archunit.rules;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.Fixtures;
@@ -15,12 +14,18 @@ class CycleRulesTest {
   private static final String GOOD = Fixtures.ROOT + ".cycles.good";
   private static final String BAD = Fixtures.ROOT + ".cycles.bad";
 
+  /**
+   * One rule since 0.5.0: DCA-CYC-001 to DCA-CYC-004 sliced per module root, so the only cycle they
+   * could report ran between two modules — and its first direction is already forbidden outright by
+   * DCA-STR-004, DCA-STR-003, DCA-STR-006 and DCA-HEX-007. DCA-CYC-005 slices within a module and
+   * is the one that reports something no sibling does.
+   */
   @Test
-  void setHasFiveRulesInCatalogOrder() {
+  void setHasOneRule() {
     CycleRules set = new CycleRules(DcaLayout.forBasePackage(GOOD));
     assertEquals("cycles", set.name());
-    assertEquals(5, set.rules().size());
-    Fixtures.assertIdsAreSequential(set, "CYC");
+    assertEquals(1, set.rules().size());
+    assertEquals("DCA-CYC-005", set.rules().get(0).id());
   }
 
   @TestFactory
@@ -28,23 +33,7 @@ class CycleRulesTest {
     return Fixtures.goodFixturePasses(CycleRules::new, GOOD);
   }
 
-  /**
-   * The domain-model segment is read from the layout: with it renamed, the bad fixture's
-   * domain.model packages are no longer sliced and the cycle between them is not seen.
-   */
-  @Test
-  void theDomainModelSegmentComesFromTheLayout() {
-    var arch = Fixtures.arch(BAD);
-    assertThrows(
-        AssertionError.class,
-        () -> CycleRules.domainPackagesFreeOfCycles(arch.layout()).check(arch));
-    var renamed =
-        dev.domaincentric.dca.archunit.DcaArchitecture.of(
-            arch.layout().withModelSubpackage("entities"), arch.classes());
-    CycleRules.domainPackagesFreeOfCycles(renamed.layout()).check(renamed);
-  }
-
-  /** Every cycle rule has a negative fixture. */
+  /** The remaining cycle rule has a negative fixture. */
   @TestFactory
   Stream<DynamicTest> badFixtureFails() {
     return Fixtures.badFixtureFails(CycleRules::new, BAD);

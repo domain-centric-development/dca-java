@@ -268,19 +268,20 @@ class ContextDiscoveryTest {
     }
 
     /**
-     * The acceptance test for the slice change. The cycle rules used to slice with {@code
-     * slices().matching(base + ".(*)." + layer + "..")}, and {@code (*)} is one segment — so two
-     * contexts grouped below an intermediate package produced no slices at all and their mutual
-     * dependency went unreported. They now assign slices from the module root, so the cycle is
-     * found.
+     * The acceptance test for the slice change. Module roots used to be matched with {@code base +
+     * ".(*)." + layer + ".."}, and {@code (*)} is one segment — so two contexts grouped below an
+     * intermediate package were found by nothing and their mutual dependency went unreported. Both
+     * are discovered at depth two now, and the dependency is reported.
+     *
+     * <p>Checked through {@code DCA-STR-003}: the per-module cycle rules were retired in 0.5.0
+     * because a cycle they could see always runs between two modules, and the first direction of it
+     * is what the cross-module rules forbid outright. This fixture is the demonstration — {@code
+     * DCA-CYC-002} and {@code DCA-STR-003} both reported it, and the surviving one is enough.
      */
     @Test
     void isReported() {
       AssertionError error =
-          assertThrows(AssertionError.class, () -> rule("DCA-CYC-002", BASE).check(arch(BASE)));
-      assertTrue(
-          error.getMessage().contains("Cycle") || error.getMessage().contains("cycle"),
-          "expected a cycle violation, was: " + error.getMessage());
+          assertThrows(AssertionError.class, () -> rule("DCA-STR-003", BASE).check(arch(BASE)));
       assertTrue(
           error.getMessage().contains("alpha") && error.getMessage().contains("beta"),
           "should name both contexts, was: " + error.getMessage());
@@ -289,8 +290,7 @@ class ContextDiscoveryTest {
 
   /** The domain-layer rules that have no subject in a context without a domain layer. */
   private static final List<String> EMPTY_DOMAIN_SUBJECT =
-      List.of(
-          "DCA-LAY-002", "DCA-ONI-001", "DCA-ONI-002", "DCA-ONI-003", "DCA-HEX-001", "DCA-CYC-001");
+      List.of("DCA-LAY-002", "DCA-ONI-001", "DCA-ONI-002", "DCA-ONI-003", "DCA-HEX-001");
 
   @Nested
   @DisplayName("rootContextPackage")

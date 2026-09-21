@@ -1,8 +1,8 @@
 # DCA rule catalog
 
-Generated from `dca-archunit` — do not edit. 121 rules in 11 sets.
+Generated from `dca-archunit` — do not edit. 117 rules in 11 sets.
 
-115 enforced, 6 informational, 3 retired, 0 n/a
+111 enforced, 6 informational, 7 retired, 0 n/a
 
 ## `layered`
 
@@ -163,10 +163,6 @@ Generated from `dca-archunit` — do not edit. 121 rules in 11 sets.
 
 | Id | Rule | Rationale | Selects | Checks |
 |----|------|-----------|---------|--------|
-| `DCA-CYC-001` | Domain Packages must not have cyclic dependencies (package-based slice discovery) | Domain model packages should have clear boundaries and no cycles (Acyclic Dependencies Principle) | One slice per module root, holding the classes in <module>.domain.model.. of that module (segment names from the layout). A module root is the shortest package prefix whose next segment is a layer segment, so modules are found at any depth; classes outside every module or outside the domain-model package are ignored. | The slices form no dependency cycle - no two modules' domain models depend on each other, directly or via further modules' domain models. Slices are per module root, so a cycle between classes inside one module's domain model is not detected here, and dependencies into other layers do not count. DCA-CYC-005 covers the application layer per operation; no rule slices the domain model within a module. Fewer than two slices pass. |
-| `DCA-CYC-002` | Application Layer must not have cyclic dependencies (package-based slice discovery) | Application services should have clear boundaries and no cycles | One slice per module root, holding the classes in <module>.application.. of that module (application.shared included); classes outside every module or outside the application layer are ignored. | The slices form no dependency cycle between modules' application layers. Slices are per module root, so a cycle between use cases or features inside one module is not detected here - DCA-CYC-005 covers the application layer per operation - and dependencies into domain or adapter classes do not count. |
-| `DCA-CYC-003` | Outgoing Adapter Packages must not have cyclic dependencies | Outgoing adapters should have clear boundaries and no cycles | One slice per module root, holding the classes in <module>.adapter.outgoing.. of that module; everything else is ignored. | The slices form no dependency cycle between modules' outgoing adapters. Slices are per module root, so a cycle inside one module's outgoing adapters is not detected here, and dependencies into other layers do not count. DCA-CYC-005 covers the application layer per operation; no rule slices the adapters within a module. |
-| `DCA-CYC-004` | Incoming Adapter Packages must not have cyclic dependencies | Incoming adapters should have clear boundaries and no cycles | One slice per module root, holding the classes in <module>.adapter.incoming.. of that module; everything else is ignored. | The slices form no dependency cycle between modules' incoming adapters. Slices are per module root, so a cycle inside one module's incoming adapters is not detected here, and dependencies into other layers do not count. DCA-CYC-005 covers the application layer per operation; no rule slices the adapters within a module. |
 | `DCA-CYC-005` | Feature and use case packages within a module's application layer must not have cyclic dependencies | The packages directly below a module's application package are its features (application.<feature>.<usecase>) or, in a flat layout, its use cases (application.<usecase>). A feature is an optional, domain-named group of related use cases; it may depend on another feature in one direction, but a cycle between two of them means the grouping does not carry its weight - the shared concept belongs in application.shared, in the domain, or in one of the two. application.shared is the context-wide port package and is not a slice. The rule does not infer bounded contexts or aggregate ownership from the packages it slices | One slice per operation-root package (marker or suffix), with configured containers stripped; supporting subfolders join the nearest operation root. Classes directly in an enclosing feature package form its feature slice. Shared and direct application classes are ignored. | The slices form no dependency cycle: two features or two use cases that depend on each other, directly or through further slices, are reported. Dependencies on application.shared, the domain or an adapter do not count. Slices of all modules are checked together, so a cycle through another module's use case package is reported here as well. |
 
 ## `errors`
@@ -183,5 +179,9 @@ Generated from `dca-archunit` — do not edit. 121 rules in 11 sets.
 ## Retired identities
 
 - `DCA-ADV-003` — Immutable event shape is checked by DCA-ADV-001; replacement: DCA-ADV-001; since 0.4.0
+- `DCA-CYC-001` — A cycle between domain packages is already reported by DCA-STR-004; replacement: DCA-STR-004; since 0.5.0
+- `DCA-CYC-002` — A cycle between application packages is already reported by DCA-STR-003; DCA-CYC-005 covers the application layer per operation; replacement: DCA-STR-003; since 0.5.0
+- `DCA-CYC-003` — A cycle between outgoing-adapter packages is already reported by DCA-STR-006; replacement: DCA-STR-006; since 0.5.0
+- `DCA-CYC-004` — A cycle between incoming-adapter packages is already reported by DCA-HEX-007; replacement: DCA-HEX-007; since 0.5.0
 - `DCA-MAP-003` — Renderer disambiguates normalized external-system identifiers; replacement: ContextMapRenderer; since 0.4.0
 - `DCA-TAC-022` — Value model already covered; enrichment remains guide and catalog guidance; replacement: DCA-TAC-008..012; since 0.4.0
