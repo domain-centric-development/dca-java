@@ -246,9 +246,11 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                 + " to UseCaseException, the building-blocks package excluded.")
         .checking(
             "The simple name ends with none of Error, Fault, Failure and contains none of Http,"
-                + " Status, Response. Whether the remaining name is a term of the Ubiquitous"
-                + " Language is not decidable here and stays with review. An empty selection"
-                + " passes.");
+                + " StatusCode, ResponseStatus, ResponseEntity. The bare words Status and"
+                + " Response are not matched: they are transport words and domain words, and"
+                + " the name alone does not tell them apart, so OrderStatusInvalidException"
+                + " passes. Whether the remaining name is a term of the Ubiquitous Language is"
+                + " not decidable here and stays with review. An empty selection passes.");
   }
 
   public DcaRule adaptersWithoutTranslation() {
@@ -307,7 +309,8 @@ public final class ErrorHandlingRules implements DcaRuleSet {
 
   private static final List<String> FORBIDDEN_SUFFIXES = List.of("Error", "Fault", "Failure");
 
-  private static final List<String> FORBIDDEN_WORDS = List.of("Http", "Status", "Response");
+  private static final List<String> FORBIDDEN_WORDS =
+      List.of("Http", "StatusCode", "ResponseStatus", "ResponseEntity");
 
   /** A project's own exception type: assignable to a base type, outside the building blocks. */
   private static boolean isProjectException(JavaClass type, DcaMarkers markers) {

@@ -185,7 +185,8 @@ public final class CycleRules implements DcaRuleSet {
                 + " application.shared, the domain or an adapter do not count. Slices of all"
                 + " modules are checked together, so a cycle through another module's use case"
                 + " package is"
-                + " reported here as well.");
+                + " reported here as well.",
+            "break the cycle by moving the shared concept into one slice or behind a port");
   }
 
   /**
@@ -213,7 +214,7 @@ public final class CycleRules implements DcaRuleSet {
         int index = 0;
         while (index < segments.length && layout.operationContainers().contains(segments[index]))
           index++;
-        if (index == segments.length || segments[index].equals("shared"))
+        if (index == segments.length || segments[index].equals(layout.sharedSubpackage()))
           return SliceIdentifier.ignore();
         String operationRoot =
             arch.classes().stream()

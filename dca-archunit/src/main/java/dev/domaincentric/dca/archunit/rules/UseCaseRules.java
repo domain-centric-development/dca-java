@@ -105,12 +105,15 @@ public final class UseCaseRules implements DcaRuleSet {
                 classes()
                     .that()
                     .areInterfaces()
-                    .and()
-                    .haveSimpleName("InputPort")
+                    .and(
+                        JavaClass.Predicates.simpleName("InputPort")
+                            .or(JavaClass.Predicates.simpleName("IInputPort")))
                     .should()
                     .resideInAPackage(DcaLayout.BUILDING_BLOCKS_PORT_IN_PACKAGE)
                     .allowEmptyShould(true))
-        .selecting("Interfaces named InputPort anywhere on the classpath under scan.")
+        .selecting(
+            "Interfaces named InputPort or IInputPort anywhere on the classpath under scan - both"
+                + " spellings, so the rule means the same in both languages.")
         .checking(
             "The interface resides in the building-blocks package hexagonal.port.in - the generic contract is not redeclared in the project.");
   }
@@ -118,7 +121,7 @@ public final class UseCaseRules implements DcaRuleSet {
   public static DcaRule commandsResideInApplication(DcaLayout layout) {
     return DcaRule.of(
             "DCA-USE-002",
-            "Use Case Commands must end with 'Command' and reside in application package",
+            "Types named *Command reside in the application layer",
             "Use case commands should be in application layer (CQRS pattern)",
             arch ->
                 classes()
@@ -137,7 +140,7 @@ public final class UseCaseRules implements DcaRuleSet {
   public static DcaRule queriesResideInApplication(DcaLayout layout) {
     return DcaRule.of(
             "DCA-USE-003",
-            "Use Case Queries must end with 'Query' and reside in application package",
+            "Types named *Query reside in the application layer",
             "Use case queries should be in application layer (CQRS pattern)",
             arch ->
                 classes()
@@ -180,7 +183,7 @@ public final class UseCaseRules implements DcaRuleSet {
   public static DcaRule resultsResideInApplication(DcaLayout layout) {
     return DcaRule.of(
             "DCA-USE-006",
-            "Use Case Result Models must end with 'Result' and reside in application package",
+            "Types named *Result reside in the application layer",
             "Use case result models should be in application layer. Domain Value Objects with 'Result'"
                 + " in name are allowed in domain layer.",
             arch ->
@@ -217,7 +220,7 @@ public final class UseCaseRules implements DcaRuleSet {
     // kernel's adapter where cross-cutting Response classes typically live.
     return DcaRule.of(
             "DCA-USE-008",
-            "HTTP Response Models must end with 'Response' and reside in adapter package",
+            "Types named *Response reside in an adapter",
             "HTTP response models should be in adapter layer",
             arch ->
                 classes()
@@ -260,7 +263,8 @@ public final class UseCaseRules implements DcaRuleSet {
         .selecting(
             "Non-interface classes in <module>.application.. that implement InputPort or whose simple name ends with the configured use-case suffix.")
         .checking(
-            "Only a resolved Repository<T,ID> whose aggregate and every non-building-block superclass are scanned and have no registration call (including helpers) is exempt. Unresolved generics, partial scans or undecidable external helpers remain required. For every non-exempt method of the class that calls Repository.save, every entry point reaching it (a method callable from outside the class, or one nothing in the class calls) also reaches, through calls within the class, a call of DomainEventPublisher.publishAndClearEvents. Only publishAndClearEvents counts - publish(event), even followed by clearDomainEvents(), does not. A use case without a save (a query, a bulk delete) is selected but has nothing to check and passes. The method names are fixed and are not part of the marker roles: a vocabulary whose repository writes under another name is selected and then found to save nothing, so this rule passes over it.");
+            "Only a resolved Repository<T,ID> whose aggregate and every non-building-block superclass are scanned and have no registration call (including helpers) is exempt. Unresolved generics, partial scans or undecidable external helpers remain required. For every non-exempt method of the class that calls Repository.save, every entry point reaching it (a method callable from outside the class, or one nothing in the class calls) also reaches, through calls within the class, a call of DomainEventPublisher.publishAndClearEvents. Only publishAndClearEvents counts - publish(event), even followed by clearDomainEvents(), does not. A use case without a save (a query, a bulk delete) is selected but has nothing to check and passes. The method names are fixed and are not part of the marker roles: a vocabulary whose repository writes under another name is selected and then found to save nothing, so this rule passes over it.",
+            "call DomainEventPublisher.publishAndClearEvents(aggregate) after Repository.save(aggregate) on every path that saves");
   }
 
   public static DcaRule noDtosInDomain(DcaLayout layout) {
@@ -378,7 +382,9 @@ public final class UseCaseRules implements DcaRuleSet {
                 + " class carries one of the configured transactional annotations, or every uncovered"
                 + " unit on the route is either annotated or calls TransactionBoundary.inTransaction."
                 + " A covered caller does not cover a second route to the same helper. With an empty"
-                + " transactional role only the explicit boundary counts. A use case that neither"
+                + " transactional role only the explicit boundary counts - which is the .NET default,"
+                + " where no preset configures a transactional attribute, while the Java presets"
+                + " configure the framework's own. A use case that neither"
                 + " saves, deletes nor publishes (a query, a Store write) is selected but has nothing"
                 + " to check and passes. Whether the save or publish call sits inside the"
                 + " inTransaction block is not checked - ArchUnit folds a lambda into its enclosing"
@@ -442,7 +448,8 @@ public final class UseCaseRules implements DcaRuleSet {
         .selecting(
             "Per module root: non-interface, non-abstract, non-nested classes below <module>.application that implement InputPort or whose simple name ends with the configured use-case suffix, excluding application.shared and everything below it.")
         .checking(
-            "After removing configured operationContainers segments, all of them sit at one depth: application.<usecase> (flat) or application.<feature>.<usecase> (grouped). Reported are a use case directly in the application package, one nested deeper than a feature, and a module mixing both depths. What a feature means is not checked.");
+            "After removing configured operationContainers segments, all of them sit at one depth: application.<usecase> (flat) or application.<feature>.<usecase> (grouped). Reported are a use case directly in the application package, one nested deeper than a feature, and a module mixing both depths. What a feature means is not checked.",
+            "keep every use case of the module at application.<usecase>, one package per use case");
   }
 
   private static void checkUseCaseDepth(DcaArchitecture arch, DcaLayout layout) {
@@ -541,9 +548,13 @@ public final class UseCaseRules implements DcaRuleSet {
                 + " the result binds them",
             arch -> checkResultsCarryNoIdentities(arch))
         .selecting(
-            "Non-interface, non-nested classes in <module>.application.. whose simple name ends with Result.")
+            "Non-interface, non-nested classes in <module>.application.. whose simple name ends"
+                + " with Result, types assignable to the value role excluded - a domain value"
+                + " object named *Result crosses the port as a value, as DCA-USE-006 already"
+                + " allows.")
         .checking(
-            "No instance field - inherited ones included, walked through raw type and generic type arguments, and transitively into every record that lives in an application package - involves a type assignable to AggregateRoot or Entity. Records outside the application layer (domain value objects, read models) are not walked. Every offending path is reported.");
+            "No instance field - inherited ones included, walked through raw type and generic type arguments, and transitively into every record that lives in an application package - involves a type assignable to AggregateRoot or Entity. Records outside the application layer (domain value objects, read models) are not walked. Every offending path is reported.",
+            "carry ids and primitives in a result, never an aggregate, an entity or a domain object");
   }
 
   private static void checkResultsCarryNoIdentities(DcaArchitecture arch) {
@@ -552,6 +563,7 @@ public final class UseCaseRules implements DcaRuleSet {
       if (result.isInterface()
           || result.isNestedClass()
           || !result.getSimpleName().endsWith("Result")
+          || result.isAssignableTo(arch.layout().markers().value())
           || !residesInAny(result, arch.allApplicationPatterns())) {
         continue;
       }

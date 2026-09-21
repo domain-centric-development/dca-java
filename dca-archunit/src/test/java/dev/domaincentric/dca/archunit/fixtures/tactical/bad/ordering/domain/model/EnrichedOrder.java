@@ -1,4 +1,4 @@
 package dev.domaincentric.dca.archunit.fixtures.tactical.bad.ordering.domain.model;
 
-/** DCA-TAC-022: a record, but not a Value. */
+/** A record that is not a Value; kept as a neighbour of the reported types. */
 public record EnrichedOrder(OrderId orderId, int lineItemCount) {}

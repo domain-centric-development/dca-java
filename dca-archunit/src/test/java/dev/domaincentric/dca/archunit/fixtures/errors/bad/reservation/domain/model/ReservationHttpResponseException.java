@@ -3,11 +3,11 @@ package dev.domaincentric.dca.archunit.fixtures.errors.bad.reservation.domain.mo
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.DomainException;
 import java.io.Serial;
 
-public final class ReservationResponseException extends DomainException {
+public final class ReservationHttpResponseException extends DomainException {
 
   @Serial private static final long serialVersionUID = 1L;
 
-  public ReservationResponseException(ReservationId id) {
+  public ReservationHttpResponseException(ReservationId id) {
     super("reservation " + id.value() + " cannot be served");
   }
 }

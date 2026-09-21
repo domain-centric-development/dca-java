@@ -4,6 +4,57 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+**Every violation can carry a remedy, in both languages.** `DcaRule` gained `remedy()` and
+`checking(checks, remedy)`; `DcaRuleExecution` appends it as one `Fix:` line under the violations,
+prefixed with the rule id like every other line. Eleven rules name theirs — `DCA-CYC-005`,
+`DCA-HEX-012`, `DCA-NAM-001`, `-003`, `-004`, `-005`, `-006`, `DCA-STR-008`, `DCA-USE-009`, `-014`
+and `-015` — the same wording the .NET twins have carried in `DcaRule.Fail` since 0.4.0. Unlike
+.NET's, the parameter works for rules built with `DcaRule.of(...)` too, whose ArchUnit report says
+only what is wrong.
+
+**`DCA-TAC-009` no longer reports an enum value object.** An `enum Currency implements Value` with
+constant-specific class bodies is compiled abstract, so the rule demanded a `final` modifier the
+language forbids — a false positive with no fix. Enums are no longer selected, as the .NET twin
+never selected them. A fixture proves it.
+
+**`DCA-ERR-005` no longer rejects Ubiquitous-Language names.** The word list matched `Status` and
+`Response` as substrings, so `OrderStatusInvalidException` and `PaymentResponseMissingException`
+failed the rule that exists to protect the language. It now matches the compound transport words —
+`Http`, `StatusCode`, `ResponseStatus`, `ResponseEntity` — in both languages. `Http` as a substring
+was and stays safe.
+
+**`DCA-TAC-021` matches the same six write names in both languages.** Java knew `save`, `deleteById`
+and `delete`; .NET additionally knew their `Async` forms, so a Java store declaring
+`CompletableFuture<Void> saveAsync(Entry)` passed where its C# twin failed. Both now match the three
+names and their asynchronous forms, compared case-insensitively.
+
+**`DCA-USE-001` matches both spellings of the reserved contract name.** Java caught `InputPort`
+only, .NET `InputPort` and `IInputPort`. A Java project that declares `IInputPort` is now caught too.
+
+**`DCA-USE-015` exempts the value role, as .NET always has.** A domain value object whose name ends
+in `Result` and which lives in an application package was walked in Java and skipped in .NET.
+`DCA-USE-006` already lets such a type cross the port; the content walk now agrees.
+
+**Four `DCA-USE` titles say what the rule checks.** `DCA-USE-002`, `-003`, `-006` and `-008` were
+titled "must end with 'Command' and reside in application package", but the suffix is the
+*selection* — the rule never requires anything to be named that way. They are now "Types named
+`*Command` reside in the application layer" and so on. Titles are not ids; nothing breaks.
+
+**The web adapter and shared segments are configurable.** `withWebSubpackage(...)` and
+`withSharedSubpackage(...)` join the other segments. `web` was hard-wired in `DCA-NAM-011`, so a
+project whose web adapter is `adapter.incoming.ui` had every ViewModel reported with no
+configuration exit; `shared` was hard-wired in the shared-output-port patterns and in the cycle
+slicing. The defaults are unchanged, and the shared segment stays reserved against the operation
+containers whatever it is called.
+
+**`DCA-STR-008` cites the right reason.** Its rationale attributed the immutability of a published
+contract to event sourcing, which DCA prescribes nowhere. It now argues from the contract: once
+another context has read an integration event, its shape may only grow.
+
+**Four fixture comments described behaviour that no longer exists** — `DCA-TAC-003`'s tolerated
+self-reference (it is reported), a retired id, and two use-case-local output ports still marked as
+`DCA-TAC-014` / `DCA-TAC-019` negatives, which R3 made legal.
+
 **Six `DCA-ADV` rules and `DCA-STR-007` / `DCA-STR-008` no longer report an intermediate marker
 interface.** `DCA-ADV-002`, `-010`, `-012`, `-013`, `-014`, `-016`, `DCA-STR-007` and `DCA-STR-008`
 selected every type assignable to their marker role, interfaces included, while both `rules.json`

@@ -69,9 +69,11 @@ public final class DcaLayout {
   private final String domainSubpackage;
   private final String modelSubpackage;
   private final String applicationSubpackage;
+  private final String sharedSubpackage;
   private final String adapterSubpackage;
   private final String incomingSubpackage;
   private final String incomingEventSubpackage;
+  private final String webSubpackage;
   private final String outgoingSubpackage;
   private final String infrastructureSubpackage;
   private final String apiSubpackage;
@@ -106,10 +108,12 @@ public final class DcaLayout {
     this.modelSubpackage = requireSegment(settings.modelSubpackage, "modelSubpackage");
     this.applicationSubpackage =
         requireSegment(settings.applicationSubpackage, "applicationSubpackage");
+    this.sharedSubpackage = requireSegment(settings.sharedSubpackage, "sharedSubpackage");
     this.adapterSubpackage = requireSegment(settings.adapterSubpackage, "adapterSubpackage");
     this.incomingSubpackage = requireSegment(settings.incomingSubpackage, "incomingSubpackage");
     this.incomingEventSubpackage =
         requireSegment(settings.incomingEventSubpackage, "incomingEventSubpackage");
+    this.webSubpackage = requireSegment(settings.webSubpackage, "webSubpackage");
     this.outgoingSubpackage = requireSegment(settings.outgoingSubpackage, "outgoingSubpackage");
     this.infrastructureSubpackage =
         requireSegment(settings.infrastructureSubpackage, "infrastructureSubpackage");
@@ -120,6 +124,12 @@ public final class DcaLayout {
           "apiSubpackage and eventsSubpackage must differ, both are '" + apiSubpackage + "'");
     }
     this.operationContainers = List.copyOf(settings.operationContainers);
+    if (this.operationContainers.contains(this.sharedSubpackage)) {
+      throw new IllegalArgumentException(
+          "The shared sub-package '"
+              + this.sharedSubpackage
+              + "' may not also be an operation container");
+    }
     this.useCaseSuffix = requireSuffix(settings.useCaseSuffix, "useCaseSuffix");
     this.controllerSuffix = requireSuffix(settings.controllerSuffix, "controllerSuffix");
     this.restControllerSuffix =
@@ -149,9 +159,11 @@ public final class DcaLayout {
     defaults.domainSubpackage = "domain";
     defaults.modelSubpackage = "model";
     defaults.applicationSubpackage = "application";
+    defaults.sharedSubpackage = "shared";
     defaults.adapterSubpackage = "adapter";
     defaults.incomingSubpackage = "incoming";
     defaults.incomingEventSubpackage = "event";
+    defaults.webSubpackage = "web";
     defaults.outgoingSubpackage = "outgoing";
     defaults.infrastructureSubpackage = "infrastructure";
     defaults.apiSubpackage = "api";
@@ -247,6 +259,15 @@ public final class DcaLayout {
     return copy(settings -> settings.applicationSubpackage = value);
   }
 
+  /**
+   * Sub-package of the application layer that holds the output ports shared by the use cases of one
+   * context - e.g. {@code "shared"} (default), {@code "ports"} or {@code "spi"}. The name is
+   * reserved: it may not be used as an operation container.
+   */
+  public DcaLayout withSharedSubpackage(String value) {
+    return copy(settings -> settings.sharedSubpackage = value);
+  }
+
   public DcaLayout withAdapterSubpackage(String value) {
     return copy(settings -> settings.adapterSubpackage = value);
   }
@@ -264,6 +285,15 @@ public final class DcaLayout {
    */
   public DcaLayout withIncomingEventSubpackage(String value) {
     return copy(settings -> settings.incomingEventSubpackage = value);
+  }
+
+  /**
+   * Sub-package of the incoming adapters that holds the web adapter - e.g. {@code "web"} (default),
+   * {@code "ui"} or {@code "mvc"}. Only {@code DCA-NAM-011} reads it: a ViewModel belongs below
+   * {@code <module>.adapter.incoming.<web>..}.
+   */
+  public DcaLayout withWebSubpackage(String value) {
+    return copy(settings -> settings.webSubpackage = value);
   }
 
   /**
@@ -298,7 +328,9 @@ public final class DcaLayout {
   /** Organisational package segments ignored when measuring operation depth; empty by default. */
   public DcaLayout withOperationContainers(String... names) {
     for (String name : names) {
-      if (name == null || !name.matches("[a-zA-Z_][a-zA-Z0-9_]*") || name.equals("shared")) {
+      if (name == null
+          || !name.matches("[a-zA-Z_][a-zA-Z0-9_]*")
+          || name.equals(sharedSubpackage)) {
         throw new IllegalArgumentException("Invalid operation container: " + name);
       }
     }
@@ -406,9 +438,11 @@ public final class DcaLayout {
     settings.domainSubpackage = domainSubpackage;
     settings.modelSubpackage = modelSubpackage;
     settings.applicationSubpackage = applicationSubpackage;
+    settings.sharedSubpackage = sharedSubpackage;
     settings.adapterSubpackage = adapterSubpackage;
     settings.incomingSubpackage = incomingSubpackage;
     settings.incomingEventSubpackage = incomingEventSubpackage;
+    settings.webSubpackage = webSubpackage;
     settings.outgoingSubpackage = outgoingSubpackage;
     settings.infrastructureSubpackage = infrastructureSubpackage;
     settings.apiSubpackage = apiSubpackage;
@@ -433,9 +467,11 @@ public final class DcaLayout {
     String domainSubpackage;
     String modelSubpackage;
     String applicationSubpackage;
+    String sharedSubpackage;
     String adapterSubpackage;
     String incomingSubpackage;
     String incomingEventSubpackage;
+    String webSubpackage;
     String outgoingSubpackage;
     String infrastructureSubpackage;
     String apiSubpackage;
@@ -476,6 +512,11 @@ public final class DcaLayout {
     return applicationSubpackage;
   }
 
+  /** The shared-output-port sub-package of the application layer, {@code shared} by default. */
+  public String sharedSubpackage() {
+    return sharedSubpackage;
+  }
+
   public String adapterSubpackage() {
     return adapterSubpackage;
   }
@@ -487,6 +528,11 @@ public final class DcaLayout {
   /** The event-consumer sub-package of the incoming adapters, {@code event} by default. */
   public String incomingEventSubpackage() {
     return incomingEventSubpackage;
+  }
+
+  /** The web sub-package of the incoming adapters, {@code web} by default. */
+  public String webSubpackage() {
+    return webSubpackage;
   }
 
   public String outgoingSubpackage() {
@@ -635,9 +681,11 @@ public final class DcaLayout {
     return basePackage + ".*." + applicationSubpackage + "..";
   }
 
-  /** {@code base.*.application.shared..} — output ports shared by the use cases of one context. */
+  /**
+   * {@code base.*.application.<shared>..} — output ports shared by the use cases of one context.
+   */
   public String sharedOutputPortPattern() {
-    return basePackage + ".*." + applicationSubpackage + ".shared..";
+    return basePackage + ".*." + applicationSubpackage + "." + sharedSubpackage + "..";
   }
 
   /** {@code base.*.adapter..} */
@@ -675,7 +723,7 @@ public final class DcaLayout {
   }
 
   public String sharedOutputPortPattern(String contextPackage) {
-    return contextPackage + "." + applicationSubpackage + ".shared..";
+    return contextPackage + "." + applicationSubpackage + "." + sharedSubpackage + "..";
   }
 
   public String adapterPattern(String contextPackage) {

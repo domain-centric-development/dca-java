@@ -42,7 +42,9 @@ public final class DcaRuleExecution {
       return new DcaRuleOutcome(rule.id(), DcaRuleOutcome.Status.PASSED, null);
     }
     String message =
-        withReason(withRuleId(violations.get(), rule.id()), selection.reasonFor(rule.id()));
+        withRuleId(
+            withReason(withRemedy(violations.get(), rule.remedy()), selection.reasonFor(rule.id())),
+            rule.id());
     return severity == DcaSeverity.WARN
         ? new DcaRuleOutcome(rule.id(), DcaRuleOutcome.Status.WARNED, message)
         : new DcaRuleOutcome(rule.id(), DcaRuleOutcome.Status.FAILED, message);
@@ -166,6 +168,15 @@ public final class DcaRuleExecution {
       prefixed.add(line.isBlank() || line.contains(prefix) ? line : prefix + line);
     }
     return String.join("\n", prefixed);
+  }
+
+  /**
+   * Appends the rule's remedy as a {@code Fix:} line, the way .NET's {@code
+   * DcaRuleViolationException} formats its {@code fix} - one line about the rule, not one per
+   * violation. It is added before the id is prefixed, so that line carries the id too.
+   */
+  private static String withRemedy(String violations, Optional<String> remedy) {
+    return remedy.map(text -> violations + "\n\nFix: " + text).orElse(violations);
   }
 
   private static String withReason(String violations, Optional<String> reason) {

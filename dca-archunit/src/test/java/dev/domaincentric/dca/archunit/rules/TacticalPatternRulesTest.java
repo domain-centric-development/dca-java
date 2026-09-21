@@ -136,4 +136,25 @@ class TacticalPatternRulesTest {
         violation.violations().stream().anyMatch(v -> v.contains("Weight")),
         violation.getMessage());
   }
+
+  /**
+   * An enum value object with constant-specific class bodies is compiled abstract, so requiring
+   * {@code final} of it could never be satisfied. DCA-TAC-009 therefore does not select enums - as
+   * the .NET twin never has.
+   */
+  @Test
+  @DisplayName("DCA-TAC-009 does not select an enum value object")
+  void enumValueObjectsAreNotSelected() {
+    Fixtures.rule(GOOD, "DCA-TAC-009").check(Fixtures.arch(GOOD));
+  }
+
+  /** The asynchronous spellings are the same names to DCA-TAC-021, as they are in .NET. */
+  @Test
+  @DisplayName("DCA-TAC-021 reports the asynchronous write vocabulary too")
+  void asynchronousRepositorySemanticsOnAStoreAreReported() {
+    DcaRuleViolation violation = Fixtures.violation(BAD, "DCA-TAC-021");
+    assertTrue(
+        violation.violations().stream().anyMatch(v -> v.contains("saveAsync")),
+        violation.getMessage());
+  }
 }

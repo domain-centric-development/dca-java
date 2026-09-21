@@ -321,7 +321,7 @@ public final class HexagonalRules implements DcaRuleSet {
                     .beAssignableTo(arch.layout().markers().outputPort())
                     .allowEmptyShould(true))
         .selecting(
-            "Top-level interfaces in <module>.application.shared.. of every module root,"
+            "Top-level interfaces in <module>.application.<shared>.. of every module root,"
                 + " excluding package-info. Nested interfaces are not selected - they belong to"
                 + " their enclosing port's contract.")
         .checking(
@@ -419,6 +419,7 @@ public final class HexagonalRules implements DcaRuleSet {
                 + " interface, any sub-interface of it and every class implementing one. A domain"
                 + " class without the marker is not a domain service by this rule. Injecting it,"
                 + " calling it or naming it in a signature all count as a dependency. An empty"
-                + " selection passes.");
+                + " selection passes.",
+            "move the collaboration into the use case and carry its outcome in the result");
   }
 }

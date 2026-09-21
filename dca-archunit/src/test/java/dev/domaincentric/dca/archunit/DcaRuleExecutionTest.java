@@ -256,4 +256,32 @@ class DcaRuleExecutionTest {
     assertTrue(failure.getMessage().contains(CUSTOM_RULE), failure.getMessage());
     assertTrue(failure.getMessage().contains("WARN"), "points at the alternative");
   }
+
+  /**
+   * A rule that names its remedy gets it appended as one {@code Fix:} line, the counterpart of the
+   * {@code fix} argument .NET's {@code DcaRule.Fail} has always taken. The line carries the rule id
+   * like every other, so a grep for the id finds the advice with the finding.
+   */
+  @Test
+  void aRuleWithARemedyAppendsOneFixLine() {
+    DcaRuleOutcome outcome = execute(BAD, ARCH_RULE, DcaRuleSelection.all());
+
+    assertEquals(DcaRuleOutcome.Status.FAILED, outcome.status());
+    assertEquals(
+        1,
+        outcome.message().lines().filter(line -> line.contains("Fix: ")).count(),
+        outcome.message());
+    assertTrue(
+        outcome.message().contains("[DCA-NAM-001] Fix: rename the class to *UseCase"),
+        outcome.message());
+  }
+
+  /** A rule that names none is unchanged: no empty Fix line. */
+  @Test
+  void aRuleWithoutARemedyAppendsNothing() {
+    DcaRuleOutcome outcome = execute(BAD, "DCA-NAM-011", DcaRuleSelection.all());
+
+    assertEquals(DcaRuleOutcome.Status.FAILED, outcome.status());
+    assertFalse(outcome.message().contains("Fix: "), outcome.message());
+  }
 }

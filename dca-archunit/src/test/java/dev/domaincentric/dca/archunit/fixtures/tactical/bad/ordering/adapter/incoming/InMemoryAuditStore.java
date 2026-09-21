@@ -6,4 +6,9 @@ import dev.domaincentric.dca.archunit.fixtures.tactical.bad.ordering.application
 public class InMemoryAuditStore implements AuditStore {
   @Override
   public void save(String entry) {}
+
+  @Override
+  public java.util.concurrent.CompletableFuture<Void> saveAsync(String entry) {
+    return java.util.concurrent.CompletableFuture.completedFuture(null);
+  }
 }

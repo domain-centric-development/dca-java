@@ -65,6 +65,9 @@ class UseCaseRulesTest {
       assertTrue(
           violations.stream().noneMatch(v -> v.startsWith("PlaceOrderResult")),
           "a result of values is not reported: " + violations);
+      assertTrue(
+          violations.stream().noneMatch(v -> v.startsWith("MoneyResult")),
+          "a value object named *Result is exempt, as it is in .NET: " + violations);
     }
 
     /** The same part record reached through two fields is reported on both paths. */
@@ -304,5 +307,19 @@ class UseCaseRulesTest {
           message.contains("SharedPublishHelperUseCase.execute "),
           "the annotated entry path is not reported: " + message);
     }
+  }
+
+  /**
+   * The reserved contract name is matched in both spellings, so the id means the same in both
+   * languages: a Java project that writes {@code IInputPort} is caught, as the .NET twin catches a
+   * .NET project that writes {@code InputPort}.
+   */
+  @Test
+  @DisplayName("DCA-USE-001 reports both spellings of the reserved contract name")
+  void bothSpellingsOfTheReservedContractNameAreReported() {
+    String message = Fixtures.failure(FIXTURES + ".bad", "DCA-USE-001").getMessage();
+
+    assertTrue(message.contains("application.InputPort"), message);
+    assertTrue(message.contains("application.IInputPort"), message);
   }
 }

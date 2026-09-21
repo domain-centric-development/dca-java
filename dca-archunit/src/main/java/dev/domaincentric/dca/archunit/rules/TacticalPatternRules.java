@@ -31,7 +31,13 @@ public final class TacticalPatternRules implements DcaRuleSet {
 
   private static final String REPOSITORY_SUFFIX = "Repository";
   private static final String STORE_SUFFIX = "Store";
-  private static final Set<String> REPOSITORY_METHOD_NAMES = Set.of("save", "deleteById", "delete");
+
+  /**
+   * Write vocabulary a Store must not declare, compared case-insensitively so that the same six
+   * names are matched in both languages - {@code save} and {@code SaveAsync} are the same name.
+   */
+  private static final Set<String> REPOSITORY_METHOD_NAMES =
+      Set.of("save", "deletebyid", "delete", "saveasync", "deletebyidasync", "deleteasync");
 
   private final DcaLayout layout;
   private final List<DcaRule> rules;
@@ -379,15 +385,19 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .areNotInterfaces()
                     .and()
                     .areNotRecords()
+                    .and()
+                    .areNotEnums()
                     .should()
                     .haveModifier(JavaModifier.FINAL)
                     .allowEmptyShould(true))
         .selecting(
-            "Non-interface, non-record classes in <module>.domain.model.. of every module "
-                + "root that are assignable to Value; enums included.")
+            "Non-interface, non-record, non-enum classes in <module>.domain.model.. of every "
+                + "module root that are assignable to Value.")
         .checking(
-            "The class carries the final modifier. Records and interfaces are not selected, "
-                + "so a record value object always passes; a value object outside "
+            "The class carries the final modifier. Records, interfaces and enums are not "
+                + "selected, so a record value object always passes and an enum value object is "
+                + "never reported - an enum with constant-specific class bodies is compiled "
+                + "abstract and cannot be made final. A value object outside "
                 + "<module>.domain.model.. is never reported, and an empty selection passes.");
   }
 
@@ -759,7 +769,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
               List<String> violations = new ArrayList<>();
               for (JavaClass store : storeInterfaces(arch)) {
                 for (JavaMethod method : store.getMethods()) {
-                  if (REPOSITORY_METHOD_NAMES.contains(method.getName())) {
+                  if (REPOSITORY_METHOD_NAMES.contains(
+                      method.getName().toLowerCase(java.util.Locale.ROOT))) {
                     violations.add(
                         store.getFullName()
                             + "."
@@ -778,10 +789,14 @@ public final class TacticalPatternRules implements DcaRuleSet {
             "Interfaces anywhere under scan assignable to Store, the marker Store itself "
                 + "excluded.")
         .checking(
-            "No method declared on the interface itself is named save, deleteById "
-                + "or delete - matched by name alone, parameters and return type disregarded. "
-                + "Inherited methods are not inspected, and no particular vocabulary (record, "
-                + "count, exists) is required. The three names are fixed and are not part of the marker roles: a vocabulary that writes under another name is selected and then found to declare no write.");
+            "No method declared on the interface itself is named save, deleteById, delete "
+                + "or one of their asynchronous forms saveAsync, deleteByIdAsync, "
+                + "deleteAsync - matched by name alone, parameters and return type "
+                + "disregarded and case ignored, so both languages match the same six names. Inherited methods "
+                + "are not inspected, and no particular vocabulary (record, count, exists) "
+                + "is required. The six names are fixed and are not part of the marker "
+                + "roles: a vocabulary that writes under another name is selected and then "
+                + "found to declare no write.");
   }
 
   // ---------------------------------------------------------------------------------------------

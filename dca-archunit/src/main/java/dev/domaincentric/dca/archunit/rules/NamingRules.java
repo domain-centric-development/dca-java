@@ -71,7 +71,8 @@ public final class NamingRules implements DcaRuleSet {
         .checking(
             "The simple name ends with the configured use-case suffix. Interfaces and records are"
                 + " not selected; a class assignable only to the input-port role without the"
-                + " use-case role is not selected either. An empty selection passes.");
+                + " use-case role is not selected either. An empty selection passes.",
+            "rename the class to *" + layout.useCaseSuffix());
   }
 
   public static DcaRule useCasesAreServices(DcaLayout layout) {
@@ -134,7 +135,8 @@ public final class NamingRules implements DcaRuleSet {
         .checking(
             "The simple name ends with InputPort. Classes and records are not selected, and an"
                 + " interface extending InputPort outside an application package is not checked. An"
-                + " empty selection passes.");
+                + " empty selection passes.",
+            "rename the interface to <UseCaseName>InputPort");
   }
 
   public static DcaRule repositoryInterfacesEndWithRepository(DcaLayout layout) {
@@ -162,7 +164,8 @@ public final class NamingRules implements DcaRuleSet {
             "The simple name ends with Repository (RepositoryPort or ProductRepositoryAdapter is"
                 + " reported). Selection is by name only - whether the interface extends the"
                 + " Repository marker is not checked, and classes are not selected. An empty"
-                + " selection passes.");
+                + " selection passes.",
+            "rename the interface to <Aggregate>Repository");
   }
 
   public static DcaRule controllersEndWithController(DcaLayout layout) {
@@ -187,7 +190,8 @@ public final class NamingRules implements DcaRuleSet {
             "The simple name ends with the configured controller suffix (default Controller). A"
                 + " class carrying only a REST-controller stereotype is not selected here, and a"
                 + " controller outside an incoming-adapter package is not checked. An empty"
-                + " selection passes - which is always the case when the role is empty.");
+                + " selection passes - which is always the case when the role is empty.",
+            "rename the class to *" + layout.controllerSuffix());
   }
 
   public static DcaRule restControllersEndWithRestControllerSuffix(DcaLayout layout) {
@@ -216,7 +220,8 @@ public final class NamingRules implements DcaRuleSet {
             "The simple name ends with the configured REST-controller suffix. Classes annotated"
                 + " only with a web-controller stereotype are not selected, and a REST controller"
                 + " outside an incoming-adapter package is not checked. An empty selection"
-                + " passes - which is always the case when the role is empty.");
+                + " passes - which is always the case when the role is empty.",
+            "rename the class to *" + layout.restControllerSuffix());
   }
 
   public static DcaRule dtosResideInAdapterLayer(DcaLayout layout) {
@@ -326,8 +331,10 @@ public final class NamingRules implements DcaRuleSet {
   public static DcaRule viewModelsResideInIncomingWebAdapters(DcaLayout layout) {
     return DcaRule.of(
             "DCA-NAM-011",
-            "ViewModels must reside in adapter.incoming.web packages",
-            "ViewModels are presentation concerns and must reside in incoming web adapter packages",
+            "ViewModels must reside in the configured web adapter package",
+            "A ViewModel is shaped for the protocol of one incoming adapter and belongs in it. It has"
+                + " no reading in the domain or the application layer, and none in a second"
+                + " adapter",
             arch ->
                 classes()
                     .that()
@@ -339,10 +346,11 @@ public final class NamingRules implements DcaRuleSet {
                     .allowEmptyShould(true))
         .selecting("Classes under the base package whose simple name ends with ViewModel.")
         .checking(
-            "Each resides in <module>.adapter.incoming.web.. of some module root - the adapter and"
-                + " incoming segments are the configured ones, the web segment is fixed. A"
-                + " ViewModel in a domain or application package, or in a non-web incoming adapter"
-                + " such as adapter.incoming.mcp, is reported. An empty selection passes.");
+            "Each resides in <module>.adapter.incoming.<web>.. of some module root - all three"
+                + " segments are the configured ones (withWebSubpackage changes the last). A"
+                + " ViewModel in a domain or application package, or in an incoming adapter other"
+                + " than the configured web one, such as adapter.incoming.mcp, is reported. An"
+                + " empty selection passes.");
   }
 
   private static String[] incomingWebAdapterPatterns(DcaArchitecture arch) {
@@ -355,7 +363,9 @@ public final class NamingRules implements DcaRuleSet {
                     + layout.adapterSubpackage()
                     + "."
                     + layout.incomingSubpackage()
-                    + ".web..")
+                    + "."
+                    + layout.webSubpackage()
+                    + "..")
         .toArray(String[]::new);
   }
 }

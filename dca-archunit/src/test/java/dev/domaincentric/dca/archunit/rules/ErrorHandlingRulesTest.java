@@ -82,7 +82,7 @@ class ErrorHandlingRulesTest {
   void transportVocabularyInAnExceptionNameIsReported() {
     String message = Fixtures.failure(FIXTURES + ".bad", "DCA-ERR-005").getMessage();
 
-    assertTrue(message.contains("ReservationResponseException"), message);
+    assertTrue(message.contains("ReservationHttpResponseException"), message);
   }
 
   /**

@@ -6,9 +6,9 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * DCA-TAC-003: containers of the aggregate's own type hold other aggregate instances - a list, an
- * optional, an array, a map and a nested list are all reported. The direct field {@code root} of
- * the own type is the one tolerated shape (a self-reference is not another aggregate).
+ * DCA-TAC-003: a reference to another aggregate root must be an id. Every shape is reported, the
+ * direct field {@code root} of the own type included - a parent is another instance, not this one -
+ * as are a list, an optional, an array, a map and a nested list.
  */
 public final class Category extends BaseAggregateRoot<Category, CategoryId> {
   private final CategoryId id;

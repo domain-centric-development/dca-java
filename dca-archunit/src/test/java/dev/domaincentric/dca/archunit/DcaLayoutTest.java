@@ -99,4 +99,26 @@ class DcaLayoutTest {
     assertEquals("published", layout.channelSubpackage(Upstream.Consumes.EVENTS));
     assertEquals(List.of("contract", "published"), layout.publishedSubpackages());
   }
+
+  /**
+   * The web adapter and shared segments are configurable like every other one: DCA-NAM-011 reads
+   * the first, the shared-output-port patterns read the second, and the shared segment stays
+   * reserved against the operation containers whatever it is called.
+   */
+  @Test
+  void theWebAdapterAndSharedSegmentsAreConfigurable() {
+    assertEquals("web", DEFAULTS.webSubpackage());
+    assertEquals("shared", DEFAULTS.sharedSubpackage());
+    assertEquals("ui", DEFAULTS.withWebSubpackage("ui").webSubpackage());
+
+    DcaLayout ports = DEFAULTS.withSharedSubpackage("ports");
+    assertEquals("com.acme.shop.*.application.ports..", ports.sharedOutputPortPattern());
+    assertEquals(
+        "com.acme.cart.application.ports..", ports.sharedOutputPortPattern("com.acme.cart"));
+
+    assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withOperationContainers("shared"));
+    assertThrows(IllegalArgumentException.class, () -> ports.withOperationContainers("ports"));
+    assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withWebSubpackage(""));
+    assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withSharedSubpackage("a.b"));
+  }
 }
