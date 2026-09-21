@@ -133,7 +133,9 @@ public final class NamingRules implements DcaRuleSet {
             "Interfaces in <module>.application.. of every module root that are assignable to"
                 + " InputPort, except those named exactly InputPort or UseCase.")
         .checking(
-            "The simple name ends with InputPort. Classes and records are not selected, and an"
+            "The simple name ends with InputPort - no prefix is required, because Java interfaces"
+                + " carry none; the .NET twin additionally requires the platform's I prefix."
+                + " Classes and records are not selected, and an"
                 + " interface extending InputPort outside an application package is not checked. An"
                 + " empty selection passes.",
             "rename the interface to <UseCaseName>InputPort");

@@ -16,7 +16,8 @@ final class DomainMetadata {
     if (type.isAssignableTo(markers.domainEvent())) return "DCA-ADV-004";
     if (type.isAssignableTo(markers.domainService())) return "DCA-ADV-011";
     if (type.isAssignableTo(markers.factory())) return "DCA-ADV-015";
-    if (type.getSimpleName().endsWith("Specification")) return "DCA-ADV-018";
+    if (type.isAssignableTo(markers.specification())
+        || type.getSimpleName().endsWith("Specification")) return "DCA-ADV-018";
     return "DCA-ONI-003";
   }
 

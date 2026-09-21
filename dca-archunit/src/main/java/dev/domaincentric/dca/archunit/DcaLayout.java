@@ -42,15 +42,6 @@ import java.util.function.Consumer;
  */
 public final class DcaLayout {
 
-  /** Package of the dca-building-blocks markers, as an ArchUnit pattern. */
-  public static final String BUILDING_BLOCKS_PACKAGE = "dev.domaincentric.dca.buildingblocks..";
-
-  public static final String BUILDING_BLOCKS_TACTICAL_PACKAGE =
-      "dev.domaincentric.dca.buildingblocks.ddd.tactical..";
-  public static final String BUILDING_BLOCKS_STRATEGIC_PACKAGE =
-      "dev.domaincentric.dca.buildingblocks.ddd.strategic..";
-  public static final String BUILDING_BLOCKS_PORT_PACKAGE =
-      "dev.domaincentric.dca.buildingblocks.hexagonal.port..";
   public static final String BUILDING_BLOCKS_PORT_IN_PACKAGE =
       "dev.domaincentric.dca.buildingblocks.hexagonal.port.in..";
   public static final String BUILDING_BLOCKS_PORT_OUT_PACKAGE =

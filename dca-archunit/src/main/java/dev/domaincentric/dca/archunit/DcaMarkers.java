@@ -33,6 +33,12 @@ import java.util.Objects;
  * outside this: a role names one type, so a migration points the role at one of them and the rules
  * select what carries it.
  *
+ * <p><b>The port roles need a common root.</b> {@code withOutputPort} must be set whenever any
+ * other port role is: {@code DCA-HEX-009} measures every output port of the project against it, so
+ * leaving it at the library's own type while {@code repository} points elsewhere reports every port
+ * of the project's vocabulary. A vocabulary that has no common port supertype cannot express that
+ * here - switch {@code DCA-HEX-009} off rather than pointing the role at an unrelated type.
+ *
  * <p>What the roles do <em>not</em> cover are the strategic annotations ({@code @BoundedContext},
  * {@code @Upstream}, {@code @Partnership} and their siblings). The rules do not only select on
  * them, they read their members — the context a relationship names, the dependencies a module
@@ -60,6 +66,8 @@ import java.util.Objects;
  * @param integrationEvent the marker of an integration event
  * @param domainService the marker of a domain service
  * @param factory the marker of a factory
+ * @param specification the marker of a specification — a predicate over a domain object, selected
+ *     by {@code DCA-ADV-017} and {@code DCA-ADV-018} alongside the name suffix
  * @param domainException the base type of a domain failure
  * @param useCaseException the base type of a use-case failure
  * @param transactionBoundary the explicit transaction boundary of the application layer
@@ -84,6 +92,7 @@ public record DcaMarkers(
     String integrationEvent,
     String domainService,
     String factory,
+    String specification,
     String domainException,
     String useCaseException,
     String transactionBoundary,
@@ -110,6 +119,7 @@ public record DcaMarkers(
     integrationEvent = type(integrationEvent, "integrationEvent");
     domainService = type(domainService, "domainService");
     factory = type(factory, "factory");
+    specification = type(specification, "specification");
     domainException = type(domainException, "domainException");
     useCaseException = type(useCaseException, "useCaseException");
     transactionBoundary = type(transactionBoundary, "transactionBoundary");
@@ -145,6 +155,7 @@ public record DcaMarkers(
         DCA_BUILDING_BLOCKS + ".ddd.tactical.IntegrationEvent",
         DCA_BUILDING_BLOCKS + ".ddd.tactical.DomainService",
         DCA_BUILDING_BLOCKS + ".ddd.tactical.Factory",
+        DCA_BUILDING_BLOCKS + ".ddd.tactical.Specification",
         DCA_BUILDING_BLOCKS + ".ddd.tactical.DomainException",
         DCA_BUILDING_BLOCKS + ".application.UseCaseException",
         DCA_BUILDING_BLOCKS + ".application.TransactionBoundary",
@@ -188,6 +199,7 @@ public record DcaMarkers(
         roles.get("integrationEvent"),
         roles.get("domainService"),
         roles.get("factory"),
+        roles.get("specification"),
         roles.get("domainException"),
         roles.get("useCaseException"),
         roles.get("transactionBoundary"),
@@ -230,6 +242,10 @@ public record DcaMarkers(
 
   public DcaMarkers withFactory(String fqn) {
     return withRole("factory", fqn);
+  }
+
+  public DcaMarkers withSpecification(String fqn) {
+    return withRole("specification", fqn);
   }
 
   public DcaMarkers withDomainException(String fqn) {
@@ -301,6 +317,7 @@ public record DcaMarkers(
           "integrationEvent",
           "domainService",
           "factory",
+          "specification",
           "domainException",
           "outputPort",
           "repository",
@@ -359,6 +376,7 @@ public record DcaMarkers(
     roles.put("integrationEvent", integrationEvent);
     roles.put("domainService", domainService);
     roles.put("factory", factory);
+    roles.put("specification", specification);
     roles.put("domainException", domainException);
     roles.put("useCaseException", useCaseException);
     roles.put("transactionBoundary", transactionBoundary);

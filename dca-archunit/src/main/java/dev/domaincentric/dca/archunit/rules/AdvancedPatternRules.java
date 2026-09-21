@@ -2,6 +2,7 @@ package dev.domaincentric.dca.archunit.rules;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.lang.ArchCondition;
@@ -9,6 +10,7 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
+import dev.domaincentric.dca.archunit.DcaMarkers;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
 import dev.domaincentric.dca.archunit.DcaRuleViolation;
@@ -114,34 +116,6 @@ public final class AdvancedPatternRules implements DcaRuleSet {
         .checking(
             "Each resides in a domain package of some module root (<module>.domain..). An event in an"
                 + " application, adapter or infrastructure package is reported. An empty selection passes.");
-  }
-
-  public DcaRule domainEventsAreImmutable() {
-    return DcaRule.of(
-            "DCA-ADV-003",
-            "Domain Events should be immutable (final or records)",
-            "Domain events should be immutable (final classes or records)",
-            arch ->
-                classes()
-                    .that()
-                    .resideInAnyPackage(arch.allDomainPatterns())
-                    .and()
-                    .areAssignableTo(arch.layout().markers().domainEvent())
-                    .and()
-                    .areNotInterfaces()
-                    .and()
-                    .areNotEnums()
-                    .and()
-                    .areNotRecords()
-                    .should()
-                    .haveModifier(JavaModifier.FINAL)
-                    .allowEmptyShould(true))
-        .selecting(
-            "Non-interface, non-enum, non-record classes in <module>.domain.. of every module root that are"
-                + " assignable to DomainEvent.")
-        .checking(
-            "The class is final. Records and enums are not selected, so a record event always passes here."
-                + " An empty selection passes.");
   }
 
   public DcaRule domainEventsHaveNoFrameworkAnnotations() {
@@ -449,22 +423,20 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             "Specification implementations are part of the domain layer",
             arch ->
                 classes()
-                    .that()
-                    .haveSimpleNameEndingWith("Specification")
-                    .and()
-                    .areNotInterfaces()
-                    .and()
-                    .doNotHaveSimpleName("Specification")
+                    .that(specifications(arch.layout().markers()))
                     .should()
                     .resideInAnyPackage(arch.allDomainPatterns())
                     .allowEmptyShould(true))
         .selecting(
-            "Non-interface classes anywhere on the classpath under scan whose simple name ends with"
-                + " Specification, excluding a class named exactly Specification. No marker is involved - only"
-                + " the name selects.")
+            "Non-interface classes anywhere on the classpath under scan that are assignable to the"
+                + " configured specification role or whose simple name ends with Specification, the"
+                + " role's own type and a class named exactly Specification excluded. The marker"
+                + " and the name both select, so a specification named after the predicate it"
+                + " expresses is governed too.")
         .checking(
             "Each resides in a domain package of some module root (<module>.domain..). An empty selection"
-                + " passes.");
+                + " passes.",
+            "move the specification into the module's domain package");
   }
 
   public DcaRule specificationsHaveNoFrameworkAnnotations() {
@@ -474,7 +446,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             "Domain objects carry no metadata for container management, persistence or transaction coordination",
             arch -> DomainMetadata.check(arch, "DCA-ADV-018"))
         .selecting(
-            "Non-interface specifications in domain packages. Metadata ownership is exclusive: events, services, factories, specifications, then domain.model types.")
+            "Non-interface types in domain packages that are assignable to the configured specification role or whose simple name ends with Specification. Metadata ownership is exclusive: events, services, factories, specifications, then domain.model types.")
         .checking(
             "Direct or meta-annotations: types prohibit injectable, persistenceEntity and transactional roles; fields prohibit injectionSite and persistenceMapping; methods prohibit transactional and eventListener, plus injectionSite except on events; constructors prohibit injectionSite. Unclassified annotations are allowed by this check. Empty configured roles select no metadata; wiring is not established.");
   }
@@ -482,6 +454,27 @@ public final class AdvancedPatternRules implements DcaRuleSet {
   // ============================================================================
   // HELPERS
   // ============================================================================
+
+  /**
+   * A specification: assignable to the configured role, or named after the pattern. Both select,
+   * because a project may carry the marker without the suffix — as both reference samples do — or
+   * the suffix without the marker.
+   */
+  private static DescribedPredicate<JavaClass> specifications(DcaMarkers markers) {
+    DescribedPredicate<JavaClass> byRole =
+        JavaClass.Predicates.assignableTo(markers.specification());
+    DescribedPredicate<JavaClass> byName =
+        JavaClass.Predicates.simpleNameEndingWith("Specification");
+    return byRole
+        .or(byName)
+        .and(DescribedPredicate.not(JavaClass.Predicates.INTERFACES))
+        .and(DescribedPredicate.not(JavaClass.Predicates.simpleName("Specification")))
+        .and(
+            DescribedPredicate.not(
+                DescribedPredicate.describe(
+                    "the role's own type", c -> c.getName().equals(markers.specification()))))
+        .as("specifications");
+  }
 
   /**
    * Like ArchUnit's {@code haveOnlyFinalFields()}, but over {@code getAllFields()}: a mutable field

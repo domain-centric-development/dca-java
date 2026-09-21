@@ -157,4 +157,30 @@ class TacticalPatternRulesTest {
         violation.violations().stream().anyMatch(v -> v.contains("saveAsync")),
         violation.getMessage());
   }
+
+  /**
+   * The aggregate comes from the bound type argument, and the name must name it. A repository bound
+   * to one aggregate and named after another is what the name-only resolution could not see.
+   */
+  @Test
+  @DisplayName("DCA-TAC-016 reports a repository named after another aggregate than it binds")
+  void aRepositoryMustBeNamedAfterTheAggregateItBinds() {
+    DcaRuleViolation violation = Fixtures.violation(BAD, "DCA-TAC-016");
+
+    assertTrue(
+        violation.violations().stream()
+            .anyMatch(
+                v -> v.contains("CategoryRepository") && v.contains("name it OrderRepository")),
+        violation.getMessage());
+  }
+
+  /**
+   * A generic intermediate port binds a type variable, not an aggregate. Resolving its name would
+   * look for a class called "Audited" and report a violation with no remedy, so it is skipped.
+   */
+  @Test
+  @DisplayName("DCA-TAC-016 skips a generic intermediate repository port")
+  void aGenericIntermediateRepositoryPortIsSkipped() {
+    Fixtures.rule(GOOD, "DCA-TAC-016").check(Fixtures.arch(GOOD));
+  }
 }

@@ -456,7 +456,7 @@ public final class UseCaseRules implements DcaRuleSet {
     List<String> violations = new ArrayList<>();
     for (String root : arch.moduleRoots()) {
       String application = root + "." + layout.applicationSubpackage();
-      String shared = application + ".shared";
+      String shared = application + "." + layout.sharedSubpackage();
       // depth -> use case packages at that depth, both sorted for a stable message
       Map<Integer, TreeSet<String>> byDepth = new TreeMap<>();
       for (JavaClass candidate : arch.classes()) {

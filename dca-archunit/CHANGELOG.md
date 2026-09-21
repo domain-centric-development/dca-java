@@ -4,6 +4,40 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+**`DCA-TAC-016` reads the aggregate the repository binds, and the name must name it.** The rule
+resolved the aggregate from the interface name alone and never looked at the type argument, so
+`CategoryRepository extends Repository<Order, OrderId>` passed. It now takes the first type argument
+of the parameterised marker, requires it to be an aggregate root, and requires the interface's simple
+name to be that type plus `Repository`. A generic intermediate port — `AuditedRepository<T, ID>` —
+binds a type variable and is skipped instead of reported as "no class named Audited". Where the
+marker is not generic or is used raw, the old name resolution still applies. Decision R3 is withdrawn
+and replaced: both, not either.
+
+**`Specification` is a role, not only a suffix.** `DcaMarkers` gains `specification`;
+`DCA-ADV-017` (placement) and `DCA-ADV-018` (metadata ownership) select through the marker **or** the
+name. Both reference samples name their specifications after the predicate they express —
+`HasMinTotal`, `ActiveCart` — and carry the marker through an intermediate interface, so under
+name-only selection neither rule saw them and a container stereotype on one was reported by nothing.
+`DomainGateway` stays vocabulary; no rule reads it, and the marker says so.
+
+**Every violation can carry a remedy, and eleven more rules do.** See the entry above; with this
+release `DCA-TAC-016` names its remedy too.
+
+**Dead public API is gone while the version is unpublished.** Four unused package constants
+(`BUILDING_BLOCKS_PACKAGE`, `_TACTICAL_`, `_STRATEGIC_`, `_PORT_`) and the two public factory methods
+for the retired `DCA-ADV-003` and `DCA-TAC-022` are removed — the methods produced rule ids that
+`DcaRuleSelection` refuses and the report cannot place. `BUILDING_BLOCKS_PORT_IN_PACKAGE` and
+`…_PORT_OUT_PACKAGE` stay; they carry `DCA-USE-001` and `DCA-LAY-005`. A new test asserts that no rule
+set offers a retired id.
+
+**`DCA-NAM-003` and `DCA-HEX-009` say what they presume.** `DCA-NAM-003` states that the `I` prefix is
+a platform convention checked only in .NET. `DCA-HEX-009` and the `DcaMarkers` javadoc state that
+`withOutputPort` must be set whenever any other port role is, and that a vocabulary without a common
+port root should switch the id off rather than point the role at an unrelated type.
+
+**One more hard-wired segment.** `DCA-USE-014`'s depth check still read a literal `shared`; it reads
+the configured segment now, like the rest.
+
 **Every violation can carry a remedy, in both languages.** `DcaRule` gained `remedy()` and
 `checking(checks, remedy)`; `DcaRuleExecution` appends it as one `Fix:` line under the violations,
 prefixed with the rule id like every other line. Eleven rules name theirs — `DCA-CYC-005`,
