@@ -15,9 +15,6 @@ import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
 import dev.domaincentric.dca.archunit.DcaRuleViolation;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.IntegrationEventType;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -227,7 +224,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                       c ->
                           c.isAssignableTo(arch.layout().markers().domainEvent())
                               && !c.isInterface(),
-                      c -> !hasTimestampField(c),
+                      c -> !hasTimestampField(c, arch.layout().timestampTypes()),
                       c -> c.getName() + " does not have a timestamp field");
               failIfAny(
                   violations,
@@ -239,10 +236,13 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                 + " also implements DomainEvent.")
         .checking(
             "At least one field - declared by the class or inherited from a supertype, static or not, of any"
-                + " name - has the raw type java.time.Instant, java.time.LocalDateTime or java.time.ZonedDateTime;"
-                + " a record component of one of these types counts. OffsetDateTime, LocalDate, long or Date"
-                + " fields do not satisfy it, and a timestamp method without a backing field does not either."
-                + " Every offender is reported in one violation; an empty selection passes.");
+                + " name - has one of the configured timestamp types, by default java.time.Instant,"
+                + " OffsetDateTime, ZonedDateTime or LocalDateTime; a record component of one of these types"
+                + " counts. LocalDate, long or Date fields do not satisfy it, and a timestamp method without a"
+                + " backing field does not either - which is what the rule is for, because the marker already"
+                + " forces the accessor. A project whose own event vocabulary wraps the timestamp in a value"
+                + " object names that type with withTimestampTypes. Every offender is reported in one"
+                + " violation; an empty selection passes.");
   }
 
   // ============================================================================
@@ -486,13 +486,9 @@ public final class AdvancedPatternRules implements DcaRuleSet {
     return eventClass.getAllFields().stream().anyMatch(f -> SCHEMA_FIELDS.contains(f.getName()));
   }
 
-  private static boolean hasTimestampField(JavaClass eventClass) {
+  private static boolean hasTimestampField(JavaClass eventClass, List<String> timestampTypes) {
     return eventClass.getAllFields().stream()
-        .anyMatch(
-            f ->
-                f.getRawType().isEquivalentTo(Instant.class)
-                    || f.getRawType().isEquivalentTo(LocalDateTime.class)
-                    || f.getRawType().isEquivalentTo(ZonedDateTime.class));
+        .anyMatch(f -> timestampTypes.contains(f.getRawType().getName()));
   }
 
   private static List<String> violations(

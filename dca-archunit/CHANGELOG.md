@@ -20,6 +20,17 @@ team's decision, per project. `DCA-ADV-010` continues to keep it out of the appl
 `withDomainServiceSubpackage` goes with it — `DCA-ADV-009` was its only reader, and it was never
 released.
 
+**`DCA-ADV-008` follows a configurable list of timestamp types**, `withTimestampTypes(...)`, and
+`java.time.OffsetDateTime` joins the default beside `Instant`, `ZonedDateTime` and `LocalDateTime`.
+The rule asks that a domain event *stores* its occurrence time rather than computing it — the
+marker already forces the accessor, so a record that returns `Instant.EPOCH` from `occurredOn()`
+satisfies the compiler and loses the fact. With the shipped markers the list can never bite,
+because `DomainEvent` declares `Instant occurredOn()`. It bites a project that points the
+`domainEvent` role at its own marker and wraps the timestamp in a value object, which had no exit
+but excluding the id — and excluding it gave up the one thing the rule checks. A fixture proves
+both directions: the event is reported under the default list and passes once its own type is
+named.
+
 **`DCA-STR-009` is retired.** It selected on three hard-coded suffixes — `*EventTranslator`,
 `*ACL`, `*AntiCorruptionLayer` — and demanded an `..acl..` segment. Neither reference sample contains
 a class of any of those names or an `acl` package, so the rule selected nothing in the project's own

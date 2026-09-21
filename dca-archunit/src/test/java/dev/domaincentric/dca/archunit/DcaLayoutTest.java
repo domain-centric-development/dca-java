@@ -153,4 +153,23 @@ class DcaLayoutTest {
     assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withRepositorySuffix(""));
     assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withStoreSuffix("a.b"));
   }
+
+  @Test
+  void theTimestampTypesAreConfigurable() {
+    assertEquals(
+        java.util.List.of(
+            "java.time.Instant",
+            "java.time.OffsetDateTime",
+            "java.time.ZonedDateTime",
+            "java.time.LocalDateTime"),
+        DEFAULTS.timestampTypes());
+
+    DcaLayout own = DEFAULTS.withTimestampTypes("com.acme.shop.platform.Timestamp");
+    assertEquals(java.util.List.of("com.acme.shop.platform.Timestamp"), own.timestampTypes());
+    assertEquals("com.acme.shop", own.basePackage(), "the rest is unchanged");
+
+    // An empty list would report every event, which is never what a caller means.
+    assertThrows(IllegalArgumentException.class, DEFAULTS::withTimestampTypes);
+    assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withTimestampTypes(" "));
+  }
 }

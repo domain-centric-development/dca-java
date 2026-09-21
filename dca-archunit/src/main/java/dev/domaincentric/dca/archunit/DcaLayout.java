@@ -47,6 +47,13 @@ public final class DcaLayout {
   public static final String BUILDING_BLOCKS_PORT_OUT_PACKAGE =
       "dev.domaincentric.dca.buildingblocks.hexagonal.port.out..";
 
+  private static final List<String> DEFAULT_TIMESTAMP_TYPES =
+      List.of(
+          "java.time.Instant",
+          "java.time.OffsetDateTime",
+          "java.time.ZonedDateTime",
+          "java.time.LocalDateTime");
+
   private static final List<String> DEFAULT_THIRD_PARTY_ALLOWED_IN_DOMAIN =
       List.of(
           "java..",
@@ -78,6 +85,7 @@ public final class DcaLayout {
   private final String storeSuffix;
   private final String factorySuffix;
   private final String specificationSuffix;
+  private final List<String> timestampTypes;
   private final List<String> thirdPartyPackagesAllowedInDomain;
   private final DcaMarkers markers;
   private final FrameworkAnnotations frameworkAnnotations;
@@ -135,6 +143,7 @@ public final class DcaLayout {
     this.storeSuffix = requireSuffix(settings.storeSuffix, "storeSuffix");
     this.factorySuffix = requireSuffix(settings.factorySuffix, "factorySuffix");
     this.specificationSuffix = requireSuffix(settings.specificationSuffix, "specificationSuffix");
+    this.timestampTypes = requireTypeNames(settings.timestampTypes, "timestampTypes");
     this.thirdPartyPackagesAllowedInDomain =
         List.copyOf(
             Objects.requireNonNull(
@@ -177,6 +186,7 @@ public final class DcaLayout {
     defaults.storeSuffix = "Store";
     defaults.factorySuffix = "Factory";
     defaults.specificationSuffix = "Specification";
+    defaults.timestampTypes = DEFAULT_TIMESTAMP_TYPES;
     defaults.thirdPartyPackagesAllowedInDomain = DEFAULT_THIRD_PARTY_ALLOWED_IN_DOMAIN;
     defaults.markers = DcaMarkers.dca();
     FrameworkAnnotations.Detection detection = FrameworkAnnotations.detect();
@@ -208,6 +218,16 @@ public final class DcaLayout {
           name + " must be a single package segment, was '" + value + "'");
     }
     return value;
+  }
+
+  /** A non-empty list of fully qualified type names, none of them blank. */
+  private static List<String> requireTypeNames(List<String> values, String name) {
+    Objects.requireNonNull(values, name);
+    if (values.isEmpty()) {
+      throw new IllegalArgumentException(name + " must name at least one type");
+    }
+    values.forEach(value -> requireNotBlank(value, name));
+    return List.copyOf(values);
   }
 
   /** A class-name suffix: part of a Java identifier. */
@@ -404,6 +424,17 @@ public final class DcaLayout {
   }
 
   /**
+   * Types a domain event may store its occurrence time in, by fully qualified name. Replaces the
+   * default list ({@code java.time.Instant}, {@code OffsetDateTime}, {@code ZonedDateTime}, {@code
+   * LocalDateTime}) - a project whose own event vocabulary wraps the timestamp in a value object
+   * names that type here instead of excluding {@code DCA-ADV-008}. At least one name is required:
+   * an empty list would report every event.
+   */
+  public DcaLayout withTimestampTypes(String... typeNames) {
+    return copy(settings -> settings.timestampTypes = List.of(typeNames));
+  }
+
+  /**
    * Third-party packages the domain layer may depend on (ArchUnit patterns). Replaces the default
    * list ({@code java..}, {@code lombok..}, commons-lang3, commons-collections4, jspecify).
    */
@@ -497,6 +528,7 @@ public final class DcaLayout {
     settings.storeSuffix = storeSuffix;
     settings.factorySuffix = factorySuffix;
     settings.specificationSuffix = specificationSuffix;
+    settings.timestampTypes = timestampTypes;
     settings.thirdPartyPackagesAllowedInDomain = thirdPartyPackagesAllowedInDomain;
     settings.markers = markers;
     settings.frameworkAnnotations = frameworkAnnotations;
@@ -531,6 +563,7 @@ public final class DcaLayout {
     String storeSuffix;
     String factorySuffix;
     String specificationSuffix;
+    List<String> timestampTypes;
     List<String> thirdPartyPackagesAllowedInDomain;
     DcaMarkers markers;
     FrameworkAnnotations frameworkAnnotations;
@@ -646,6 +679,11 @@ public final class DcaLayout {
   /** Name suffix of a specification, {@code Specification} by default. */
   public String specificationSuffix() {
     return specificationSuffix;
+  }
+
+  /** Types a domain event may store its occurrence time in, read by {@code DCA-ADV-008}. */
+  public List<String> timestampTypes() {
+    return timestampTypes;
   }
 
   public List<String> thirdPartyPackagesAllowedInDomain() {
