@@ -45,7 +45,6 @@ public final class StrategicPatternRules implements DcaRuleSet {
             outgoingAdaptersOnlyUseOpenHostServices(),
             integrationEventsResideInEventsPackages(),
             integrationEventsAreRecords(),
-            antiCorruptionLayerComponentsResideInAclPackages(),
             eventListenersUseAntiCorruptionLayer(),
             atLeastOneBoundedContextIsDeclared(),
             atLeastOneModuleOwnsALayer());
@@ -367,32 +366,6 @@ public final class StrategicPatternRules implements DcaRuleSet {
             "The class is final or a record with final inherited instance fields and no instance setter methods - a name heuristic: set followed by an upper-case letter, with parameters, returning void (settle(x) is not a setter)."
                 + " Referenced objects and collection contents are not inspected. Interfaces are excluded.",
             "declare the event as a final record");
-  }
-
-  public static DcaRule antiCorruptionLayerComponentsResideInAclPackages() {
-    return DcaRule.of(
-            "DCA-STR-009",
-            "Anti-Corruption Layer components must be in acl packages",
-            "Anti-Corruption Layer components must be in 'acl' packages for clear architectural intent"
-                + " (DDD Strategic Pattern)",
-            arch ->
-                classes()
-                    .that()
-                    .haveSimpleNameEndingWith("EventTranslator")
-                    .or()
-                    .haveSimpleNameEndingWith("ACL")
-                    .or()
-                    .haveSimpleNameEndingWith("AntiCorruptionLayer")
-                    .should()
-                    .resideInAPackage("..acl..")
-                    .allowEmptyShould(true))
-        .selecting(
-            "Classes anywhere on the classpath under scan whose simple name ends with"
-                + " EventTranslator, ACL or AntiCorruptionLayer - selected by name alone, no marker"
-                + " or annotation is read.")
-        .checking(
-            "Each resides in a package whose path contains an acl segment (..acl..), at any depth."
-                + " A translation class named otherwise is neither selected nor checked.");
   }
 
   /** DCA-STR-010 — documentation only, never fails. */

@@ -20,6 +20,20 @@ team's decision, per project. `DCA-ADV-010` continues to keep it out of the appl
 `withDomainServiceSubpackage` goes with it — `DCA-ADV-009` was its only reader, and it was never
 released.
 
+**`DCA-STR-009` is retired.** It selected on three hard-coded suffixes — `*EventTranslator`,
+`*ACL`, `*AntiCorruptionLayer` — and demanded an `..acl..` segment. Neither reference sample contains
+a class of any of those names or an `acl` package, so the rule selected nothing in the project's own
+code. An anti-corruption layer lives in the incoming adapter, which the onion and hexagonal sets
+already govern; whether it gets an own segment there is a filing decision. No replacement id: the
+pattern stays in the guide and the catalog. The good fixture moves out of its `acl` package, where it
+now proves that a translator directly in the incoming adapter passes.
+
+**The retirement reason of `DCA-TAC-022` is corrected.** It read "Value model already covered" with
+`DCA-TAC-008..012` as replacement, which promised a coverage that does not exist: those rules select
+types that already carry the value role, while `TAC-022` selected by name and required the type to
+*be* a value record. The entry now names the reason the identity was actually given up — the
+selection matched `Enriched*`, the sample's own pattern name, which a general rule may not carry.
+
 **`DCA-ADV-013` and `DCA-ADV-017` are titled after what they check.** "Factories should implement
 Factory Marker Interface" selected the marked types and checked the *name*; "Specifications must end
 with 'Specification'" selected by the name and checked the *placement* — and since the specification
