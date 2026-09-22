@@ -845,14 +845,13 @@ public final class ContextMapRules implements DcaRuleSet {
             "Diagnostic: Display declared context map",
             "Printing the declared edges makes the executable context map reviewable at a glance",
             arch -> {
-              System.out.println("=== Context Map (declared) ===");
+              List<String> observed = new ArrayList<>();
               for (String pkg : arch.boundedContextPackages()) {
                 String source = arch.contextName(pkg);
                 for (Upstream u : arch.packageAnnotations(pkg, Upstream.class)) {
                   for (Upstream.Consumes channel : u.via()) {
-                    System.out.println(
-                        "  "
-                            + source
+                    observed.add(
+                        source
                             + " --["
                             + u.translation()
                             + " / "
@@ -862,9 +861,8 @@ public final class ContextMapRules implements DcaRuleSet {
                   }
                 }
                 for (ExternalUpstream e : arch.packageAnnotations(pkg, ExternalUpstream.class)) {
-                  System.out.println(
-                      "  "
-                          + source
+                  observed.add(
+                      source
                           + " --["
                           + e.translation()
                           + " / "
@@ -873,17 +871,17 @@ public final class ContextMapRules implements DcaRuleSet {
                           + e.name());
                 }
                 for (Partnership p : arch.packageAnnotations(pkg, Partnership.class)) {
-                  System.out.println("  " + source + " <--[PARTNERSHIP]--> " + p.context());
+                  observed.add(source + " <--[PARTNERSHIP]--> " + p.context());
                 }
               }
-              System.out.println("==============================");
+              return observed;
             })
         .selecting(
             "Every @Upstream, @ExternalUpstream and @Partnership declaration on the"
                 + " package-info of every package carrying @BoundedContext, reading context()"
                 + " or name(), translation(), and via() or interaction().")
         .checking(
-            "Informational - prints every declared edge to standard output and never"
+            "Informational - reports every declared edge in the rule's own outcome and never"
                 + " fails; it carries no assertion. status() is not printed, so a PLANNED edge"
                 + " is listed like an implemented one.");
   }

@@ -262,6 +262,7 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                 + " everything escape to a generic handler or catches a generic type and answers"
                 + " every outcome the same way; whether it does is not visible in the import model",
             arch -> {
+              List<String> observed = new ArrayList<>();
               Map<String, List<JavaClass>> drivingByPackage = new TreeMap<>();
               Set<String> packagesThatName = new HashSet<>();
               for (JavaClass type : arch.classes()) {
@@ -285,14 +286,14 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                     if (packagesThatName.contains(pkg)) {
                       return;
                     }
-                    System.out.println(
-                        "[DCA-ERR-006] "
-                            + pkg
+                    observed.add(
+                        pkg
                             + ": drives an input port and names no failure type of the inner layers"
                             + " ("
                             + driving.stream().map(JavaClass::getSimpleName).sorted().toList()
                             + ")");
                   });
+              return observed;
             })
         .selecting(
             "Incoming adapter packages of every module root (<module>.adapter.incoming..) that hold"

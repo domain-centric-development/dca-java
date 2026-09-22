@@ -54,7 +54,7 @@ public final class LayeredRules implements DcaRuleSet {
             "Traditional layering (application accessed only by incoming adapters) contradicts Ports"
                 + " and Adapters, where outgoing adapters implement application-level output ports;"
                 + " the hexagonal rules cover the intended dependency direction",
-            arch -> {})
+            arch -> List.of())
         .selecting(
             "Informational - selects nothing. ArchUnit's layered-architecture definition (adapter"
                 + " layer accesses application, application accesses domain, domain accesses"

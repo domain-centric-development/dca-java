@@ -1,6 +1,7 @@
 package dev.domaincentric.dca.archunit;
 
 import com.tngtech.archunit.lang.ArchRule;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -28,6 +29,15 @@ public interface DcaRule {
   enum Kind {
     ENFORCED,
     INFORMATIONAL
+  }
+
+  /**
+   * What an informational rule observed, in reading order — empty for every enforced rule and for a
+   * diagnostic that found nothing. It asserts nothing, so this never fails a build; {@link
+   * DcaRuleExecution} carries the lines in the rule's outcome.
+   */
+  default List<String> observe(DcaArchitecture architecture) {
+    return List.of();
   }
 
   /** Whether this entry asserts policy or only reports information. */
@@ -101,17 +111,24 @@ public interface DcaRule {
     return new Undescribed(id, title, rationale, Objects.requireNonNull(check), null);
   }
 
-  /** A diagnostic entry, counted separately from enforced rules. */
+  /**
+   * A diagnostic entry, counted separately from enforced rules. It asserts nothing, so it does not
+   * throw: what it observes it returns, and {@link DcaRuleExecution} carries the lines in the
+   * rule's outcome. Returning an empty list means there was nothing to observe.
+   */
   static Undescribed informational(
-      String id, String title, String rationale, Consumer<DcaArchitecture> diagnostic) {
-    Undescribed result = check(id, title, rationale, diagnostic);
+      String id, String title, String rationale, Function<DcaArchitecture, List<String>> report) {
+    Objects.requireNonNull(report, "report");
+    Undescribed result = check(id, title, rationale, architecture -> {});
     result.kind = Kind.INFORMATIONAL;
+    result.report = report;
     return result;
   }
 
   /** A rule whose mechanics are not yet described; not a {@code DcaRule} until they are. */
   final class Undescribed {
     private Kind kind = Kind.ENFORCED;
+    private Function<DcaArchitecture, List<String>> report;
     private final String id;
     private final String title;
     private final String rationale;
@@ -166,7 +183,8 @@ public interface DcaRule {
           remedy == null ? null : requireText(remedy, "remedy", rule.id),
           rule.check,
           rule.archRule,
-          rule.kind);
+          rule.kind,
+          rule.report);
     }
   }
 
@@ -186,6 +204,11 @@ public interface DcaRule {
       return kind;
     }
 
+    @Override
+    public List<String> observe(DcaArchitecture architecture) {
+      return report == null ? List.of() : List.copyOf(report.apply(architecture));
+    }
+
     private final String id;
     private final String title;
     private final String rationale;
@@ -194,6 +217,7 @@ public interface DcaRule {
     private final String remedy;
     private final Consumer<DcaArchitecture> check;
     private final Function<DcaArchitecture, ArchRule> archRule;
+    private final Function<DcaArchitecture, List<String>> report;
 
     SimpleRule(
         String id,
@@ -204,8 +228,10 @@ public interface DcaRule {
         String remedy,
         Consumer<DcaArchitecture> check,
         Function<DcaArchitecture, ArchRule> archRule,
-        Kind kind) {
+        Kind kind,
+        Function<DcaArchitecture, List<String>> report) {
       this.kind = kind;
+      this.report = report;
       this.id = Objects.requireNonNull(id);
       this.title = Objects.requireNonNull(title);
       this.rationale = Objects.requireNonNull(rationale);

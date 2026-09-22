@@ -67,24 +67,22 @@ public final class StrategicPatternRules implements DcaRuleSet {
             "Diagnostic: Display discovered bounded contexts",
             "Making the discovered contexts visible shows which packages the strategic rules govern",
             arch -> {
-              System.out.println("=== Discovered Bounded Contexts ===");
+              List<String> observed = new ArrayList<>();
               for (Map.Entry<String, BoundedContext> e : arch.boundedContexts().entrySet()) {
-                System.out.println("  " + e.getValue().name() + ": " + e.getKey());
-                if (!e.getValue().description().isEmpty()) {
-                  System.out.println("    Description: " + e.getValue().description());
-                }
+                String description =
+                    e.getValue().description().isEmpty() ? "" : " - " + e.getValue().description();
+                observed.add(e.getValue().name() + ": " + e.getKey() + description);
               }
-              System.out.println("=== Shared Kernel ===");
-              System.out.println("  Package: " + arch.sharedKernelPackage().orElse("<none>"));
-              System.out.println("==================================");
+              observed.add("shared kernel: " + arch.sharedKernelPackage().orElse("<none>"));
+              return observed;
             })
         .selecting(
             "Every package whose package-info carries @BoundedContext, at any depth below the base"
                 + " package, plus the package annotated with @SharedKernel if there is one. Modules"
                 + " that own layers without declaring @BoundedContext are not listed.")
         .checking(
-            "Diagnostic - prints each discovered context's name, package and description and the"
-                + " shared kernel package to standard output. It asserts nothing and never fails.");
+            "Diagnostic - reports each discovered context's name, package and description and the"
+                + " shared kernel package in the rule's own outcome. It asserts nothing and never fails.");
   }
 
   /** DCA-STR-002. */
@@ -376,7 +374,7 @@ public final class StrategicPatternRules implements DcaRuleSet {
                 + " Layer",
             "Consumed integration events are translated into the consuming context's own language"
                 + " before they reach its domain — verified by code review, not statically",
-            arch -> {})
+            arch -> List.of())
         .selecting("Informational - selects nothing and never fails; it carries doctrine only.")
         .checking(
             "Nothing is asserted. Whether a consumed integration event is translated into the"

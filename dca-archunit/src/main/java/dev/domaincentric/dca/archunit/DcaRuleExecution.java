@@ -36,6 +36,17 @@ public final class DcaRuleExecution {
           selection.reasonFor(rule.id()).orElse("switched off, no reason recorded"));
     }
 
+    // A diagnostic asserts nothing: it observes and hands back what it saw, so it never fails and
+    // its lines travel in the outcome instead of going to standard output, where no report and no
+    // pipeline stage would see them.
+    if (rule.kind() == DcaRule.Kind.INFORMATIONAL) {
+      List<String> observed = rule.observe(architecture);
+      return new DcaRuleOutcome(
+          rule.id(),
+          DcaRuleOutcome.Status.PASSED,
+          observed.isEmpty() ? null : withRuleId(String.join("\n", observed), rule.id()));
+    }
+
     List<Pattern> ignored = compile(selection.ignoredViolationPatterns(rule.id()));
     Optional<String> violations = evaluate(rule, architecture, selection, ignored);
     if (violations.isEmpty()) {

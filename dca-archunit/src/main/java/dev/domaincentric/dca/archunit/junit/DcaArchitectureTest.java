@@ -228,7 +228,12 @@ public abstract class DcaArchitectureTest {
             case WARNED -> Assumptions.abort("WARNING — " + outcome.message());
             case SKIPPED -> Assumptions.abort("switched off — " + outcome.message());
             case PASSED -> {
-              // nothing to report
+              // A diagnostic that observed something is reported the way a warning is: as an
+              // aborted test carrying its text. JUnit shows no message for a passing test, and
+              // stdout reaches no report and no pipeline stage.
+              if (outcome.message() != null) {
+                Assumptions.abort("INFO — " + outcome.message());
+              }
             }
           }
         });

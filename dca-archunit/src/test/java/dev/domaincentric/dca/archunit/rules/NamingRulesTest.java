@@ -33,16 +33,13 @@ class NamingRulesTest {
   /** DCA-NAM-002 lists unannotated use cases but, like DCA-NAM-001, never a record. */
   @Test
   void theDiagnosticExcludesRecords() {
-    var out = System.out;
-    var captured = new java.io.ByteArrayOutputStream();
-    System.setOut(new java.io.PrintStream(captured));
-    try {
-      Fixtures.rule(FIXTURES + ".bad", "DCA-NAM-002").check(Fixtures.arch(FIXTURES + ".bad"));
-    } finally {
-      System.setOut(out);
-    }
-    String printed = captured.toString();
-    assertTrue(printed.contains("CancelOrderUseCase"), printed);
-    assertFalse(printed.contains("ShipOrderUseCase"), printed);
+    var observed =
+        Fixtures.rule(FIXTURES + ".bad", "DCA-NAM-002").observe(Fixtures.arch(FIXTURES + ".bad"));
+
+    assertTrue(
+        observed.stream().anyMatch(line -> line.contains("CancelOrderUseCase")),
+        observed.toString());
+    assertFalse(
+        observed.stream().anyMatch(line -> line.contains("ShipOrderUseCase")), observed.toString());
   }
 }

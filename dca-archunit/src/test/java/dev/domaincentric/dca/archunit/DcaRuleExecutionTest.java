@@ -2,6 +2,7 @@ package dev.domaincentric.dca.archunit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -274,6 +275,52 @@ class DcaRuleExecutionTest {
     assertTrue(
         outcome.message().contains("[DCA-NAM-001] Fix: rename the class to *UseCase"),
         outcome.message());
+  }
+
+  /**
+   * F34 of the 2026-09-21 review: the diagnostics wrote to {@code System.out}, where no report and
+   * no pipeline stage sees them. What a diagnostic observes now travels in its outcome — it still
+   * passes, because it asserts nothing, and it carries the rule id like every other line.
+   */
+  @Test
+  void aDiagnosticPassesAndCarriesWhatItObserved() {
+    DcaRule diagnostic =
+        DcaRule.informational(
+                "DCA-NAM-002",
+                "Diagnostic: observed something",
+                "a diagnostic asserts nothing",
+                architecture -> java.util.List.of("one.Thing: says so", "another.Thing: too"))
+            .selecting("nothing")
+            .checking("nothing");
+
+    DcaRuleOutcome outcome =
+        DcaRuleExecution.execute(diagnostic, Fixtures.arch(BAD), DcaRuleSelection.all());
+
+    assertEquals(DcaRuleOutcome.Status.PASSED, outcome.status());
+    assertEquals(
+        2,
+        outcome.message().lines().filter(line -> line.startsWith("[DCA-NAM-002]")).count(),
+        outcome.message());
+    assertTrue(outcome.message().contains("one.Thing: says so"), outcome.message());
+  }
+
+  /** A diagnostic that saw nothing says nothing — no empty report to read past. */
+  @Test
+  void aDiagnosticThatObservedNothingCarriesNoMessage() {
+    DcaRule quiet =
+        DcaRule.informational(
+                "DCA-STR-010",
+                "Diagnostic: quiet",
+                "nothing to say",
+                architecture -> java.util.List.of())
+            .selecting("nothing")
+            .checking("nothing");
+
+    DcaRuleOutcome outcome =
+        DcaRuleExecution.execute(quiet, Fixtures.arch(BAD), DcaRuleSelection.all());
+
+    assertEquals(DcaRuleOutcome.Status.PASSED, outcome.status());
+    assertNull(outcome.message());
   }
 
   /** A rule that names none is unchanged: no empty Fix line. */

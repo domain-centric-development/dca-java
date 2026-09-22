@@ -94,17 +94,15 @@ class DomainMetadataTest {
     var layout =
         DcaLayout.forBasePackage(root).withFrameworkAnnotations(FrameworkAnnotations.spring());
     var architecture = DcaArchitecture.of(layout, new ClassFileImporter().importPackages(root));
-    var bytes = new java.io.ByteArrayOutputStream();
-    var original = System.out;
-    try {
-      System.setOut(new java.io.PrintStream(bytes));
-      NamingRules.useCasesAreServices(layout).check(architecture);
-    } finally {
-      System.setOut(original);
-    }
+
+    // The diagnostic observes and hands the lines back; it neither throws nor prints.
+    var observed = NamingRules.useCasesAreServices(layout).observe(architecture);
+
     assertTrue(
-        bytes.toString().contains("application.usecases.placeorder.Place"), bytes.toString());
+        observed.stream().anyMatch(line -> line.contains("application.usecases.placeorder.Place")),
+        observed.toString());
     assertTrue(
-        bytes.toString().contains("register by configuration or annotate"), bytes.toString());
+        observed.stream().anyMatch(line -> line.contains("register by configuration or annotate")),
+        observed.toString());
   }
 }
