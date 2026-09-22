@@ -406,6 +406,11 @@ What a consumer may rely on, and what may change in a patch:
 | `dev.domaincentric.dca.buildingblocks..` — every marker and port type | Test fixtures, and anything under a `catalog` or `spi.internal` package |
 | The JUnit base class `DcaArchitectureTest` | |
 
+Every published jar carries an `Automatic-Module-Name` — `dev.domaincentric.dca.buildingblocks`,
+`…dca.archunit`, `…dca.spring`, `…dca.archunit.springmodulith` — so a consumer on the module path
+writes a stable name into their `module-info` instead of one derived from the file name. The jars are
+not real modules; the name is a promise about what one would be called.
+
 The rule-set classes are `public` because the catalog generator and the JUnit integration are in a
 different package, not because they are meant to be called directly. Build a run through `DcaRules`
 and a `DcaRuleSelection`; that is the supported entry point, and it is the one that applies severities,

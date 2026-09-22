@@ -4,6 +4,11 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+**Every published jar names its module.** `Automatic-Module-Name` is set on all four artifacts
+(`dev.domaincentric.dca.buildingblocks`, `…dca.archunit`, `…dca.spring`, `…dca.archunit.springmodulith`),
+so a consumer on the module path gets a stable name rather than one derived from the file name. A
+`verifyModuleName` task in `check` fails when the entry is missing.
+
 **The rendered context map is sorted.** `ContextMapRenderer` iterated the `@Upstream` and
 `@ExternalUpstream` declarations in the order they appear in the source, so two code bases that
 declare the same relationships in a different order rendered two documents that could not be

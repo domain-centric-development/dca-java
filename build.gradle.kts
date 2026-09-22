@@ -61,9 +61,42 @@ subprojects {
         tasks.named("check") { dependsOn(verifyFrameworkFree) }
     }
 
-    // Every published jar carries the license it is released under.
+    // Every published jar carries the license it is released under, and the module name a consumer
+    // on the module path writes into their module-info. The name is the artifact's own root package,
+    // so it stays valid if the jar ever becomes a real module; without it, the module name would be
+    // derived from the file name and change with every rename.
+    val automaticModuleName = when (name) {
+        "dca-building-blocks" -> "dev.domaincentric.dca.buildingblocks"
+        "dca-archunit" -> "dev.domaincentric.dca.archunit"
+        "dca-spring" -> "dev.domaincentric.dca.spring"
+        "dca-archunit-spring-modulith" -> "dev.domaincentric.dca.archunit.springmodulith"
+        else -> null
+    }
     tasks.withType<Jar>().configureEach {
         from(rootProject.layout.projectDirectory.file("LICENSE")) { into("META-INF") }
+        if (automaticModuleName != null && this.name == "jar") {
+            manifest { attributes("Automatic-Module-Name" to automaticModuleName) }
+        }
+    }
+
+    if (automaticModuleName != null) {
+        val verifyModuleName = tasks.register("verifyModuleName") {
+            group = "verification"
+            description = "Fails if the jar of $name carries no Automatic-Module-Name"
+            val jar = tasks.named<Jar>("jar")
+            dependsOn(jar)
+            val archive = jar.flatMap { it.archiveFile }
+            val expected = automaticModuleName
+            doLast {
+                val found = java.util.jar.JarFile(archive.get().asFile).use { file ->
+                    file.manifest?.mainAttributes?.getValue("Automatic-Module-Name")
+                }
+                check(found == expected) {
+                    "$name: expected Automatic-Module-Name '$expected' in the jar manifest, found ${found ?: "none"}"
+                }
+            }
+        }
+        tasks.named("check") { dependsOn(verifyModuleName) }
     }
 
     extensions.configure<com.diffplug.gradle.spotless.SpotlessExtension> {
