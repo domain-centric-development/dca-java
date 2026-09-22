@@ -27,11 +27,11 @@ import java.util.TreeSet;
  * of the {@code @BoundedContext}, {@code @Upstream}, {@code @ExternalUpstream} and
  * {@code @Partnership} package annotations.
  *
- * <p>Opt-in, not a rule: typical use is a test that regenerates {@code docs/context-map.md} and
- * fails when the committed file was stale.
+ * <p>Opt-in, not a rule: typical use is a test that regenerates the generated map under {@code
+ * docs/architecture/} and fails when the committed file was stale.
  *
  * <pre>{@code
- * ContextMapRenderer.of(arch).withTitle("Context Map").writeTo(Path.of("docs/context-map.md"));
+ * ContextMapRenderer.of(arch).withTitle("Context Map").writeTo(Path.of("docs/architecture/context-map.md"));
  * }</pre>
  */
 public final class ContextMapRenderer {

@@ -370,7 +370,7 @@ void renderContextMap() {
   ContextMapRenderer.of(architecture())
       .includeExternalSystems(true)
       .includePlanned(true)
-      .writeTo(Path.of("docs/context-map.md"));
+      .writeTo(Path.of("docs/architecture/context-map.md"));
 }
 ```
 
