@@ -1,9 +1,11 @@
 package dev.domaincentric.dca.archunit.rules;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ConditionEvents;
@@ -28,6 +30,10 @@ import java.util.function.Predicate;
  * Specifications); Vaughn Vernon, <i>Implementing DDD</i> (Domain Events for eventual consistency).
  */
 public final class AdvancedPatternRules implements DcaRuleSet {
+
+  /** The methods every object has; they carry no domain parameters and are not operations. */
+  private static final java.util.Set<String> OBJECT_METHODS =
+      java.util.Set.of("equals", "hashCode", "toString");
 
   private static final java.util.Set<String> SCHEMA_FIELDS =
       java.util.Set.of("schemaVersion", "eventVersion", "contractVersion");
@@ -54,7 +60,9 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             factoriesHaveNoFrameworkAnnotations(),
             factoriesAreStateless(),
             specificationsResideInDomain(),
-            specificationsHaveNoFrameworkAnnotations());
+            specificationsHaveNoFrameworkAnnotations(),
+            modelTypesDoNotUseDomainServices(),
+            domainServiceOperationsTakeAModelObject());
   }
 
   @Override
@@ -269,6 +277,91 @@ public final class AdvancedPatternRules implements DcaRuleSet {
         .checking(
             "Each resides in a domain package of some module root (<module>.domain..). An empty selection"
                 + " passes.");
+  }
+
+  public DcaRule modelTypesDoNotUseDomainServices() {
+    return DcaRule.of(
+            "DCA-ADV-019",
+            "Aggregates, entities and value objects must not use domain services",
+            "A domain service exists for logic that spans several aggregates, so the application"
+                + " calls it; a model type that reaches for one would drive another aggregate from"
+                + " inside its own",
+            arch ->
+                noClasses()
+                    .that()
+                    .areAssignableTo(arch.layout().markers().aggregateRoot())
+                    .or()
+                    .areAssignableTo(arch.layout().markers().entity())
+                    .or()
+                    .areAssignableTo(arch.layout().markers().value())
+                    .should()
+                    .accessClassesThat()
+                    .areAssignableTo(arch.layout().markers().domainService())
+                    .allowEmptyShould(true))
+        .selecting(
+            "Classes anywhere on the classpath under scan that carry the aggregate-root, entity or"
+                + " value role.")
+        .checking(
+            "None of them calls a method of, reads a field of, or instantiates a type carrying the"
+                + " domain-service role. Holding one as a parameter or a field type is not an"
+                + " access and is not reported. A domain service calling another domain service is"
+                + " outside this selection. An empty selection passes.",
+            "let the use case call the domain service and hand the model the result");
+  }
+
+  public DcaRule domainServiceOperationsTakeAModelObject() {
+    return DcaRule.check(
+            "DCA-ADV-020",
+            "Domain service operations take an aggregate or an entity",
+            "A domain service works on the model itself; an operation that only takes extracted"
+                + " values moves the decision out of the domain and into its caller",
+            arch -> {
+              CollectedViolations collected =
+                  CollectedViolations.withHeader(
+                      "A domain service operation takes at least one aggregate or entity");
+              String aggregateRoot = arch.layout().markers().aggregateRoot();
+              String entity = arch.layout().markers().entity();
+              for (JavaClass type :
+                  arch.classes()
+                      .that(
+                          DescribedPredicate.describe(
+                              "domain services",
+                              candidate ->
+                                  candidate.isAssignableTo(arch.layout().markers().domainService())
+                                      && !candidate.isInterface()))) {
+                for (JavaMethod method : type.getMethods()) {
+                  if (!method.getModifiers().contains(JavaModifier.PUBLIC)
+                      || method.getModifiers().contains(JavaModifier.SYNTHETIC)
+                      || method.getModifiers().contains(JavaModifier.BRIDGE)
+                      || OBJECT_METHODS.contains(method.getName())) {
+                    continue;
+                  }
+                  boolean takesModelObject =
+                      method.getRawParameterTypes().stream()
+                          .anyMatch(
+                              parameter ->
+                                  parameter.isAssignableTo(aggregateRoot)
+                                      || parameter.isAssignableTo(entity));
+                  collected.require(
+                      takesModelObject,
+                      type.getName()
+                          + "."
+                          + method.getName()
+                          + " takes no aggregate and no entity");
+                }
+              }
+              collected.throwIfAny();
+            })
+        .selecting(
+            "Public methods declared on non-interface classes carrying the domain-service role,"
+                + " except the methods every object has (equals, hashCode, toString) and compiler"
+                + " generated ones.")
+        .checking(
+            "At least one parameter of the method carries the aggregate-root or the entity role."
+                + " Value objects and foreign facts may be passed alongside but do not satisfy the"
+                + " check on their own: a calculation that needs no aggregate is behaviour of the"
+                + " value object or the aggregate, not a domain service. An empty selection passes.",
+            "pass the aggregate itself, or move the operation onto the value object it computes on");
   }
 
   public DcaRule domainServicesHaveNoFrameworkAnnotations() {

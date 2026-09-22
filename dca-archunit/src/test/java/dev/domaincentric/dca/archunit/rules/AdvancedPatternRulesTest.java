@@ -25,8 +25,8 @@ class AdvancedPatternRulesTest {
   void setHasExpectedShape() {
     AdvancedPatternRules set = new AdvancedPatternRules(DcaLayout.forBasePackage(GOOD));
     assertEquals("advanced", set.name());
-    assertEquals(16, set.rules().size());
-    assertEquals(16, set.rules().stream().map(DcaRule::id).distinct().count());
+    assertEquals(18, set.rules().size());
+    assertEquals(18, set.rules().stream().map(DcaRule::id).distinct().count());
     Fixtures.assertIdsAreSequential(set, "ADV");
   }
 
@@ -39,6 +39,28 @@ class AdvancedPatternRulesTest {
   @TestFactory
   Stream<DynamicTest> badFixtureFails() {
     return Fixtures.badFixtureFails(AdvancedPatternRules::new, BAD);
+  }
+
+  @Test
+  @DisplayName("DCA-ADV-019 reports an aggregate that calls and constructs a domain service")
+  void anAggregateMustNotReachForADomainService() {
+    String message = Fixtures.failure(BAD, "DCA-ADV-019").getMessage();
+
+    assertTrue(message.contains("SelfPricingOrder"), message);
+  }
+
+  /**
+   * The measure is Evans' "parameters and results should be domain objects", tightened to the
+   * aggregate: a calculation that needs no aggregate is behaviour of the value object it computes
+   * on, not a domain service.
+   */
+  @Test
+  @DisplayName("DCA-ADV-020 reports an operation that takes only values")
+  void aDomainServiceOperationTakesTheAggregate() {
+    String message = Fixtures.failure(BAD, "DCA-ADV-020").getMessage();
+
+    assertTrue(message.contains("OrderTotalCalculator.withTax"), message);
+    assertTrue(message.contains("OrderCounter.increment"), message);
   }
 
   /**

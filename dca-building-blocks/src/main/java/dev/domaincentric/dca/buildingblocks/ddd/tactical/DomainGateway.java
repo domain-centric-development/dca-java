@@ -4,10 +4,17 @@ package dev.domaincentric.dca.buildingblocks.ddd.tactical;
  * Marker interface for Domain Gateways.
  *
  * <p>A Domain Gateway is an interface declared in the <b>domain layer</b> that the domain itself
- * uses to consult external facts or delegate technology-bound operations, without coupling the
- * domain to framework or infrastructure types. The implementation lives outside the domain
- * (typically in an outgoing adapter), but the contract is owned by the domain and expressed in
- * domain language.
+ * uses to obtain facts it does not hold, or to delegate a technology-bound computation, without
+ * coupling the domain to framework or infrastructure types. The implementation lives outside the
+ * domain (typically in an outgoing adapter), but the contract is owned by the domain and expressed
+ * in domain language.
+ *
+ * <p><b>It never writes to the outside.</b> A gateway enriches the model with information so that
+ * the model can decide; it does not change the state of any external system. Persisting, sending,
+ * publishing and calling a remote operation that has an effect are the application's business,
+ * through an output port. A computation that touches nothing outside the process — hashing a
+ * password, converting a currency with a supplied rate — is a gateway, because no external state
+ * changes.
  *
  * <p><b>How it differs from related concepts:</b>
  *
@@ -30,7 +37,7 @@ package dev.domaincentric.dca.buildingblocks.ddd.tactical;
  *   <li>No framework dependencies in the interface
  *   <li>Implementation in the outgoing adapter layer
  *   <li>Typically called by aggregates, entities, or domain services
- *   <li>Side-effect-free or read-only operations are the typical case
+ *   <li>Read-only towards the outside: no external state is created, changed or removed
  * </ul>
  *
  * <p><b>Example use cases:</b>

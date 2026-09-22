@@ -43,6 +43,14 @@ class FrameworkNeutralityTest {
   private static final Pattern EXAMPLE_MARKER =
       Pattern.compile("for\\s+example|e\\.g\\.|such\\s+as|one\\s+implementation|for\\s+instance");
 
+  /**
+   * Code blocks are exempt on purpose (decision of 2026-09-22). What has to stay transferable to
+   * any industry is the normative text — a rule's title, rationale, {@code selects} and {@code
+   * checks}, and the prose of a building block. An example needs a domain to be an example at all,
+   * and the shop is the one every reader of this project already knows; a deliberately neutral
+   * {@code FooService} teaches less. So the guard reads the prose and skips what is inside {@code
+   * <pre>} and {@code @code}.
+   */
   private static final Pattern CODE =
       Pattern.compile("<pre>.*?</pre>|\\{@(?:code|link|linkplain)\\s[^}]*}", Pattern.DOTALL);
 

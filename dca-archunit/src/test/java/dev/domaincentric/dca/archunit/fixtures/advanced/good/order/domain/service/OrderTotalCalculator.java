@@ -1,5 +1,6 @@
 package dev.domaincentric.dca.archunit.fixtures.advanced.good.order.domain.service;
 
+import dev.domaincentric.dca.archunit.fixtures.advanced.good.order.domain.model.Order;
 import dev.domaincentric.dca.archunit.fixtures.advanced.good.sharedkernel.domain.model.Money;
 import dev.domaincentric.dca.buildingblocks.ddd.tactical.DomainService;
 import java.math.BigDecimal;
@@ -11,7 +12,8 @@ public final class OrderTotalCalculator implements DomainService {
     this.taxRate = taxRate;
   }
 
-  public Money withTax(Money net) {
-    return new Money(net.amount().multiply(BigDecimal.ONE.add(taxRate)));
+  /** Takes the aggregate, not extracted values - see DCA-ADV-020. */
+  public Money totalWithTax(Order order) {
+    return new Money(order.total().amount().multiply(BigDecimal.ONE.add(taxRate)));
   }
 }
