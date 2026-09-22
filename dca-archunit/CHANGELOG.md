@@ -4,6 +4,13 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+**The rendered context map is sorted.** `ContextMapRenderer` iterated the `@Upstream` and
+`@ExternalUpstream` declarations in the order they appear in the source, so two code bases that
+declare the same relationships in a different order rendered two documents that could not be
+compared line by line. Declarations are now sorted by target context, first channel and translation;
+external systems by name, interaction and translation. The contexts were already sorted. A project
+that regenerates its map after upgrading will see the rows move once — commit the regenerated file.
+
 ## [0.5.0] - 2026-09-21
 
 **Every name a rule matches on is configurable.** `withAggregateRootSuffix`,

@@ -313,15 +313,32 @@ public final class ContextMapRenderer {
   // Declarations (filtered by options)
   // ---------------------------------------------------------------------------------------------
 
+  /**
+   * Declarations of one context, sorted by target, first channel and translation. The order of the
+   * annotations in the source must not reach the rendered map: two code bases that declare the same
+   * relationships differently ordered would otherwise render two documents that cannot be compared.
+   */
   private List<Upstream> upstreams(String pkg) {
     return arch.packageAnnotations(pkg, Upstream.class).stream()
         .filter(u -> includePlanned || u.status() != Upstream.Status.PLANNED)
+        .sorted(
+            Comparator.comparing(Upstream::context)
+                .thenComparing(ContextMapRenderer::firstChannel)
+                .thenComparing(u -> u.translation().name()))
         .toList();
+  }
+
+  private static String firstChannel(Upstream u) {
+    return u.via().length == 0 ? "" : u.via()[0].name();
   }
 
   private List<ExternalUpstream> externalUpstreams(String pkg) {
     return arch.packageAnnotations(pkg, ExternalUpstream.class).stream()
         .filter(e -> includePlanned || e.status() != Upstream.Status.PLANNED)
+        .sorted(
+            Comparator.comparing(ExternalUpstream::name)
+                .thenComparing(e -> e.interaction().name())
+                .thenComparing(e -> e.translation().name()))
         .toList();
   }
 

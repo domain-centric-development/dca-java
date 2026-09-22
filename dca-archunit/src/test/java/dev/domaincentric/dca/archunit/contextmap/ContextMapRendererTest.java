@@ -62,6 +62,24 @@ class ContextMapRendererTest {
   }
 
   @Test
+  void sortsDeclarationsSoTheOrderInTheSourceDoesNotReachTheMap() {
+    List<String> lines = lines(ContextMapRenderer.of(arch).render());
+    // shipping declares catalog first, cart second; the map lists cart first in both the table
+    // and the diagram. Two code bases with the same relationships render comparable documents.
+    int cart =
+        lines.indexOf(
+            "| shipping | cart | events | Conformist | planned | Ship what was ordered |");
+    int catalog =
+        lines.indexOf(
+            "| shipping | catalog | api | ACL | implemented | Dimensions and weight of the articles"
+                + " to dispatch |");
+    assertTrue(cart > 0 && catalog > cart, String.join("\n", lines));
+    int cartEdge = lines.indexOf("  shipping -.->|\"Conformist / events / planned\"| cart");
+    int catalogEdge = lines.indexOf("  shipping -->|\"ACL / api\"| catalog");
+    assertTrue(cartEdge > 0 && catalogEdge > cartEdge, String.join("\n", lines));
+  }
+
+  @Test
   void rendersMermaidDiagram() {
     String md = ContextMapRenderer.of(arch).render();
     assertTrue(md.contains("```mermaid\ngraph LR\n"));
