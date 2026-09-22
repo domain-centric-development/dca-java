@@ -1,6 +1,6 @@
 {
 "library": "dca-archunit",
-"version": "0.5.0",
+"version": "0.6.0-SNAPSHOT",
 "rules": [
   {"set": "layered", "id": "DCA-LAY-001", "title": "Diagnostic: The rules of the Layered Architecture should be followed", "rationale": "Traditional layering (application accessed only by incoming adapters) contradicts Ports and Adapters, where outgoing adapters implement application-level output ports; the hexagonal rules cover the intended dependency direction", "selects": "Informational - selects nothing. ArchUnit's layered-architecture definition (adapter layer accesses application, application accesses domain, domain accesses nothing) is not built, because in Ports and Adapters outgoing adapters implement application-level output ports.", "checks": "Informational - selects nothing and never fails; it carries doctrine only. The dependency direction is enforced by the hexagonal rules.", "status": "informational"},
   {"set": "layered", "id": "DCA-LAY-002", "title": "Domain must not have dependencies on Infrastructure", "rationale": "Domain should not depend on infrastructure concerns (Dependency Inversion Principle)", "selects": "Classes in <module>.domain.. of every module root, the shared kernel's domain included.", "checks": "No dependency on a class in the global infrastructure package (<base>.infrastructure..) or in any module's own infrastructure package (<module>.infrastructure..). The shared kernel's infrastructure package is not in that list. A module without a domain layer selects nothing and passes.", "status": "enforced"},

@@ -5,6 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.domaincentric.dca.archunit.DcaLayout;
+import dev.domaincentric.dca.archunit.DcaRuleExecution;
+import dev.domaincentric.dca.archunit.DcaRuleOutcome;
+import dev.domaincentric.dca.archunit.DcaRuleSelection;
 import dev.domaincentric.dca.archunit.Fixtures;
 import java.util.List;
 import java.util.stream.Stream;
@@ -137,6 +140,26 @@ class UseCaseRulesTest {
   @Nested
   @DisplayName("DCA-USE-009 / DCA-USE-012 — transaction placement per method")
   class TransactionPlacement {
+
+    /**
+     * The .NET twin has always passed a remedy to {@code DcaRule.Fail}; this one said only what was
+     * wrong. The advice reaches the reader through the execution wrapper, which appends it as the
+     * {@code Fix:} line — so the assertion runs a real execution rather than the bare rule.
+     */
+    @Test
+    @DisplayName("the violation says what to change, as the .NET twin does")
+    void theViolationNamesTheRemedy() {
+      DcaRuleOutcome outcome =
+          DcaRuleExecution.execute(
+              Fixtures.rule(TRANSACTIONS, "DCA-USE-012"),
+              Fixtures.arch(TRANSACTIONS),
+              DcaRuleSelection.all());
+
+      assertEquals(DcaRuleOutcome.Status.FAILED, outcome.status());
+      assertTrue(
+          outcome.message().contains("Fix: wrap load, mutate, save and publish"),
+          outcome.message());
+    }
 
     @Test
     @DisplayName("a transactional executing method may delegate save and publish to a helper")
