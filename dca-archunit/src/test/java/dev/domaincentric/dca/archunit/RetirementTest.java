@@ -62,6 +62,18 @@ class RetirementTest {
   }
 
   @Test
+  void onlyInformationalTitlesCarryTheDiagnosticPrefix() {
+    var layout = DcaLayout.forBasePackage("example");
+    for (DcaRule rule : DcaRules.all(layout)) {
+      boolean prefixed = rule.title().startsWith("Diagnostic: ");
+      assertEquals(
+          rule.kind() == DcaRule.Kind.INFORMATIONAL,
+          prefixed,
+          rule.id() + " " + rule.kind() + ": " + rule.title());
+    }
+  }
+
+  @Test
   void consumerImplementationInReservedOutputPackageFailsButImportedMarkerPasses() {
     var layout = DcaLayout.forBasePackage("example");
     var rule = new LayeredRules(layout).outputPortMarkersMustBeInterfaces();
