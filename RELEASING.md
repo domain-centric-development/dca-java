@@ -121,7 +121,19 @@ same commit:
 3. `README.md` — the quick-start dependency block, which must stay identical to the sample's.
 
 Then regenerate the catalog (`./gradlew :dca-archunit:rulesCatalog`) so that `rules.json` records the
-released version rather than the snapshot, and commit it with the rest. Central takes about ten minutes to serve
+released version rather than the snapshot, and commit it with the rest.
+
+**What was waiting for this release.** While a rule exists only in a snapshot, two things cannot follow it,
+and both come loose now:
+
+- the **knowledge catalog** — its release gate refuses a bundle documenting an id no released library has,
+  and because the bundle is generated as a whole, that holds back every other catalog change with it. After
+  the release, regenerate it (`cd ../dca-knowledge-catalog && PYTHONPATH=src python3 -m dca_catalog.generate`)
+  and commit bundle and mirror.
+- the **samples' generated documents** — they consume the released libraries, so a renderer change reaches
+  `docs/architecture/context-map.md` only once the sample picks up the new version. Expect the architecture
+  test to report the committed map as stale on the first run afterwards; the fix is to commit the
+  regenerated file. Central takes about ten minutes to serve
 a published deployment; poll `repo1.maven.org` before tagging, or the workflow's wait runs out.
 
 To release without the manual click, change `publishToMavenCentral()` in
