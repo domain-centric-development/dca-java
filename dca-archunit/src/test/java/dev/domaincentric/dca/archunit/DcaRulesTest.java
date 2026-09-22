@@ -12,6 +12,66 @@ class DcaRulesTest {
 
   private static final DcaLayout LAYOUT = DcaLayout.forBasePackage("com.example");
 
+  /**
+   * ArchUnit renders {@code "<title>, because <rationale>"}. The rationale is its own sentence in
+   * rules.json and in the catalog, so it starts with a capital there — inside this one it has to
+   * read "because a domain service …", not "because A domain service …".
+   */
+  @Test
+  void theRationaleReadsAsPartOfTheArchUnitSentence() {
+    DcaRule rule =
+        DcaRule.of(
+                "DCA-TAC-001",
+                "A title",
+                "A domain service exists for logic that spans several aggregates",
+                architecture ->
+                    com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes()
+                        .should()
+                        .bePublic()
+                        .allowEmptyShould(true))
+            .selecting("nothing")
+            .checking("nothing");
+
+    String description =
+        rule.archRule(
+                DcaArchitecture.of(
+                    LAYOUT,
+                    new com.tngtech.archunit.core.importer.ClassFileImporter()
+                        .importPackages("com.example")))
+            .orElseThrow()
+            .getDescription();
+
+    assertTrue(description.contains("because a domain service exists"), description);
+  }
+
+  /** An acronym keeps its capital: "because DTOs are …", not "because dTOs are …". */
+  @Test
+  void anAcronymKeepsItsCapital() {
+    DcaRule rule =
+        DcaRule.of(
+                "DCA-TAC-002",
+                "A title",
+                "DTOs are mapped at the edge",
+                architecture ->
+                    com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes()
+                        .should()
+                        .bePublic()
+                        .allowEmptyShould(true))
+            .selecting("nothing")
+            .checking("nothing");
+
+    String description =
+        rule.archRule(
+                DcaArchitecture.of(
+                    LAYOUT,
+                    new com.tngtech.archunit.core.importer.ClassFileImporter()
+                        .importPackages("com.example")))
+            .orElseThrow()
+            .getDescription();
+
+    assertTrue(description.contains("because DTOs are"), description);
+  }
+
   @Test
   void onlyRejectsAnUnknownSetName() {
     IllegalArgumentException rejected =

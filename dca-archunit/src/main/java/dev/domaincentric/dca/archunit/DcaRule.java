@@ -188,6 +188,20 @@ public interface DcaRule {
     }
   }
 
+  /**
+   * The rationale as it reads after "because": the first letter lower-cased, acronyms untouched.
+   */
+  private static String uncapitalised(String text) {
+    if (text.isEmpty() || !Character.isUpperCase(text.charAt(0))) {
+      return text;
+    }
+    // "DTOs are …" or "HTTP adapters …" keep their capital; only an ordinary word is lowered.
+    if (text.length() > 1 && Character.isUpperCase(text.charAt(1))) {
+      return text;
+    }
+    return Character.toLowerCase(text.charAt(0)) + text.substring(1);
+  }
+
   private static String requireText(String text, String field, String id) {
     if (text == null || text.isBlank()) {
       throw new IllegalArgumentException(id + ": " + field + " must not be blank");
@@ -287,7 +301,11 @@ public interface DcaRule {
     }
 
     private ArchRule described(DcaArchitecture architecture) {
-      return archRule.apply(architecture).as(title).because(rationale);
+      // ArchUnit renders "<title>, because <rationale>". The rationale is a sentence of its own in
+      // rules.json and in the catalog, so it starts with a capital there; inside this sentence that
+      // reads as "because A domain service exists …". Lower-casing the first letter here keeps both
+      // readings right without touching 120 texts.
+      return archRule.apply(architecture).as(title).because(uncapitalised(rationale));
     }
 
     @Override
