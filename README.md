@@ -18,7 +18,7 @@ of them is optional except the building blocks:
 
 ```kotlin
 dependencies {
-    implementation("dev.domaincentric:dca-building-blocks:0.3.0")
+    implementation("dev.domaincentric:dca-building-blocks:0.3.1")
     implementation("dev.domaincentric:dca-spring:0.2.0")
     testImplementation("dev.domaincentric:dca-archunit:0.5.0")
     testImplementation("dev.domaincentric:dca-archunit-spring-modulith:0.2.0")   // Spring Modulith projects only
@@ -41,7 +41,7 @@ see [Versioning](#versioning).
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("dev.domaincentric:dca-building-blocks:0.3.0")
+    implementation("dev.domaincentric:dca-building-blocks:0.3.1")
 }
 ```
 
@@ -81,7 +81,7 @@ dev.domaincentric.dca.buildingblocks
 
 ```kotlin
 dependencies {
-    implementation("dev.domaincentric:dca-building-blocks:0.3.0")
+    implementation("dev.domaincentric:dca-building-blocks:0.3.1")
 
     testImplementation("dev.domaincentric:dca-archunit:0.5.0")
     testImplementation(platform("org.junit:junit-bom:6.1.3"))
