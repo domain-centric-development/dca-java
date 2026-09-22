@@ -4,6 +4,64 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-22
+
+**Migration from 0.5.0.** Two new rules, `DCA-ADV-019` and `DCA-ADV-020`, can turn a suite red that
+was green — a model type that calls a domain service, and a domain service whose operation takes no
+aggregate. Both state the doctrine below and are `error`. Anyone who builds their own informational
+rule has one signature to change: the factory takes a `Function` where it took a `Consumer`. The
+retired `DCA-MAP-003` loses its last public factory. Everything else is a fix or a rendering change.
+
+### Changed — breaking
+
+**A domain service works on the model, and the model does not reach for it.** Two rules for the
+doctrine decided on 2026-09-22. `DCA-ADV-019`: an aggregate, entity or value object neither calls
+nor constructs a domain service — a service spans several aggregates, so the application calls it
+and hands the model the result. `DCA-ADV-020`: every public operation of a domain service takes at
+least one aggregate or entity. The measure for the second is Evans, chapter 5 ("Parameters and
+results should be domain objects"), tightened to the aggregate because a calculation that needs no
+aggregate is behaviour of the value object it computes on, not a domain service; the tightening is a
+deviation from Evans and is documented as one.
+
+**A diagnostic reports into its outcome, not to standard output.** `DCA-LAY-001`, `DCA-STR-001`,
+`DCA-MAP-013`, `DCA-NAM-002` and `DCA-ERR-006` wrote their findings with `System.out.println`, where
+no report, no CI log parser and no pipeline stage sees them — the diagnostics existed but reached
+nobody. An informational rule returns what it observed through `DcaRule.observe(architecture)`; the
+execution wrapper puts the lines into the outcome, prefixed with the rule id like every other line,
+and the rule still passes because it asserts nothing. The JUnit base class reports a diagnostic that
+saw something as an aborted test carrying its text, the way a warning already was; a passing test
+shows no message anywhere. Breaking for anyone building their own informational rule: the factory
+takes a `Function<DcaArchitecture, List<String>>` instead of a `Consumer`. Enforced rules are
+untouched.
+
+**The last public factory for a retired id is gone.** `DCA-MAP-003` was retired in 0.4.0, but
+`ContextMapRules.externalSystemNamesDistinctAfterNormalization()` was still public and still produced
+that id. It is not in `rules()`, so the retirement test passed — a caller could nevertheless build a
+rule the selection refuses and the report cannot place, which is why the `DCA-ADV-003` and
+`DCA-TAC-022` factories went earlier. This one was missed; found by the new cross-checkout rule-id
+check, which reads both `rules.json` and reports a retired id named outside a retirement context.
+
+### Fixed
+
+**The rationale reads as part of the sentence ArchUnit builds.** ArchUnit renders
+"`<title>`, because `<rationale>`", and 117 of 120 rationales start with a capital — correct in
+`rules.json` and in the catalog, where each is a sentence of its own, wrong inside this one: "must
+not use domain services, because A domain service exists for logic …". The first letter is
+lower-cased where the description is built, which fixes every rule at once and leaves both readings
+right. An acronym keeps its capital, detected by a second upper-case letter: "because DTOs are mapped
+at the edge" stays as it is.
+
+**`DCA-USE-012` says what to change, as the .NET twin does.** The .NET side has passed a remedy to
+`DcaRule.Fail` since the review fixes; the Java rule said only what was wrong. The advice reaches the
+reader as the `Fix:` line the execution wrapper appends.
+
+**`DCA-STR-010` says that it is a diagnostic.** It asserts nothing, but its title read like an
+enforced rule while the other five informational ids carry the `Diagnostic:` prefix. A test holds the
+convention in both directions now: an informational title carries the prefix, an enforced one does
+not.
+
+### Changed
+
 **Every published jar names its module.** `Automatic-Module-Name` is set on all four artifacts
 (`dev.domaincentric.dca.buildingblocks`, `…dca.archunit`, `…dca.spring`, `…dca.archunit.springmodulith`),
 so a consumer on the module path gets a stable name rather than one derived from the file name. A

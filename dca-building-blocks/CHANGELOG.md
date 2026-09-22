@@ -4,6 +4,26 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-09-22
+
+Documentation-only release: no type, signature or behaviour changed, binary-compatible with 0.3.0.
+The javadoc flows verbatim into the knowledge catalog and is guarded by `dca-archunit`'s
+`FrameworkNeutralityTest`, so a doctrine written into a marker's contract reaches readers only once
+the artifact is published.
+
+### Changed — documentation
+
+- `DomainGateway` states that it never writes to the outside. A gateway obtains facts the domain does
+  not hold, or delegates a technology-bound computation, so that the model can decide; it does not
+  change the state of any external system. Persisting, sending, publishing and calling a remote
+  operation that has an effect are the application's business, through an output port. A computation
+  that touches nothing outside the process — hashing a password, converting a currency with a
+  supplied rate — is a gateway, because no external state changes. The condition list says
+  "read-only towards the outside" where it said "side-effect-free or read-only operations are the
+  typical case". Recorded as a decision on 2026-09-22.
+- `UseCase` calls its output a Result, not a Response. The ubiquitous language of the port hierarchy
+  is Command / Query / Result everywhere else, including `DCA-USE-004`'s message.
+
 ## [0.3.0] - 2026-09-21
 
 ### Added
