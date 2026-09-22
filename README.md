@@ -20,7 +20,7 @@ of them is optional except the building blocks:
 dependencies {
     implementation("dev.domaincentric:dca-building-blocks:0.3.1")
     implementation("dev.domaincentric:dca-spring:0.2.0")
-    testImplementation("dev.domaincentric:dca-archunit:0.5.0")
+    testImplementation("dev.domaincentric:dca-archunit:0.6.0")
     testImplementation("dev.domaincentric:dca-archunit-spring-modulith:0.2.0")   // Spring Modulith projects only
 }
 ```
@@ -83,7 +83,7 @@ dev.domaincentric.dca.buildingblocks
 dependencies {
     implementation("dev.domaincentric:dca-building-blocks:0.3.1")
 
-    testImplementation("dev.domaincentric:dca-archunit:0.5.0")
+    testImplementation("dev.domaincentric:dca-archunit:0.6.0")
     testImplementation(platform("org.junit:junit-bom:6.1.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
