@@ -403,3 +403,19 @@ The decision behind the set, the naming and the limits is `docs/adr/adr-002-exce
   semantic checks belong to the review perspectives.
 - **The base types are excluded from every selection** by their package (`dev.domaincentric.dca.buildingblocks`):
   they are library code, and ERR-002 would otherwise report them as residing outside the project's layers.
+
+## Additions 2026-10-10 — three rules from the audit
+
+New in this repository, no Groovy source; each was proposed by a `dca-audit` run on the Java sample
+for a shape the suite passed.
+
+- **`DCA-HEX-013`** (`HexagonalRules.outgoingAdaptersMustNotDependOnInputPorts`): the reverse of
+  `DCA-HEX-011`. Selects every outgoing adapter package, checks no dependency on the input-port role.
+- **`DCA-TAC-023`** (`TacticalPatternRules.aggregateRootsHaveNoPublicConstructors`): selects concrete,
+  non-record aggregate roots. Records are out because a record's canonical constructor cannot be
+  hidden; the Java fixtures `Order` and `Category` moved to private constructors with `create` /
+  `reconstitute`.
+- **`DCA-STR-013`** (`StrategicPatternRules.eventsContractInterfacesExtendIntegrationEvent`): top-level
+  interfaces below `<module>.<events>`. `package-info` compiles to a synthetic interface and is
+  excluded by name; the good fixture carries one so the exclusion stays tested.
+

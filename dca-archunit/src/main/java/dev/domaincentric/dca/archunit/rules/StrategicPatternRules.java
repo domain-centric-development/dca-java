@@ -47,7 +47,8 @@ public final class StrategicPatternRules implements DcaRuleSet {
             integrationEventsAreRecords(),
             eventListenersUseAntiCorruptionLayer(),
             atLeastOneBoundedContextIsDeclared(),
-            atLeastOneModuleOwnsALayer());
+            atLeastOneModuleOwnsALayer(),
+            eventsContractInterfacesExtendIntegrationEvent());
   }
 
   @Override
@@ -468,5 +469,59 @@ public final class StrategicPatternRules implements DcaRuleSet {
                 + " should be, about their boundaries, or about modules that own a layer without"
                 + " declaring a context — those are governed structurally and are not a substitute"
                 + " for the declaration.");
+  }
+
+  /**
+   * DCA-STR-013. A consumer may publish an interface in its own events package that a producer's
+   * integration event implements (interface inversion); the consumer then listens to its own type.
+   * Without the integration event contract on that interface, the consumer cannot read the identity
+   * it needs to recognise a redelivered event.
+   */
+  public DcaRule eventsContractInterfacesExtendIntegrationEvent() {
+    return DcaRule.check(
+            "DCA-STR-013",
+            "Interfaces in a module's events package must extend IntegrationEvent",
+            "Everything in the events package is a published event contract. An interface there is"
+                + " one a producer's integration event implements and a consumer receives; delivery"
+                + " is at least once, so the consumer needs the event's identity and occurrence time"
+                + " through that interface, not only the payload",
+            arch -> {
+              List<String> violations = new ArrayList<>();
+              String marker = arch.layout().markers().integrationEvent();
+              for (String root : arch.moduleRoots()) {
+                String events = root + "." + layout.eventsSubpackage();
+                for (JavaClass type : arch.classes()) {
+                  boolean inEvents =
+                      type.getPackageName().equals(events)
+                          || type.getPackageName().startsWith(events + ".");
+                  if (inEvents
+                      && type.isInterface()
+                      && !type.isAnnotation()
+                      && type.isTopLevelClass()
+                      && !type.getSimpleName().equals("package-info")
+                      && !type.isAssignableTo(marker)) {
+                    violations.add(
+                        type.getName()
+                            + " is an event contract without the integration event identity");
+                  }
+                }
+              }
+              if (!violations.isEmpty()) {
+                throw new DcaRuleViolation(
+                    "Interfaces in the events package extend IntegrationEvent, so a consumer reads"
+                        + " eventId() and occurredOn() from the contract it listens to.",
+                    violations);
+              }
+            })
+        .selecting(
+            "Top-level interfaces in <module>.<events>.. of every module root, the shared kernel's"
+                + " included, excluding package-info. Annotation types and nested interfaces are not"
+                + " selected - a nested interface belongs to its enclosing contract.")
+        .checking(
+            "The interface is assignable to IntegrationEvent, directly or through another"
+                + " interface. Which classes implement it and whether they live in another module"
+                + " are not checked; DCA-ADV-005 and DCA-STR-008 cover the implementing class. An"
+                + " empty selection passes.",
+            "let the interface extend IntegrationEvent");
   }
 }

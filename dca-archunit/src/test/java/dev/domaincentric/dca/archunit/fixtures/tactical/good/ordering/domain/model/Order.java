@@ -12,9 +12,13 @@ public final class Order extends BaseAggregateRoot<Order, OrderId> {
   private final List<LineItem> lineItems = new ArrayList<>();
   private boolean placed;
 
-  public Order(OrderId id, CustomerId customerId) {
+  private Order(OrderId id, CustomerId customerId) {
     this.id = id;
     this.customerId = customerId;
+  }
+
+  public static Order create(OrderId id, CustomerId customerId) {
+    return new Order(id, customerId);
   }
 
   @Override

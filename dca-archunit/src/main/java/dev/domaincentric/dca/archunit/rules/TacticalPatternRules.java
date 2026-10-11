@@ -67,7 +67,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
             storeInterfacesExtendStoreMarker(),
             storeInterfacesResideInSharedOutputPorts(layout),
             storeImplementationsResideInOutgoingAdapters(layout),
-            storeInterfacesHaveNoRepositorySemantics());
+            storeInterfacesHaveNoRepositorySemantics(),
+            aggregateRootsHaveNoPublicConstructors());
   }
 
   @Override
@@ -840,12 +841,66 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 + "found to declare no write.");
   }
 
+  /**
+   * The aggregate's sibling of DCA-TAC-005: an entity is guarded by its root, the root guards
+   * itself by naming the ways it comes into being.
+   */
+  public static DcaRule aggregateRootsHaveNoPublicConstructors() {
+    return DcaRule.check(
+            "DCA-TAC-023",
+            "Aggregate Roots must not declare public constructors",
+            "An aggregate comes into being in two ways - created as a business fact or reconstituted"
+                + " from storage - and each is a named factory method. A public constructor is a"
+                + " third, unnamed way that skips the creation invariants and the event creation"
+                + " raises",
+            arch -> {
+              List<String> violations = new ArrayList<>();
+              for (JavaClass root : aggregateRootClasses(arch)) {
+                for (var constructor : root.getConstructors()) {
+                  if (constructor.getModifiers().contains(JavaModifier.PUBLIC)) {
+                    violations.add(
+                        root.getName()
+                            + " declares public constructor "
+                            + constructor.getFullName());
+                  }
+                }
+              }
+              fail(
+                  "Aggregate Roots are created and reconstituted through named factory methods."
+                      + " Fix: make the constructor private and add a static create(...) for a new"
+                      + " aggregate and a static reconstitute(...) for the outgoing adapter that"
+                      + " loads one.",
+                  violations);
+            })
+        .selecting(
+            "Concrete, non-record classes anywhere under scan assignable to AggregateRoot. Abstract"
+                + " base classes are not selected - their constructors are reachable only from a"
+                + " subclass. Records are not selected: the language fixes a record's canonical"
+                + " constructor at the record's own visibility, so a record root guards its"
+                + " invariants in that constructor instead.")
+        .checking(
+            "No constructor declared by the class itself is public. Private, package-private and"
+                + " protected constructors pass - a persistence framework that needs a no-argument"
+                + " constructor gets a non-public one. Who calls the factory methods is not"
+                + " checked. An empty selection passes.");
+  }
+
   // ---------------------------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------------------------
 
   private static List<JavaClass> concreteClassesAssignableTo(DcaArchitecture arch, String marker) {
     return classesMatching(arch, c -> c.isAssignableTo(marker) && !c.isInterface());
+  }
+
+  private static List<JavaClass> aggregateRootClasses(DcaArchitecture arch) {
+    return classesMatching(
+        arch,
+        c ->
+            c.isAssignableTo(arch.layout().markers().aggregateRoot())
+                && !c.isInterface()
+                && !c.getModifiers().contains(JavaModifier.ABSTRACT)
+                && !c.isRecord());
   }
 
   private static List<JavaClass> nonRootEntities(DcaArchitecture arch) {

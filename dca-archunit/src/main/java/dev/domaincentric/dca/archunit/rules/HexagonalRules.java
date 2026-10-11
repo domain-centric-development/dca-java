@@ -18,7 +18,8 @@ import java.util.List;
  * Hexagonal Architecture (Ports and Adapters) rules: separation between ports and adapters,
  * incoming adapters drive the application through its input ports, outgoing adapters implement
  * outbound ports, adapters never talk to each other directly, incoming adapters stay inside their
- * own bounded context and do not operate the domain through its services.
+ * own bounded context and do not operate the domain through its services, and outgoing adapters
+ * never drive the application.
  */
 public final class HexagonalRules implements DcaRuleSet {
 
@@ -40,7 +41,8 @@ public final class HexagonalRules implements DcaRuleSet {
             sharedOutputPortsExtendOutputPort(),
             outputPortsMustNotResideInDomain(),
             incomingAdaptersMustDependOnInputPortsNotUseCaseClasses(),
-            incomingAdaptersMustNotDependOnDomainServices());
+            incomingAdaptersMustNotDependOnDomainServices(),
+            outgoingAdaptersMustNotDependOnInputPorts());
   }
 
   @Override
@@ -425,5 +427,35 @@ public final class HexagonalRules implements DcaRuleSet {
                 + " calling it or naming it in a signature all count as a dependency. An empty"
                 + " selection passes.",
             "move the collaboration into the use case and carry its outcome in the result");
+  }
+
+  /**
+   * The direction of an adapter is decided by who calls whom: an adapter that invokes an input port
+   * drives the application and is incoming, whatever package it sits in.
+   */
+  public DcaRule outgoingAdaptersMustNotDependOnInputPorts() {
+    return DcaRule.of(
+            "DCA-HEX-013",
+            "Outgoing Adapters must not depend on input ports",
+            "An outgoing adapter is driven: the application calls it through an output port. One that"
+                + " calls an input port drives the application instead - it is an incoming adapter"
+                + " filed on the wrong side, and the call it makes runs a second use case from inside"
+                + " the first one's outgoing edge",
+            arch ->
+                noClasses()
+                    .that()
+                    .resideInAnyPackage(arch.allOutgoingAdapterPatterns())
+                    .should()
+                    .dependOnClassesThat()
+                    .areAssignableTo(arch.layout().markers().inputPort())
+                    .allowEmptyShould(true))
+        .selecting("Classes in <module>.adapter.outgoing.. of every module root.")
+        .checking(
+            "No dependency on a type assignable to InputPort - the input port interfaces and the use"
+                + " case classes implementing them, of any module. Calling another module's published"
+                + " api is not a dependency on an input port, even where that api delegates to one"
+                + " - only direct dependencies are read. An empty selection passes.",
+            "move the class to the incoming adapter package, or let the use case reach the"
+                + " capability through an output port");
   }
 }

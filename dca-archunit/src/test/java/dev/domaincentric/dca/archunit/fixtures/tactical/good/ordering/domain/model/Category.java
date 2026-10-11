@@ -9,9 +9,13 @@ public final class Category extends BaseAggregateRoot<Category, CategoryId> {
   private final CategoryId parent;
   private final List<CategoryId> childIds = List.of();
 
-  public Category(CategoryId id, CategoryId parent) {
+  private Category(CategoryId id, CategoryId parent) {
     this.id = id;
     this.parent = parent;
+  }
+
+  public static Category reconstitute(CategoryId id, CategoryId parent) {
+    return new Category(id, parent);
   }
 
   @Override

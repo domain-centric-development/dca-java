@@ -26,7 +26,7 @@ class TacticalPatternRulesTest {
   void ruleSetHasStableShape() {
     TacticalPatternRules set = new TacticalPatternRules(DcaLayout.forBasePackage(GOOD));
     assertEquals("tactical", set.name());
-    assertEquals(21, set.rules().size());
+    assertEquals(22, set.rules().size());
     Fixtures.assertIdsAreSequential(set, "TAC");
   }
 

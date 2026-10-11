@@ -4,6 +4,28 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+**Migration from 0.6.0.** Three new rules, all `error`, can turn a suite red that was green. Each
+names a shape an audit found on code the suite passed; freeze the places it reports, or fix them.
+
+### Added
+
+**An outgoing adapter is driven, never driving.** `DCA-HEX-013`: no class in an outgoing adapter
+package depends on an input port, interface or implementation. A class that calls an input port
+drives the application and is an incoming adapter filed on the wrong side. Only direct dependencies
+are read, so calling another module's published api passes even where that api delegates to one.
+
+**An aggregate root names the ways it comes into being.** `DCA-TAC-023`: a concrete aggregate root
+declares no public constructor; creation and reconstitution are named factory methods. The sibling
+of `DCA-TAC-005`, which guards entities behind their root. Records are not selected, because the
+language fixes a record's canonical constructor at the record's own visibility; a record root
+guards its invariants in that constructor. Abstract bases are not selected either.
+
+**A consumer-defined trigger carries the event identity.** `DCA-STR-013`: every top-level interface
+in a module's events package is assignable to `IntegrationEvent`. Under interface inversion the
+consumer publishes an interface the producer's event implements and listens to its own type; without
+the marker on that interface the consumer cannot read `eventId()` to recognise a redelivery. The
+existing marker carries the contract, so no new building block is needed.
+
 ## [0.6.0] - 2026-09-22
 
 **Migration from 0.5.0.** Two new rules, `DCA-ADV-019` and `DCA-ADV-020`, can turn a suite red that
