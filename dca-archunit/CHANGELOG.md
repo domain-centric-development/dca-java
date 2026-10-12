@@ -4,6 +4,8 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-12
+
 **Migration from 0.6.0.** Three new rules, all `error`, can turn a suite red that was green. Each
 names a shape an audit found on code the suite passed; freeze the places it reports, or fix them.
 
