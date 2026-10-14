@@ -90,4 +90,15 @@ public final class Fixtures {
       }
     }
   }
+
+  /** Runs the rule against the fixture and expects it to pass. */
+  public static void passes(String pkg, String id) {
+    DcaArchitecture arch = arch(pkg);
+    rule(pkg, id).check(arch);
+  }
+
+  /** What an informational rule observes on the fixture. */
+  public static java.util.List<String> observed(String pkg, String id) {
+    return rule(pkg, id).observe(arch(pkg));
+  }
 }

@@ -12,8 +12,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * An experimental rule runs only where the selection opts in, and the opt-in leaves every released
- * rule as it was. The rule under test is a fixture: the catalog itself carries no experimental rule
- * to rely on.
+ * rule as it was. The rule under test is a fixture, so the mechanism is tested apart from the
+ * experimental rules the catalog carries at any given time.
  */
 class ExperimentalRulesTest {
 
@@ -32,20 +32,33 @@ class ExperimentalRulesTest {
   void aRuleIsReleasedUnlessDeclaredExperimental() {
     assertEquals(DcaRule.Maturity.EXPERIMENTAL, EXPERIMENTAL.maturity());
     assertEquals(DcaRule.Kind.ENFORCED, EXPERIMENTAL.kind(), "maturity leaves the kind alone");
-    assertTrue(
-        DcaRules.all(LAYOUT).stream().allMatch(r -> r.maturity() == DcaRule.Maturity.RELEASED),
-        "every rule of the catalog is released");
+    assertEquals(DcaRule.Maturity.RELEASED, DcaRules.all(LAYOUT).get(0).maturity());
   }
 
+  /**
+   * The experimental rules the catalog ships, in catalog order. Releasing one removes it here and
+   * its {@code experimental()} call in the same change.
+   */
   @Test
-  void everyCatalogRuleIsReleased() {
+  void theCatalogShipsTheseExperimentalRules() {
     List<String> experimental =
         DcaRules.all(LAYOUT).stream()
-            .filter(rule -> rule.maturity() != DcaRule.Maturity.RELEASED)
+            .filter(rule -> rule.maturity() == DcaRule.Maturity.EXPERIMENTAL)
             .map(DcaRule::id)
             .toList();
 
-    assertEquals(List.of(), experimental, "the catalog ships no experimental rule");
+    assertEquals(
+        List.of(
+            "DCA-HEX-014",
+            "DCA-HEX-015",
+            "DCA-TAC-024",
+            "DCA-MAP-014",
+            "DCA-USE-018",
+            "DCA-USE-019",
+            "DCA-NAM-012",
+            "DCA-NAM-013",
+            "DCA-ERR-007"),
+        experimental);
   }
 
   @Test
@@ -195,7 +208,9 @@ class ExperimentalRulesTest {
     assertEquals(
         DcaRules.selectFlat(LAYOUT, DcaRuleSelection.all()).stream().map(DcaRule::id).toList(),
         DcaRules.selectFlat(LAYOUT, DcaRuleSelection.all().withExperimental()).stream()
+            .filter(rule -> rule.maturity() == DcaRule.Maturity.RELEASED)
             .map(DcaRule::id)
-            .toList());
+            .toList(),
+        "the opt-in adds the experimental rules and leaves the released ones as they were");
   }
 }

@@ -23,7 +23,13 @@ class HexagonalRulesTest {
   /** Every hexagonal rule has a negative fixture. */
   @TestFactory
   Stream<DynamicTest> badFixtureFails() {
-    return Fixtures.badFixtureFails(HexagonalRules::new, FIXTURES + ".bad");
+    return Fixtures.badFixtureFails(
+        HexagonalRules::new,
+        FIXTURES + ".bad",
+        // negative fixture in .hexagonal.getmapping
+        "DCA-HEX-014",
+        // negative fixture in .hexagonal.instancestate
+        "DCA-HEX-015");
   }
 
   /**
@@ -67,5 +73,38 @@ class HexagonalRulesTest {
         outcome.status() == dev.domaincentric.dca.archunit.DcaRuleOutcome.Status.FAILED
             && outcome.toString().contains("ForeignInfrastructureAdapter"),
         outcome.toString());
+  }
+
+  /** DCA-HEX-014, directly and through a helper the handler calls. */
+  @Test
+  void aGetHandlerThatDrivesACommandIsReported() {
+    String message = Fixtures.failure(FIXTURES + ".getmapping.bad", "DCA-HEX-014").getMessage();
+
+    assertTrue(
+        message.contains(
+            "LedgerController.show handles @GetMapping and drives a command through"
+                + " PostEntryInputPort.execute"),
+        message);
+    assertTrue(message.contains("LedgerController.quickEntry handles @GetMapping"), message);
+  }
+
+  /** A GET handler that asks a query passes; a handler without the GET mapping is not selected. */
+  @Test
+  void aGetHandlerThatAsksAQueryPasses() {
+    Fixtures.passes(FIXTURES + ".getmapping.good", "DCA-HEX-014");
+  }
+
+  @Test
+  void anIncomingAdapterThatKeepsStateInTheInstanceIsReported() {
+    String message = Fixtures.failure(FIXTURES + ".instancestate.bad", "DCA-HEX-015").getMessage();
+
+    assertTrue(message.contains("RedirectAttributes.addFlashAttribute"), message);
+    assertTrue(message.contains("HttpSession.setAttribute"), message);
+  }
+
+  /** A fixed code in the redirect address is a call of the same type, but not of the listed one. */
+  @Test
+  void stateCarriedInTheRedirectAddressPasses() {
+    Fixtures.passes(FIXTURES + ".instancestate.good", "DCA-HEX-015");
   }
 }

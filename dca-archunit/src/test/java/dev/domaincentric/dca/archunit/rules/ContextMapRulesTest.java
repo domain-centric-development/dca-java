@@ -32,7 +32,8 @@ class ContextMapRulesTest {
     return Fixtures.badFixtureFails(
         ContextMapRules::new,
         BAD,
-        "DCA-MAP-013" // diagnostic — prints the declared context map, never fails
+        "DCA-MAP-013", // diagnostic — prints the declared context map, never fails
+        "DCA-MAP-014" // negative fixture in .contextmap.unused
         );
   }
 
@@ -105,5 +106,21 @@ class ContextMapRulesTest {
     assertTrue(
         violation.violations().stream().anyMatch(v -> v.contains("pricing :: api")),
         violation.getMessage());
+  }
+
+  /** DCA-MAP-014: every allowed dependency is used, unless a PLANNED upstream announces it. */
+  @Test
+  void anAllowedDependencyNoClassUsesIsReported() {
+    String message =
+        Fixtures.violation(Fixtures.ROOT + ".contextmap.unused.bad", "DCA-MAP-014").getMessage();
+
+    assertTrue(message.contains("allows the dependency 'ledger :: events'"), message);
+    assertTrue(message.contains("allows the dependency 'sharedkernel'"), message);
+    assertFalse(message.contains("'ledger :: api'"), message);
+  }
+
+  @Test
+  void usedAndPlannedAllowedDependenciesPass() {
+    Fixtures.passes(Fixtures.ROOT + ".contextmap.unused.good", "DCA-MAP-014");
   }
 }

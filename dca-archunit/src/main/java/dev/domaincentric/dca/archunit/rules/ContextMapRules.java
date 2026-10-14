@@ -60,7 +60,8 @@ public final class ContextMapRules implements DcaRuleSet {
             externalContractTypesRespectTranslation(),
             crossContextDependenciesRequireDeclaration(),
             partnershipsSymmetric(),
-            displayDeclaredContextMap());
+            displayDeclaredContextMap(),
+            allowedDependenciesBackedByCode());
   }
 
   @Override
@@ -465,6 +466,125 @@ public final class ContextMapRules implements DcaRuleSet {
                 + " context's package has a direct dependency on a class in the target"
                 + " context's channel sub-package (api or events per the layout) or below."
                 + " Which layer holds the dependency is not checked here.");
+  }
+
+  /**
+   * DCA-MAP-014. The counterpart of DCA-MAP-007 on the module system's side: reads the module
+   * declaration the way DCA-MAP-006 does and asks of every entry whether code uses it. An entry
+   * that DCA-MAP-006 demands for a PLANNED upstream is announced, not stale, and is exempt.
+   */
+  public DcaRule allowedDependenciesBackedByCode() {
+    return DcaRule.check(
+            "DCA-MAP-014",
+            "Every allowed dependency of a module declaration must be backed by an actual code"
+                + " dependency",
+            "A context declares only the dependencies it uses. An allowed dependency no class"
+                + " uses is a door left open: the next dependency through it passes the module"
+                + " boundary without anyone deciding it",
+            arch -> {
+              CollectedViolations violations = CollectedViolations.withoutHeader();
+              List<Class<? extends Annotation>> moduleAnnotations = moduleAnnotationTypes();
+              if (moduleAnnotations.isEmpty()) {
+                return;
+              }
+              Map<String, String> modules = modulePackagesByName(arch);
+              for (String pkg : arch.boundedContextPackages()) {
+                String source = arch.contextName(pkg);
+                Set<String> planned = plannedEdges(arch, pkg);
+                for (String entry : allowedDependencies(arch, pkg, moduleAnnotations)) {
+                  String normalized = entry.replaceAll("\\s*::\\s*", " :: ").trim();
+                  if (planned.contains(normalized)) {
+                    continue;
+                  }
+                  String[] parts = normalized.split(" :: ", 2);
+                  String modulePkg = modules.get(parts[0]);
+                  if (modulePkg == null || modulePkg.equals(pkg)) {
+                    continue;
+                  }
+                  String target =
+                      parts.length == 1 || parts[1].equals("*")
+                          ? modulePkg
+                          : modulePkg + "." + parts[1];
+                  violations.require(
+                      dependsOnTree(arch, pkg, target),
+                      "Context '"
+                          + source
+                          + "' allows the dependency '"
+                          + entry
+                          + "' in its module declaration, but no class in '"
+                          + pkg
+                          + "' depends on '"
+                          + target
+                          + "..' - remove the entry, or declare the upstream PLANNED if the"
+                          + " dependency is coming");
+                }
+              }
+              violations.throwIfAny();
+            })
+        .experimental()
+        .selecting(
+            "Every package carrying @BoundedContext whose package-info carries a configured and"
+                + " loadable module declaration (a module system's per-package declaration, for"
+                + " example Spring Modulith's), and each entry of its allowedDependencies attribute,"
+                + " read as DCA-MAP-006 reads it. Entries that name an edge of a PLANNED @Upstream"
+                + " declaration, and entries whose module is neither a bounded context nor a module"
+                + " root of the scan, are skipped. Without a configured and loadable module"
+                + " declaration the rule selects nothing and passes.")
+        .checking(
+            "For every entry, at least one class anywhere below the declaring context's package"
+                + " has a direct dependency on a class in the named module's package - for"
+                + " 'module :: interface' in its sub-package of that name, for 'module' or"
+                + " 'module :: *' anywhere in the module. A named interface declared on a package"
+                + " of another name is not resolved and is reported as unused. Which layer holds"
+                + " the dependency is not checked here.",
+            "remove the unused entry from allowedDependencies, or declare the upstream PLANNED");
+  }
+
+  /** The edges 'context :: channel' of the context's PLANNED @Upstream declarations. */
+  private static Set<String> plannedEdges(DcaArchitecture arch, String contextPackage) {
+    Set<String> edges = new LinkedHashSet<>();
+    for (Upstream u : arch.packageAnnotations(contextPackage, Upstream.class)) {
+      if (u.status() != Upstream.Status.PLANNED) {
+        continue;
+      }
+      for (Upstream.Consumes channel : u.via()) {
+        edges.add(u.context() + " :: " + channelName(arch, channel));
+      }
+    }
+    return edges;
+  }
+
+  /**
+   * Module names as a module declaration spells them: a bounded context by its name, any module
+   * root - the shared kernel included - by its last package segment.
+   */
+  private static Map<String, String> modulePackagesByName(DcaArchitecture arch) {
+    Map<String, String> byName = new LinkedHashMap<>();
+    for (String root : arch.moduleRoots()) {
+      byName.putIfAbsent(lastSegment(root), root);
+    }
+    arch.sharedKernelPackage().ifPresent(shared -> byName.putIfAbsent(lastSegment(shared), shared));
+    arch.boundedContextPackages().forEach(p -> byName.put(arch.contextName(p), p));
+    return byName;
+  }
+
+  private static String lastSegment(String pkg) {
+    return pkg.substring(pkg.lastIndexOf('.') + 1);
+  }
+
+  /** Whether a class below {@code source} depends directly on a class below {@code target}. */
+  private static boolean dependsOnTree(DcaArchitecture arch, String source, String target) {
+    for (JavaClass javaClass : arch.classes()) {
+      if (!inPackageTree(javaClass.getPackageName(), source)) {
+        continue;
+      }
+      for (Dependency dep : javaClass.getDirectDependenciesFromSelf()) {
+        if (inPackageTree(dep.getTargetClass().getPackageName(), target)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   // ---------------------------------------------------------------------------------------------

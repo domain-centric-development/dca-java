@@ -35,7 +35,13 @@ class UseCaseRulesTest {
   /** Every use-case rule has a negative fixture. */
   @TestFactory
   Stream<DynamicTest> badFixtureFails() {
-    return Fixtures.badFixtureFails(UseCaseRules::new, FIXTURES + ".bad");
+    return Fixtures.badFixtureFails(
+        UseCaseRules::new,
+        FIXTURES + ".bad",
+        // negative fixture in .usecase.featurecut
+        "DCA-USE-018",
+        // negative fixture in .usecase.readonly
+        "DCA-USE-019");
   }
 
   @Nested
@@ -344,5 +350,47 @@ class UseCaseRulesTest {
 
     assertTrue(message.contains("application.InputPort"), message);
     assertTrue(message.contains("application.IInputPort"), message);
+  }
+
+  @Nested
+  @DisplayName("DCA-USE-018 — an incoming adapter serves one feature")
+  class OneFeaturePerAdapter {
+
+    @Test
+    void aControllerOverTwoFeaturesIsReported() {
+      String message = Fixtures.violation(FIXTURES + ".featurecut.bad", "DCA-USE-018").getMessage();
+
+      assertTrue(
+          message.contains("LedgerController drives the input ports of 2 features"), message);
+      assertTrue(message.contains("booking=[PostEntryInputPort]"), message);
+      assertTrue(message.contains("reporting=[ShowBalanceInputPort]"), message);
+    }
+
+    /** One controller per feature passes; a flat module has no features to cut along. */
+    @Test
+    void oneControllerPerFeatureAndAFlatModulePass() {
+      Fixtures.passes(FIXTURES + ".featurecut.good", "DCA-USE-018");
+    }
+  }
+
+  @Nested
+  @DisplayName("DCA-USE-019 — a query has no side effect")
+  class QueriesHaveNoSideEffect {
+
+    @Test
+    void aQueryThatCreatesStoresOrPublishesIsReported() {
+      String message = Fixtures.failure(FIXTURES + ".readonly.bad", "DCA-USE-019").getMessage();
+
+      assertTrue(message.contains("writes through a repository (AccountRepository.save)"), message);
+      assertTrue(message.contains("writes to a store (BalanceCache.putBalance)"), message);
+      assertTrue(
+          message.contains("publishes (DomainEventPublisher.publishAndClearEvents)"), message);
+    }
+
+    /** A query that only reads passes; a command beside it may write and publish. */
+    @Test
+    void aReadingQueryAndAWritingCommandPass() {
+      Fixtures.passes(FIXTURES + ".readonly.good", "DCA-USE-019");
+    }
   }
 }

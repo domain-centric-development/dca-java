@@ -201,4 +201,55 @@ final class TypeInspection {
     List<String> actual = method.getRawParameterTypes().stream().map(JavaClass::getName).toList();
     return actual.equals(List.of(parameterTypes));
   }
+
+  /**
+   * The types an operation takes as its input: the raw parameter types of every public instance
+   * method the type declares or inherits from an interface assignable to the input-port role, and
+   * every type a type argument of such an interface involves ({@code UseCase<PlaceOrderCommand,
+   * PlaceOrderResult>} yields both). Called on an input port or on a class implementing one. Bridge
+   * and synthetic methods are left out; an erased {@code Object} parameter is left out too.
+   */
+  static Set<JavaClass> inputTypes(JavaClass type, String inputPortRole) {
+    Set<JavaClass> inputs = new LinkedHashSet<>();
+    collectInputs(type, inputPortRole, inputs, new HashSet<>());
+    inputs.removeIf(input -> input.getName().equals(OBJECT));
+    return inputs;
+  }
+
+  /** Whether one of the operation's input types has a simple name ending with the suffix. */
+  static boolean takesInputEndingWith(JavaClass type, String inputPortRole, String suffix) {
+    return inputTypes(type, inputPortRole).stream()
+        .anyMatch(input -> input.getSimpleName().endsWith(suffix));
+  }
+
+  private static void collectInputs(
+      JavaClass type, String inputPortRole, Set<JavaClass> inputs, Set<JavaClass> visited) {
+    if (!visited.add(type)) {
+      return;
+    }
+    for (JavaMethod method : type.getMethods()) {
+      Set<JavaModifier> modifiers = method.getModifiers();
+      if (modifiers.contains(JavaModifier.PUBLIC)
+          && !modifiers.contains(JavaModifier.STATIC)
+          && !modifiers.contains(JavaModifier.BRIDGE)
+          && !modifiers.contains(JavaModifier.SYNTHETIC)) {
+        inputs.addAll(method.getRawParameterTypes());
+      }
+    }
+    for (JavaType candidate : type.getInterfaces()) {
+      JavaClass erasure = candidate.toErasure();
+      if (!erasure.isAssignableTo(inputPortRole)) {
+        continue;
+      }
+      if (candidate instanceof JavaParameterizedType parameterized) {
+        for (JavaType argument : parameterized.getActualTypeArguments()) {
+          inputs.addAll(involvedTypes(argument));
+        }
+      }
+      collectInputs(erasure, inputPortRole, inputs, visited);
+    }
+    type.getRawSuperclass()
+        .filter(superclass -> superclass.isAssignableTo(inputPortRole))
+        .ifPresent(superclass -> collectInputs(superclass, inputPortRole, inputs, visited));
+  }
 }

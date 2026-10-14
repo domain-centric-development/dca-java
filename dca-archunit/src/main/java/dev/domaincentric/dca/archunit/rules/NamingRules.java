@@ -3,12 +3,17 @@ package dev.domaincentric.dca.archunit.rules;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaMethod;
+import com.tngtech.archunit.core.domain.JavaModifier;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Naming conventions: consistent names for use cases, input ports, repositories, controllers, DTOs,
@@ -31,7 +36,9 @@ public final class NamingRules implements DcaRuleSet {
             convertersResideInAdapterLayer(layout),
             noTechnicalBucketPackages(layout),
             noTechnicalSuffixesInDomain(layout),
-            viewModelsResideInIncomingWebAdapters(layout));
+            viewModelsResideInIncomingWebAdapters(layout),
+            operationsNamedAfterTheirEffect(layout),
+            operationsSpeakTheDomain(layout));
   }
 
   @Override
@@ -368,6 +375,146 @@ public final class NamingRules implements DcaRuleSet {
                     + "."
                     + layout.webSubpackage()
                     + "..")
+        .toArray(String[]::new);
+  }
+
+  /**
+   * A trigger word is a whole word of the camel-case name: {@code On}, {@code After}, {@code When},
+   * {@code Upon} or {@code Before}, not preceded by another capital and followed by one ({@code
+   * ArchiveEntryOnExpiry}, not {@code OnboardMember} or {@code SignOn}) - at the start of the name
+   * or after a lower-case letter or digit, followed by an upper-case letter.
+   */
+  private static final Pattern TRIGGER_WORD =
+      Pattern.compile("(?:^|(?<=[\\p{Lower}\\p{Digit}]))(On|After|When|Upon|Before)(?=\\p{Upper})");
+
+  /** {@code set} or {@code update} followed by an upper-case letter, in either case. */
+  private static final Pattern DATA_WRITE = Pattern.compile("(?:[Ss]et|[Uu]pdate)\\p{Upper}.*");
+
+  public static DcaRule operationsNamedAfterTheirEffect(DcaLayout layout) {
+    return DcaRule.informational(
+            "DCA-NAM-012",
+            "Diagnostic: use cases and input ports named after a trigger rather than an effect",
+            "A use case is named after its effect, never after its trigger or its caller. When and"
+                + " by whom it runs is the business of the adapter or the consumer that calls it;"
+                + " the same effect reached from a second trigger is the same use case, and a name"
+                + " that carries the trigger invites a second use case for it",
+            arch -> {
+              List<String> observed = new ArrayList<>();
+              for (JavaClass type : operations(arch, layout)) {
+                Matcher trigger = TRIGGER_WORD.matcher(operationName(type, layout));
+                if (trigger.find()) {
+                  observed.add(
+                      type.getName()
+                          + ": '"
+                          + trigger.group(1)
+                          + "' names a trigger - name the operation after its effect");
+                }
+              }
+              return observed;
+            })
+        .experimental()
+        .selecting(
+            "Non-nested types in <module>.application.. of every module root that are assignable"
+                + " to the configured input-port role - interfaces and classes - and classes whose"
+                + " simple name ends with the configured use-case suffix.")
+        .checking(
+            "Informational diagnostic only: lists a type when its simple name, with the use-case"
+                + " suffix or InputPort removed, contains a trigger word - On, After, When, Upon or"
+                + " Before at the start of the name or after a lower-case letter or digit, followed"
+                + " by an upper-case letter - and never fails."
+                + " OnboardMember and SignOn are not reported. Whether a name without one of these"
+                + " words names the effect is not decidable here and stays with review.");
+  }
+
+  public static DcaRule operationsSpeakTheDomain(DcaLayout layout) {
+    return DcaRule.check(
+            "DCA-NAM-013",
+            "Use cases, input ports and published operations must not be named after a field they"
+                + " write",
+            "An operation speaks the domain, not data access. A name after the field it writes"
+                + " (setLimit, updateStatus) says how the data changes, not what the change means;"
+                + " the glossary's verb says that (raise a limit, grant an initial limit), and the"
+                + " caller learns which rules run",
+            arch -> {
+              List<String> violations = new ArrayList<>();
+              for (JavaClass type : operations(arch, layout)) {
+                if (DATA_WRITE.matcher(operationName(type, layout)).matches()) {
+                  violations.add(
+                      type.getName()
+                          + " is named after a data write - name it after what the change means,"
+                          + " with the glossary's verb");
+                }
+              }
+              String[] published = publishedApiPatterns(arch);
+              for (JavaClass type : arch.classes()) {
+                if (type.isNestedClass()
+                    || !JavaClass.Predicates.resideInAnyPackage(published).test(type)) {
+                  continue;
+                }
+                for (JavaMethod method : type.getMethods()) {
+                  if (method.getModifiers().contains(JavaModifier.PUBLIC)
+                      && !method.getModifiers().contains(JavaModifier.SYNTHETIC)
+                      && !method.getModifiers().contains(JavaModifier.BRIDGE)
+                      && DATA_WRITE.matcher(method.getName()).matches()) {
+                    violations.add(
+                        method.getFullName()
+                            + " of a published type is named after a data write - name it after"
+                            + " what the change means, with the glossary's verb");
+                  }
+                }
+              }
+              if (!violations.isEmpty()) {
+                throw new dev.domaincentric.dca.archunit.DcaRuleViolation(
+                    "Use cases, input ports and published operations must not be named after a"
+                        + " field they write",
+                    violations);
+              }
+            })
+        .experimental()
+        .selecting(
+            "Non-nested types in <module>.application.. of every module root that are assignable"
+                + " to the configured input-port role - interfaces and classes - and classes whose"
+                + " simple name ends with the configured use-case suffix; and the public methods of"
+                + " every non-nested type in the published api package of every module root"
+                + " (<module>.<api>..).")
+        .checking(
+            "No selected type name - with the use-case suffix or InputPort removed - and no"
+                + " selected method name starts with set or update followed by a capital"
+                + " (SetLimit, updateStatus). settle and updated are not matched. Whether the"
+                + " remaining verb is in the glossary is not checked. The events package is not"
+                + " selected. An empty selection passes.",
+            "name the operation after what the change means, with the glossary's verb");
+  }
+
+  /** The input ports and use cases of every module, nested types left out. */
+  private static List<JavaClass> operations(DcaArchitecture arch, DcaLayout layout) {
+    List<JavaClass> operations = new ArrayList<>();
+    for (JavaClass type : arch.classes()) {
+      if (!type.isNestedClass()
+          && !type.isAnonymousClass()
+          && JavaClass.Predicates.resideInAnyPackage(arch.allApplicationPatterns()).test(type)
+          && (type.isAssignableTo(layout.markers().inputPort())
+              || (!type.isInterface() && type.getSimpleName().endsWith(layout.useCaseSuffix())))) {
+        operations.add(type);
+      }
+    }
+    return operations;
+  }
+
+  /** The simple name without the use-case suffix or {@code InputPort}. */
+  private static String operationName(JavaClass type, DcaLayout layout) {
+    String name = type.getSimpleName();
+    for (String suffix : List.of(layout.useCaseSuffix(), "InputPort")) {
+      if (name.endsWith(suffix) && name.length() > suffix.length()) {
+        return name.substring(0, name.length() - suffix.length());
+      }
+    }
+    return name;
+  }
+
+  private static String[] publishedApiPatterns(DcaArchitecture arch) {
+    return arch.moduleRoots().stream()
+        .map(root -> root + "." + arch.layout().apiSubpackage() + "..")
         .toArray(String[]::new);
   }
 }

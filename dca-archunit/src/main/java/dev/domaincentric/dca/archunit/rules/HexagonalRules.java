@@ -5,11 +5,17 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaCodeUnit;
+import com.tngtech.archunit.core.domain.JavaMethodCall;
+import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.lang.ConditionEvents;
+import com.tngtech.archunit.lang.SimpleConditionEvent;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaMarkers;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
+import dev.domaincentric.dca.archunit.FrameworkAnnotations;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.in.InputPort;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,7 +48,9 @@ public final class HexagonalRules implements DcaRuleSet {
             outputPortsMustNotResideInDomain(),
             incomingAdaptersMustDependOnInputPortsNotUseCaseClasses(),
             incomingAdaptersMustNotDependOnDomainServices(),
-            outgoingAdaptersMustNotDependOnInputPorts());
+            outgoingAdaptersMustNotDependOnInputPorts(),
+            getHandlersDriveNoCommand(),
+            incomingAdaptersKeepNoInstanceLocalState());
   }
 
   @Override
@@ -457,5 +465,155 @@ public final class HexagonalRules implements DcaRuleSet {
                 + " - only direct dependencies are read. An empty selection passes.",
             "move the class to the incoming adapter package, or let the use case reach the"
                 + " capability through an output port");
+  }
+
+  /**
+   * DCA-HEX-014. The command is recognised by its input, as DCA-USE-002 and DCA-USE-004 recognise
+   * it: the input port takes a type whose simple name ends with {@code Command}.
+   */
+  public DcaRule getHandlersDriveNoCommand() {
+    List<String> controllers = layout.frameworkAnnotations().webController();
+    List<String> getMapping = layout.frameworkAnnotations().getMapping();
+    return DcaRule.of(
+            "DCA-HEX-014",
+            "GET handlers must not drive an input port that takes a command",
+            "A state-changing use case is reached only by an unsafe HTTP method, never by GET."
+                + " Links, prefetching, crawlers and cross-site navigation issue GET requests on"
+                + " their own; a GET that runs a command changes state nobody asked to change",
+            arch ->
+                classes()
+                    .that()
+                    .resideInAnyPackage(arch.allIncomingAdapterPatterns())
+                    .and(AnnotationRoles.annotatedWithAny(controllers))
+                    .should(driveNoCommandFromGet(getMapping, layout.markers()))
+                    .allowEmptyShould(true))
+        .experimental()
+        .selecting(
+            "Classes in <module>.adapter.incoming.. of every module root that are directly"
+                + " annotated with one of the configured web-controller stereotypes; within them,"
+                + " the methods carrying, directly or as a meta-annotation, an annotation of the"
+                + " configured GET-mapping role.")
+        .checking(
+            "No such method - or a method of the same class it reaches through calls within the"
+                + " class - calls a type assignable to the configured input-port role whose input"
+                + " ends with Command: a parameter of the called method, of a public method of the"
+                + " port, or a type argument of the input port it extends. A mapping that names its"
+                + " HTTP method in an attribute is not read. With an empty web-controller or"
+                + " GET-mapping role nothing is selected and the rule passes.",
+            "map the handler to POST, PUT or DELETE, or let the GET handler ask a query");
+  }
+
+  private static ArchCondition<JavaClass> driveNoCommandFromGet(
+      List<String> getMapping, DcaMarkers markers) {
+    return new ArchCondition<>("drive no command from a GET handler") {
+      @Override
+      public void check(JavaClass item, ConditionEvents events) {
+        IntraClassCalls calls = new IntraClassCalls(item);
+        for (JavaCodeUnit handler : item.getCodeUnits()) {
+          if (!AnnotationRoles.isMetaAnnotatedWithAny(handler, getMapping)) {
+            continue;
+          }
+          java.util.Set<String> commands = new java.util.TreeSet<>();
+          for (JavaCodeUnit unit : calls.reachableFrom(handler)) {
+            for (JavaMethodCall call : unit.getMethodCallsFromSelf()) {
+              JavaClass owner = call.getTargetOwner();
+              if (owner.isAssignableTo(markers.inputPort()) && takesCommand(call, markers)) {
+                commands.add(owner.getSimpleName() + "." + call.getName());
+              }
+            }
+          }
+          if (!commands.isEmpty()) {
+            events.add(
+                SimpleConditionEvent.violated(
+                    item,
+                    item.getName()
+                        + "."
+                        + handler.getName()
+                        + " handles "
+                        + FrameworkAnnotations.describe(getMapping, "a GET request")
+                        + " and drives a command through "
+                        + String.join(", ", commands)));
+          }
+        }
+      }
+    };
+  }
+
+  private static boolean takesCommand(JavaMethodCall call, DcaMarkers markers) {
+    return call.getTarget().getRawParameterTypes().stream()
+            .anyMatch(parameter -> parameter.getSimpleName().endsWith("Command"))
+        || TypeInspection.takesInputEndingWith(
+            call.getTargetOwner(), markers.inputPort(), "Command");
+  }
+
+  public DcaRule incomingAdaptersKeepNoInstanceLocalState() {
+    List<String> api = layout.frameworkAnnotations().instanceLocalState();
+    return DcaRule.of(
+            "DCA-HEX-015",
+            "Incoming adapters must not keep state for a later request in one instance",
+            "State a later request needs travels with that request or lives in a store every"
+                + " instance reads. A server session or a message held for the next request is kept"
+                + " by one instance, and behind a load balancer without sticky sessions the next"
+                + " request reaches another one. A message for the page after a redirect is a fixed"
+                + " code in the redirect address, which the page maps to its text",
+            arch ->
+                classes()
+                    .that()
+                    .resideInAnyPackage(arch.allIncomingAdapterPatterns())
+                    .should(callNoInstanceLocalState(api))
+                    .allowEmptyShould(true))
+        .experimental()
+        .selecting("Classes in <module>.adapter.incoming.. of every module root.")
+        .checking(
+            "No code unit calls an entry of the configured instance-local-state role: an entry"
+                + " naming a type matches a call of any method on a type assignable to it, an entry"
+                + " whose last segment starts in lower case (Type.method) a call of that method"
+                + " only. Holding such a type as a parameter or field without calling it is not"
+                + " reported, nor is state kept through an annotation. With an empty role nothing is"
+                + " reported.",
+            "carry the state in the request - a fixed code in the redirect address - or keep it"
+                + " in a store every instance reads");
+  }
+
+  private static ArchCondition<JavaClass> callNoInstanceLocalState(List<String> api) {
+    return new ArchCondition<>("call no instance-local state API") {
+      @Override
+      public void check(JavaClass item, ConditionEvents events) {
+        for (JavaCodeUnit unit : item.getCodeUnits()) {
+          java.util.Set<String> used = new java.util.TreeSet<>();
+          for (JavaMethodCall call : unit.getMethodCallsFromSelf()) {
+            for (String entry : api) {
+              if (matchesInstanceLocalState(call, entry)) {
+                used.add(call.getTargetOwner().getSimpleName() + "." + call.getName());
+              }
+            }
+          }
+          if (!used.isEmpty()) {
+            events.add(
+                SimpleConditionEvent.violated(
+                    item,
+                    item.getName()
+                        + "."
+                        + unit.getName()
+                        + " keeps request state in this instance through "
+                        + String.join(", ", used)));
+          }
+        }
+      }
+    };
+  }
+
+  /**
+   * {@code com.acme.Session} matches every call on a type assignable to it; {@code
+   * com.acme.Redirect.keep} - the last segment in lower case - only calls of {@code keep}.
+   */
+  private static boolean matchesInstanceLocalState(JavaMethodCall call, String entry) {
+    int dot = entry.lastIndexOf('.');
+    String last = entry.substring(dot + 1);
+    if (dot > 0 && !last.isEmpty() && Character.isLowerCase(last.charAt(0))) {
+      return call.getName().equals(last)
+          && call.getTargetOwner().isAssignableTo(entry.substring(0, dot));
+    }
+    return call.getTargetOwner().isAssignableTo(entry);
   }
 }

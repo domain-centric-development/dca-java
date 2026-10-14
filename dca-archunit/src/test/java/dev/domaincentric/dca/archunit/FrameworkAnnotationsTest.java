@@ -47,6 +47,37 @@ class FrameworkAnnotationsTest {
     assertEquals(List.of(), adjusted.withRestController().restController(), "no argument empties");
   }
 
+  /** Every with* method and named() carry every other role, the later ones included. */
+  @Test
+  void everyAdjustmentKeepsEveryOtherRole() {
+    FrameworkAnnotations spring = FrameworkAnnotations.spring();
+    List<FrameworkAnnotations> adjusted =
+        List.of(
+            spring.named("adjusted"),
+            spring.withInjectable("x.A"),
+            spring.withWebController("x.A"),
+            spring.withRestController("x.A"),
+            spring.withTransactional("x.A"),
+            spring.withEventListener("x.A"),
+            spring.withModuleDeclaration("x.A"),
+            spring.withPublishedInterface("x.A"),
+            spring.withPersistenceEntity("x.A"),
+            spring.withInjectionSite("x.A"),
+            spring.withPersistenceMapping("x.A"),
+            spring.withTransactionApi("x.A"),
+            spring.withTransactionManager("x.A"));
+    for (FrameworkAnnotations each : adjusted) {
+      assertEquals(spring.transportStatus(), each.transportStatus(), each.toString());
+      assertEquals(spring.getMapping(), each.getMapping(), each.toString());
+      assertEquals(spring.instanceLocalState(), each.instanceLocalState(), each.toString());
+    }
+    assertEquals(List.of("x.Get"), spring.withGetMapping("x.Get").getMapping());
+    assertEquals(
+        List.of("x.Flash.keep"),
+        spring.withInstanceLocalState("x.Flash.keep").instanceLocalState());
+    assertEquals(spring.getMapping(), spring.withInstanceLocalState().getMapping());
+  }
+
   @Test
   void rolesRejectBlankNames() {
     assertThrows(

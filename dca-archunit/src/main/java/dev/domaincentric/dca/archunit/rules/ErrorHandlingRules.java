@@ -3,6 +3,9 @@ package dev.domaincentric.dca.archunit.rules;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaField;
+import com.tngtech.archunit.core.domain.JavaModifier;
+import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaMarkers;
 import dev.domaincentric.dca.archunit.DcaRule;
@@ -43,7 +46,8 @@ public final class ErrorHandlingRules implements DcaRuleSet {
             applicationExceptionsExtendUseCaseException(),
             exceptionsCarryNoFrameworkMetadata(layout),
             exceptionsNameNoTransportConcept(),
-            adaptersWithoutTranslation());
+            adaptersWithoutTranslation(),
+            failuresCarryIdsAndFigures());
   }
 
   @Override
@@ -306,6 +310,88 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                 + " different package of the same module is not seen, and a caught type is not"
                 + " visible to the import model, so this does not establish that a package"
                 + " translates nothing.");
+  }
+
+  public DcaRule failuresCarryIdsAndFigures() {
+    return DcaRule.informational(
+            "DCA-ERR-007",
+            "Diagnostic: failures that carry display data or objects instead of ids and figures",
+            "A failure carries ids and figures, never what a page shows. Its fields are the typed"
+                + " identities and the values the rule compared; a name or a description of the"
+                + " thing an id refers to is resolved by the translation site through the queries"
+                + " it already has. A failure that carries the name decides for every surface what"
+                + " it shows, and one that carries an aggregate or an entity hands the model out"
+                + " through the error path",
+            arch -> {
+              List<String> observed = new ArrayList<>();
+              DcaMarkers markers = arch.layout().markers();
+              for (JavaClass failure : arch.classes()) {
+                if (failure.isInterface() || !isProjectException(failure, markers)) {
+                  continue;
+                }
+                for (JavaField field : TypeInspection.instanceFields(failure)) {
+                  JavaClass owner = field.getOwner();
+                  if (field.getModifiers().contains(JavaModifier.SYNTHETIC)
+                      || owner.getPackageName().startsWith("java.")
+                      || markers.declaresTypesIn(owner.getPackageName())) {
+                    continue;
+                  }
+                  for (JavaClass involved : TypeInspection.involvedTypes(field, failure)) {
+                    String finding = fieldFinding(involved, arch);
+                    if (finding != null) {
+                      observed.add(
+                          failure.getName()
+                              + "."
+                              + field.getName()
+                              + " is "
+                              + finding
+                              + " ("
+                              + involved.getSimpleName()
+                              + ") - carry the id or the figure the rule compared");
+                    }
+                  }
+                }
+              }
+              return observed;
+            })
+        .experimental()
+        .selecting(
+            "Concrete project classes assignable to DomainException or UseCaseException - the"
+                + " building blocks' own types excluded - and their instance fields, inherited"
+                + " ones declared in project classes included.")
+        .checking(
+            "Informational diagnostic only: lists every field that involves - through its raw type"
+                + " or a type argument - a plain string, an aggregate or entity, or any other type"
+                + " that is neither assignable to the id or value role, nor a number, a primitive,"
+                + " an enum or a date and time type of the platform, and never fails. Container"
+                + " types such as lists are looked through. The message the base type carries is"
+                + " not a field of the project's failure and is not listed.");
+  }
+
+  /** What is wrong with a type a failure's field involves, or {@code null} when it is fine. */
+  private static String fieldFinding(JavaClass type, DcaArchitecture arch) {
+    DcaMarkers markers = arch.layout().markers();
+    String name = type.getName();
+    if (type.isAssignableTo(markers.aggregateRoot()) || type.isAssignableTo(markers.entity())) {
+      return "an aggregate or entity";
+    }
+    if (type.isAssignableTo(CharSequence.class)) {
+      return "a plain string";
+    }
+    if (type.isPrimitive()
+        || type.isEnum()
+        || type.isAssignableTo(Number.class)
+        || type.isAssignableTo(markers.id())
+        || type.isAssignableTo(markers.value())
+        || name.equals("java.lang.Boolean")
+        || name.equals("java.lang.Character")
+        || type.getPackageName().equals("java.time")
+        || arch.layout().timestampTypes().contains(name)
+        || type.getPackageName().equals("java.util")
+        || name.equals("java.lang.Object")) {
+      return null;
+    }
+    return "neither an id, a value nor a number";
   }
 
   private static final List<String> FORBIDDEN_SUFFIXES = List.of("Error", "Fault", "Failure");

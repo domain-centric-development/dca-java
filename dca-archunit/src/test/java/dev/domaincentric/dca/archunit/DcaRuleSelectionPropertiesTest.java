@@ -127,10 +127,14 @@ class DcaRuleSelectionPropertiesTest {
   }
 
   @Test
-  void anAbsentClasspathResourceMeansTheWholeCatalog() {
+  void anAbsentClasspathResourceMeansTheWholeReleasedCatalog() {
     DcaRuleSelection selection = DcaRuleSelection.fromClasspath("no-such-file.properties");
 
-    assertEquals(DcaRules.all(LAYOUT).size(), DcaRules.selectFlat(LAYOUT, selection).size());
+    assertEquals(
+        DcaRules.all(LAYOUT).stream()
+            .filter(rule -> rule.maturity() == DcaRule.Maturity.RELEASED)
+            .count(),
+        DcaRules.selectFlat(LAYOUT, selection).size());
     assertEquals(DcaSeverity.ERROR, selection.severityOf("DCA-NAM-001"));
   }
 

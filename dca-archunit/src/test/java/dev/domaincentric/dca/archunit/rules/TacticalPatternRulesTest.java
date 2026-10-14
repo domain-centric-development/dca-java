@@ -26,7 +26,7 @@ class TacticalPatternRulesTest {
   void ruleSetHasStableShape() {
     TacticalPatternRules set = new TacticalPatternRules(DcaLayout.forBasePackage(GOOD));
     assertEquals("tactical", set.name());
-    assertEquals(22, set.rules().size());
+    assertEquals(23, set.rules().size());
     Fixtures.assertIdsAreSequential(set, "TAC");
   }
 
@@ -38,7 +38,11 @@ class TacticalPatternRulesTest {
   /** Every tactical rule has a negative fixture. */
   @TestFactory
   Stream<DynamicTest> badFixtureFails() {
-    return Fixtures.badFixtureFails(TacticalPatternRules::new, BAD);
+    return Fixtures.badFixtureFails(
+        TacticalPatternRules::new,
+        BAD,
+        // negative fixture in .tactical.factories
+        "DCA-TAC-024");
   }
 
   @Test
@@ -211,5 +215,24 @@ class TacticalPatternRulesTest {
         Fixtures.violation(BAD, "DCA-TAC-016").violations().stream()
             .anyMatch(v -> v.contains("Repository")),
         "the default suffix still selects");
+  }
+
+  /** DCA-TAC-024: a neutral factory beside the stored one takes the same parameters. */
+  @Test
+  void twoFactoriesWithOneSignatureAreReported() {
+    String message =
+        Fixtures.violation(Fixtures.ROOT + ".tactical.factories.bad", "DCA-TAC-024").getMessage();
+
+    assertTrue(message.contains("Password has 2 factories taking (java.lang.String)"), message);
+    assertTrue(message.contains("fromHash, of"), message);
+  }
+
+  /**
+   * One factory per origin, two named origins with equal parameters, and an enum's own factories
+   * beside the language's valueOf.
+   */
+  @Test
+  void oneFactoryPerOriginPasses() {
+    Fixtures.passes(Fixtures.ROOT + ".tactical.factories.good", "DCA-TAC-024");
   }
 }

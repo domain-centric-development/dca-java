@@ -9,8 +9,7 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 **A rule can be experimental.** Beside its kind (`ENFORCED`, `INFORMATIONAL`) every rule now has a
 maturity, `DcaRule.Maturity` — `RELEASED` or `EXPERIMENTAL`, read with `maturity()`. A rule is
 declared experimental where it is defined: `DcaRule.of(…).experimental().selecting(…).checking(…)`.
-It keeps its final id and set, so releasing it is removing that one call. Every rule of the catalog
-is released; no experimental rule ships yet.
+It keeps its final id and set, so releasing it is removing that one call.
 
 **Experimental rules run only on opt-in.** `DcaRuleSelection.all()` means every released rule.
 `DcaRuleSelection.all().withExperimental()` adds the experimental ones and composes with the scope
@@ -30,6 +29,45 @@ ones included.
 
 **`rules.json` carries the maturity.** Every rule has `"maturity": "released"` or
 `"experimental"`; `RULES.md` marks an experimental rule `(experimental)`.
+
+**The first nine experimental rules.** Off by default, each runs only with the opt-in above; the
+same ids are the .NET library's (`DCA-MAP-014` is Java only).
+
+- `DCA-TAC-024` (tactical, enforced): a value object has one factory per origin — no neutral
+  factory `of` beside another public static factory returning it with the same parameter types;
+  two named origins with equal parameters (`fromInput(String)`, `fromStored(String)`) pass.
+- `DCA-NAM-012` (naming, informational): lists input ports and use cases whose name holds a trigger
+  word — `On`, `After`, `When`, `Upon`, `Before` at the start of the name or after a lower-case
+  letter or digit, followed by an upper-case letter.
+- `DCA-NAM-013` (naming, enforced): no use case, input port or method of a published `api` type is
+  named `set…` or `update…` followed by a capital.
+- `DCA-USE-018` (usecase, enforced): in a module grouped by feature, an incoming adapter class
+  depends on the input ports of one feature only.
+- `DCA-USE-019` (usecase, enforced): a use case whose input ends in `Query` calls no repository or
+  store write — a method named by a write verb (`save`, `delete`, `remove`, `add`, `insert`,
+  `update`, `upsert`, `put`, `store`, `write`, `create`, `append`, `archive`, `purge`, `clear`,
+  `set`, `mark`) alone or followed by a capital — and no event publisher.
+- `DCA-HEX-014` (hexagonal, enforced): a GET handler of a web controller drives no input port whose
+  input ends in `Command`, directly or through a method of the same class.
+- `DCA-HEX-015` (hexagonal, enforced): an incoming adapter calls no instance-local state API.
+- `DCA-ERR-007` (errors, informational): lists the fields of a project's `DomainException` and
+  `UseCaseException` subtypes that are not an id, a value, a number, a primitive, an enum or a date
+  and time type — a plain string, an aggregate or entity, anything else.
+- `DCA-MAP-014` (contextmap, enforced): every `allowedDependencies` entry of a module declaration is
+  backed by a code dependency; an entry a PLANNED `@Upstream` announces is exempt.
+
+**Two framework roles.** `FrameworkAnnotations` gains `getMapping` — the annotations that bind a
+handler to GET (Spring `@GetMapping`, JAX-RS `@GET`, Micronaut `@Get`), read by `DCA-HEX-014` — and
+`instanceLocalState` — the types, and the methods named `Type.method`, that keep request state in
+one instance (Spring: `HttpSession`, `RedirectAttributes.addFlashAttribute`; Jakarta: `HttpSession`;
+Micronaut: `Session`), read by `DCA-HEX-015`. `withGetMapping(…)` and `withInstanceLocalState(…)`
+adjust them; the 14-role constructor stays as a compatibility constructor with both empty.
+
+### Fixed
+
+**Adjusting one framework role keeps the others.** Every `with*` method of `FrameworkAnnotations`
+except `withPersistenceMapping` and `withTransportStatus` went through a compatibility constructor
+and dropped the transport-status role; `named(…)` did the same. All of them now carry every role.
 
 ## [0.7.0] - 2026-10-12
 

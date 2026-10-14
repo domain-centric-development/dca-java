@@ -1,5 +1,6 @@
 package dev.domaincentric.dca.archunit.rules;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -31,8 +32,9 @@ class ErrorHandlingRulesTest {
     return Fixtures.badFixtureFails(
         ErrorHandlingRules::new,
         FIXTURES + ".bad",
-        // informational diagnostic, never fails
-        "DCA-ERR-006");
+        // informational diagnostics, never fail; DCA-ERR-007 observed in .errors.fieldtypes
+        "DCA-ERR-006",
+        "DCA-ERR-007");
   }
 
   @Test
@@ -99,5 +101,36 @@ class ErrorHandlingRulesTest {
 
     String baseType = Fixtures.failure(FIXTURES + ".bad", "DCA-ERR-003").getMessage();
     assertFalse(baseType.contains("ReservationRuleBrokenException"), baseType);
+  }
+
+  /** DCA-ERR-007 lists display data, raw input and objects on a failure. */
+  @Test
+  void failuresCarryingStringsOrAggregatesAreListed() {
+    var observed = Fixtures.observed(FIXTURES + ".fieldtypes.bad", "DCA-ERR-007");
+
+    assertTrue(
+        observed.stream()
+            .anyMatch(
+                line -> line.contains("AccountOverdrawnException.accountName is a plain string")),
+        observed.toString());
+    assertTrue(
+        observed.stream()
+            .anyMatch(
+                line ->
+                    line.contains("AccountOverdrawnException.account is an aggregate or entity")),
+        observed.toString());
+    assertTrue(
+        observed.stream()
+            .anyMatch(
+                line -> line.contains("AccountNotFoundException.rawAccountId is a plain string")),
+        observed.toString());
+    assertEquals(3, observed.size(), observed.toString());
+  }
+
+  /** Ids, values, numbers and a list of ids pass; the base type's message is not a field. */
+  @Test
+  void failuresCarryingIdsAndFiguresAreNotListed() {
+    assertEquals(
+        java.util.List.of(), Fixtures.observed(FIXTURES + ".fieldtypes.good", "DCA-ERR-007"));
   }
 }

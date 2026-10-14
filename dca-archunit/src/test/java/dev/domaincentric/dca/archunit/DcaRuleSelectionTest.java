@@ -14,9 +14,15 @@ class DcaRuleSelectionTest {
   private static final DcaLayout LAYOUT = DcaLayout.forBasePackage("com.acme.shop");
 
   @Test
-  void allSelectsTheWholeCatalog() {
+  void allSelectsTheWholeReleasedCatalog() {
     assertEquals(
-        DcaRules.all(LAYOUT).size(), DcaRules.selectFlat(LAYOUT, DcaRuleSelection.all()).size());
+        DcaRules.all(LAYOUT).stream()
+            .filter(rule -> rule.maturity() == DcaRule.Maturity.RELEASED)
+            .count(),
+        DcaRules.selectFlat(LAYOUT, DcaRuleSelection.all()).size());
+    assertEquals(
+        DcaRules.all(LAYOUT).size(),
+        DcaRules.selectFlat(LAYOUT, DcaRuleSelection.all().withExperimental()).size());
   }
 
   @Test

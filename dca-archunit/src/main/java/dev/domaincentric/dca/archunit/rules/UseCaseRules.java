@@ -58,7 +58,9 @@ public final class UseCaseRules implements DcaRuleSet {
             useCasePackagesUseOneDepth(layout),
             resultsMustNotExposeAggregatesOrEntities(layout),
             useCasesMustNotInvokeOtherUseCases(layout),
-            useCasesExposeOnlyInputPort(layout));
+            useCasesExposeOnlyInputPort(layout),
+            incomingAdaptersServeOneFeature(layout),
+            queriesHaveNoSideEffect(layout));
   }
 
   public static DcaRule useCasesMustNotInvokeOtherUseCases(DcaLayout layout) {
@@ -474,13 +476,7 @@ public final class UseCaseRules implements DcaRuleSet {
                 || candidate.getSimpleName().endsWith(layout.useCaseSuffix()))) {
           continue;
         }
-        int depth =
-            pkg.equals(application)
-                ? 0
-                : (int)
-                    java.util.Arrays.stream(pkg.substring(application.length() + 1).split("\\."))
-                        .filter(segment -> !layout.operationContainers().contains(segment))
-                        .count();
+        int depth = useCaseSegments(pkg, application, layout).size();
         byDepth.computeIfAbsent(depth, d -> new TreeSet<>()).add(pkg);
       }
       if (byDepth.isEmpty()) {
@@ -859,4 +855,215 @@ public final class UseCaseRules implements DcaRuleSet {
       }
     };
   }
+
+  /**
+   * The segments of a package below the module's application package, configured operation
+   * containers removed: {@code [placeorder]} for a flat use case package, {@code [ordering,
+   * placeorder]} for a grouped one, empty for the application package itself.
+   */
+  private static List<String> useCaseSegments(String pkg, String application, DcaLayout layout) {
+    if (pkg.equals(application)) {
+      return List.of();
+    }
+    return java.util.Arrays.stream(pkg.substring(application.length() + 1).split("\\."))
+        .filter(segment -> !layout.operationContainers().contains(segment))
+        .toList();
+  }
+
+  /**
+   * DCA-USE-018. A module is grouped when one of its input ports or use cases sits at the feature
+   * depth of DCA-USE-014 ({@code application.<feature>.<usecase>}); its features are the first
+   * segments below the application package. A flat module has no features and is not selected.
+   */
+  public static DcaRule incomingAdaptersServeOneFeature(DcaLayout layout) {
+    return DcaRule.check(
+            "DCA-USE-018",
+            "In a module grouped by feature, incoming adapters must drive the input ports of one"
+                + " feature only",
+            "Once the application is grouped, the incoming adapter is cut the same way: one"
+                + " controller serves the use cases of one feature. A class that drives the input"
+                + " ports of two features grows with every use case of both and hides the cut the"
+                + " application already made",
+            arch -> checkOneFeaturePerAdapter(arch, layout))
+        .experimental()
+        .selecting(
+            "Per module root whose input ports or use cases sit at the feature depth"
+                + " application.<feature>.<usecase> (configured operationContainers segments"
+                + " removed, application.shared excluded): every non-interface class in"
+                + " <module>.adapter.incoming.. of that module. Modules with flat use case packages"
+                + " are not selected.")
+        .checking(
+            "The types assignable to the configured input-port role that the class depends on"
+                + " directly - inside the same module - belong to at most one feature, the feature"
+                + " being the first segment below the application package. A dependency on an input"
+                + " port of another module is not counted here. Nested classes are counted on their"
+                + " own. An empty selection passes.",
+            "cut the class along the features, one incoming adapter per feature, mirroring"
+                + " application.<feature> below the protocol segment");
+  }
+
+  private static void checkOneFeaturePerAdapter(DcaArchitecture arch, DcaLayout layout) {
+    List<String> violations = new ArrayList<>();
+    for (String root : arch.moduleRoots()) {
+      String application = root + "." + layout.applicationSubpackage();
+      String shared = application + "." + layout.sharedSubpackage();
+      String incoming = root + "." + layout.adapterSubpackage() + "." + layout.incomingSubpackage();
+      if (!isGroupedByFeature(arch, layout, application, shared)) {
+        continue;
+      }
+      for (JavaClass adapter : arch.classes()) {
+        if (adapter.isInterface()
+            || !DcaArchitecture.inPackageTree(adapter.getPackageName(), incoming)) {
+          continue;
+        }
+        Map<String, TreeSet<String>> portsByFeature = new TreeMap<>();
+        for (var dependency : adapter.getDirectDependenciesFromSelf()) {
+          JavaClass target = dependency.getTargetClass();
+          String pkg = target.getPackageName();
+          if (!target.isAssignableTo(layout.markers().inputPort())
+              || !DcaArchitecture.inPackageTree(pkg, application)
+              || DcaArchitecture.inPackageTree(pkg, shared)) {
+            continue;
+          }
+          List<String> segments = useCaseSegments(pkg, application, layout);
+          if (segments.size() < 2) {
+            continue;
+          }
+          portsByFeature
+              .computeIfAbsent(segments.get(0), feature -> new TreeSet<>())
+              .add(target.getSimpleName());
+        }
+        if (portsByFeature.size() > 1) {
+          violations.add(
+              adapter.getName()
+                  + " drives the input ports of "
+                  + portsByFeature.size()
+                  + " features "
+                  + portsByFeature
+                  + " - cut it along the features");
+        }
+      }
+    }
+    if (!violations.isEmpty()) {
+      throw new DcaRuleViolation(
+          "In a module grouped by feature, incoming adapters must drive the input ports of one"
+              + " feature only",
+          violations);
+    }
+  }
+
+  /** Whether an input port or use case of the module sits at application.<feature>.<usecase>. */
+  private static boolean isGroupedByFeature(
+      DcaArchitecture arch, DcaLayout layout, String application, String shared) {
+    for (JavaClass candidate : arch.classes()) {
+      String pkg = candidate.getPackageName();
+      if (!DcaArchitecture.inPackageTree(pkg, application)
+          || DcaArchitecture.inPackageTree(pkg, shared)
+          || candidate.isNestedClass()
+          || !(candidate.isAssignableTo(layout.markers().inputPort())
+              || candidate.getSimpleName().endsWith(layout.useCaseSuffix()))) {
+        continue;
+      }
+      if (useCaseSegments(pkg, application, layout).size() == 2) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * DCA-USE-019. The query is recognised by its input, as DCA-USE-003 and DCA-USE-005 recognise it:
+   * the operation takes a type whose simple name ends with {@code Query}.
+   */
+  public static DcaRule queriesHaveNoSideEffect(DcaLayout layout) {
+    return DcaRule.of(
+            "DCA-USE-019",
+            "Query use cases must not write or publish",
+            "A read never creates. A query has no side effect: it does not create, save or publish,"
+                + " and when nothing exists it answers none. Find-or-create is a command, called"
+                + " where the caller is about to change state; a page or an answer that only shows"
+                + " what exists asks the query",
+            arch ->
+                classes()
+                    .that(useCases(arch, layout))
+                    .and(takingAQuery(layout))
+                    .should(notWriteOrPublish(layout.markers()))
+                    .allowEmptyShould(true))
+        .experimental()
+        .selecting(
+            "Non-interface classes in <module>.application.. that implement InputPort or whose"
+                + " simple name ends with the configured use-case suffix, and whose input ends"
+                + " with Query - a parameter of a public method, or a type argument of the input"
+                + " port they implement.")
+        .checking(
+            "No code unit of the class calls a write on the repository or store role - a method"
+                + " whose name is a write verb alone or followed by a capital (save, delete, remove,"
+                + " add, insert, update, upsert, put, store, write, create, append, archive, purge,"
+                + " clear, set, mark) - nor any method of the domain-event or integration-event"
+                + " publisher role. Calls made by another"
+                + " class the use case delegates to are not followed. An empty selection passes.",
+            "answer none when nothing exists, and move find-or-create into a command the caller"
+                + " runs before it changes state");
+  }
+
+  private static DescribedPredicate<JavaClass> takingAQuery(DcaLayout layout) {
+    return DescribedPredicate.describe(
+        "take an input ending with Query",
+        type -> TypeInspection.takesInputEndingWith(type, layout.markers().inputPort(), "Query"));
+  }
+
+  private static ArchCondition<JavaClass> notWriteOrPublish(DcaMarkers markers) {
+    return new ArchCondition<>("write nothing and publish nothing") {
+      @Override
+      public void check(JavaClass item, ConditionEvents events) {
+        for (JavaCodeUnit unit : item.getCodeUnits()) {
+          for (var call : unit.getMethodCallsFromSelf()) {
+            String effect = sideEffectOf(call.getTargetOwner(), call.getTarget(), markers);
+            if (effect != null) {
+              events.add(
+                  SimpleConditionEvent.violated(
+                      item,
+                      item.getName()
+                          + "."
+                          + unit.getName()
+                          + " answers a query and "
+                          + effect
+                          + " ("
+                          + call.getTargetOwner().getSimpleName()
+                          + "."
+                          + call.getName()
+                          + ")"));
+            }
+          }
+        }
+      }
+    };
+  }
+
+  /** The side effect a call has, worded for the violation, or {@code null} for a read. */
+  private static String sideEffectOf(
+      JavaClass owner,
+      com.tngtech.archunit.core.domain.AccessTarget.MethodCallTarget target,
+      DcaMarkers markers) {
+    if (owner.isAssignableTo(markers.domainEventPublisher())
+        || owner.isAssignableTo(markers.integrationEventPublisher())) {
+      return "publishes";
+    }
+    boolean repository = owner.isAssignableTo(markers.repository());
+    if (!repository && !owner.isAssignableTo(markers.store())) {
+      return null;
+    }
+    boolean writes = WRITE_VERB.matcher(target.getName()).matches();
+    return writes ? (repository ? "writes through a repository" : "writes to a store") : null;
+  }
+
+  /**
+   * A write by name: one of these verbs, alone or followed by an upper-case letter ({@code save},
+   * {@code deleteById}, {@code markShipped}; not {@code settle} or {@code address}). The list is
+   * the .NET twin's, compared case-insensitively there for the {@code Async} names.
+   */
+  private static final java.util.regex.Pattern WRITE_VERB =
+      java.util.regex.Pattern.compile(
+          "(?:save|delete|remove|add|insert|update|upsert|put|store|write|create|append|archive"
+              + "|purge|clear|set|mark)(?:\\p{Upper}.*)?");
 }

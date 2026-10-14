@@ -72,6 +72,16 @@ import java.util.WeakHashMap;
  *       on the exceptions of the domain and application layers: which status a failure earns is the
  *       incoming adapter's decision, and a second adapter on another protocol has no use for it.
  *       Empty where the framework answers through a mapper class instead of an annotation.
+ *   <li>{@link #getMapping()} — the annotations that bind a handler method to the HTTP method GET
+ *       (Spring's {@code @GetMapping}, JAX-RS {@code @GET}, Micronaut's {@code @Get}). A GET
+ *       handler of a web controller drives no input port that takes a command ({@code
+ *       DCA-HEX-014}). A mapping that names its HTTP method in an attribute is not read.
+ *   <li>{@link #instanceLocalState()} — the API through which an incoming adapter keeps state in
+ *       the instance that serves the request: a type name stands for every method of that type, a
+ *       name whose last segment starts in lower case ({@code Type.method}) for that one method (the
+ *       servlet {@code HttpSession}, Spring's {@code RedirectAttributes.addFlashAttribute}).
+ *       Forbidden in incoming adapters ({@code DCA-HEX-015}): behind a load balancer the next
+ *       request reaches another instance. Matched as calls rather than as annotations.
  * </ul>
  *
  * @param name the preset's name, shown in the test report so a reader knows which vocabulary the
@@ -91,6 +101,9 @@ import java.util.WeakHashMap;
  * @param transactionManager types a composition root declares or wires (transaction managers),
  *     matched as class dependencies rather than as annotations
  * @param transportStatus annotations that fix the protocol answer of the type they sit on
+ * @param getMapping annotations that bind a handler method to the HTTP method GET
+ * @param instanceLocalState types, and methods named {@code Type.method}, that keep request state
+ *     in one instance, matched as calls rather than as annotations
  */
 public record FrameworkAnnotations(
     String name,
@@ -106,7 +119,9 @@ public record FrameworkAnnotations(
     List<String> persistenceMapping,
     List<String> transactionApi,
     List<String> transactionManager,
-    List<String> transportStatus) {
+    List<String> transportStatus,
+    List<String> getMapping,
+    List<String> instanceLocalState) {
 
   public FrameworkAnnotations {
     if (name == null || name.isBlank()) {
@@ -125,6 +140,46 @@ public record FrameworkAnnotations(
     transactionApi = role(transactionApi, "transactionApi");
     transactionManager = role(transactionManager, "transactionManager");
     transportStatus = role(transportStatus, "transportStatus");
+    getMapping = role(getMapping, "getMapping");
+    instanceLocalState = role(instanceLocalState, "instanceLocalState");
+  }
+
+  /**
+   * Compatibility constructor for presets without the GET-mapping and instance-local-state roles
+   * (empty).
+   */
+  public FrameworkAnnotations(
+      String name,
+      List<String> injectable,
+      List<String> webController,
+      List<String> restController,
+      List<String> transactional,
+      List<String> eventListener,
+      List<String> moduleDeclaration,
+      List<String> publishedInterface,
+      List<String> persistenceEntity,
+      List<String> injectionSite,
+      List<String> persistenceMapping,
+      List<String> transactionApi,
+      List<String> transactionManager,
+      List<String> transportStatus) {
+    this(
+        name,
+        injectable,
+        webController,
+        restController,
+        transactional,
+        eventListener,
+        moduleDeclaration,
+        publishedInterface,
+        persistenceEntity,
+        injectionSite,
+        persistenceMapping,
+        transactionApi,
+        transactionManager,
+        transportStatus,
+        List.of(),
+        List.of());
   }
 
   /** Compatibility constructor for presets without the transport-status role (empty). */
@@ -300,7 +355,11 @@ public record FrameworkAnnotations(
             "org.springframework.transaction.TransactionManager",
             "org.springframework.transaction.ReactiveTransactionManager",
             "jakarta.transaction.TransactionManager"),
-        List.of("org.springframework.web.bind.annotation.ResponseStatus"));
+        List.of("org.springframework.web.bind.annotation.ResponseStatus"),
+        List.of("org.springframework.web.bind.annotation.GetMapping"),
+        List.of(
+            "jakarta.servlet.http.HttpSession",
+            "org.springframework.web.servlet.mvc.support.RedirectAttributes.addFlashAttribute"));
   }
 
   /**
@@ -335,7 +394,9 @@ public record FrameworkAnnotations(
             "jakarta.persistence.Version"),
         List.of("jakarta.transaction.UserTransaction"),
         List.of("jakarta.transaction.TransactionManager"),
-        List.of());
+        List.of(),
+        List.of("jakarta.ws.rs.GET"),
+        List.of("jakarta.servlet.http.HttpSession"));
   }
 
   /**
@@ -372,6 +433,8 @@ public record FrameworkAnnotations(
         List.of(
             "jakarta.transaction.UserTransaction", "io.quarkus.narayana.jta.QuarkusTransaction"),
         List.of("jakarta.transaction.TransactionManager"),
+        List.of(),
+        List.of("jakarta.ws.rs.GET"),
         List.of());
   }
 
@@ -419,7 +482,9 @@ public record FrameworkAnnotations(
             "io.micronaut.transaction.SynchronousTransactionManager",
             "jakarta.transaction.UserTransaction"),
         List.of("jakarta.transaction.TransactionManager"),
-        List.of("io.micronaut.http.annotation.Status"));
+        List.of("io.micronaut.http.annotation.Status"),
+        List.of("io.micronaut.http.annotation.Get"),
+        List.of("io.micronaut.session.Session"));
   }
 
   /**
@@ -431,7 +496,7 @@ public record FrameworkAnnotations(
   public static FrameworkAnnotations none() {
     return new FrameworkAnnotations(
         "none", List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
-        List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+        List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -570,7 +635,10 @@ public record FrameworkAnnotations(
         injectionSite,
         persistenceMapping,
         transactionApi,
-        transactionManager);
+        transactionManager,
+        transportStatus,
+        getMapping,
+        instanceLocalState);
   }
 
   public FrameworkAnnotations withInjectable(String... annotationNames) {
@@ -587,7 +655,10 @@ public record FrameworkAnnotations(
         injectionSite,
         persistenceMapping,
         transactionApi,
-        transactionManager);
+        transactionManager,
+        transportStatus,
+        getMapping,
+        instanceLocalState);
   }
 
   public FrameworkAnnotations withWebController(String... annotationNames) {
@@ -604,7 +675,10 @@ public record FrameworkAnnotations(
         injectionSite,
         persistenceMapping,
         transactionApi,
-        transactionManager);
+        transactionManager,
+        transportStatus,
+        getMapping,
+        instanceLocalState);
   }
 
   public FrameworkAnnotations withRestController(String... annotationNames) {
@@ -621,7 +695,10 @@ public record FrameworkAnnotations(
         injectionSite,
         persistenceMapping,
         transactionApi,
-        transactionManager);
+        transactionManager,
+        transportStatus,
+        getMapping,
+        instanceLocalState);
   }
 
   public FrameworkAnnotations withTransactional(String... annotationNames) {
@@ -638,7 +715,10 @@ public record FrameworkAnnotations(
         injectionSite,
         persistenceMapping,
         transactionApi,
-        transactionManager);
+        transactionManager,
+        transportStatus,
+        getMapping,
+        instanceLocalState);
   }
 
   public FrameworkAnnotations withEventListener(String... annotationNames) {
@@ -655,7 +735,10 @@ public record FrameworkAnnotations(
         injectionSite,
         persistenceMapping,
         transactionApi,
-        transactionManager);
+        transactionManager,
+        transportStatus,
+        getMapping,
+        instanceLocalState);
   }
 
   public FrameworkAnnotations withModuleDeclaration(String... annotationNames) {
@@ -672,7 +755,10 @@ public record FrameworkAnnotations(
         injectionSite,
         persistenceMapping,
         transactionApi,
-        transactionManager);
+        transactionManager,
+        transportStatus,
+        getMapping,
+        instanceLocalState);
   }
 
   public FrameworkAnnotations withPublishedInterface(String... annotationNames) {
@@ -689,7 +775,10 @@ public record FrameworkAnnotations(
         injectionSite,
         persistenceMapping,
         transactionApi,
-        transactionManager);
+        transactionManager,
+        transportStatus,
+        getMapping,
+        instanceLocalState);
   }
 
   public FrameworkAnnotations withPersistenceEntity(String... annotationNames) {
@@ -706,10 +795,12 @@ public record FrameworkAnnotations(
         injectionSite,
         persistenceMapping,
         transactionApi,
-        transactionManager);
+        transactionManager,
+        transportStatus,
+        getMapping,
+        instanceLocalState);
   }
 
-  // ---------------------------------------------------------------------------------------------
   public FrameworkAnnotations withInjectionSite(String... annotationNames) {
     return new FrameworkAnnotations(
         name,
@@ -724,41 +815,10 @@ public record FrameworkAnnotations(
         List.of(annotationNames),
         persistenceMapping,
         transactionApi,
-        transactionManager);
-  }
-
-  public FrameworkAnnotations withTransactionApi(String... typeNames) {
-    return new FrameworkAnnotations(
-        name,
-        injectable,
-        webController,
-        restController,
-        transactional,
-        eventListener,
-        moduleDeclaration,
-        publishedInterface,
-        persistenceEntity,
-        injectionSite,
-        persistenceMapping,
-        List.of(typeNames),
-        transactionManager);
-  }
-
-  public FrameworkAnnotations withTransactionManager(String... typeNames) {
-    return new FrameworkAnnotations(
-        name,
-        injectable,
-        webController,
-        restController,
-        transactional,
-        eventListener,
-        moduleDeclaration,
-        publishedInterface,
-        persistenceEntity,
-        injectionSite,
-        persistenceMapping,
-        transactionApi,
-        List.of(typeNames));
+        transactionManager,
+        transportStatus,
+        getMapping,
+        instanceLocalState);
   }
 
   public FrameworkAnnotations withPersistenceMapping(String... annotationNames) {
@@ -776,7 +836,49 @@ public record FrameworkAnnotations(
         List.of(annotationNames),
         transactionApi,
         transactionManager,
-        transportStatus);
+        transportStatus,
+        getMapping,
+        instanceLocalState);
+  }
+
+  public FrameworkAnnotations withTransactionApi(String... typeNames) {
+    return new FrameworkAnnotations(
+        name,
+        injectable,
+        webController,
+        restController,
+        transactional,
+        eventListener,
+        moduleDeclaration,
+        publishedInterface,
+        persistenceEntity,
+        injectionSite,
+        persistenceMapping,
+        List.of(typeNames),
+        transactionManager,
+        transportStatus,
+        getMapping,
+        instanceLocalState);
+  }
+
+  public FrameworkAnnotations withTransactionManager(String... typeNames) {
+    return new FrameworkAnnotations(
+        name,
+        injectable,
+        webController,
+        restController,
+        transactional,
+        eventListener,
+        moduleDeclaration,
+        publishedInterface,
+        persistenceEntity,
+        injectionSite,
+        persistenceMapping,
+        transactionApi,
+        List.of(typeNames),
+        transportStatus,
+        getMapping,
+        instanceLocalState);
   }
 
   /**
@@ -799,9 +901,62 @@ public record FrameworkAnnotations(
         persistenceMapping,
         transactionApi,
         transactionManager,
-        List.of(annotationNames));
+        List.of(annotationNames),
+        getMapping,
+        instanceLocalState);
   }
 
+  /**
+   * The same preset with a different GET-mapping role — the annotations that bind a handler method
+   * to the HTTP method GET. {@code DCA-HEX-014} reads them on the methods of a web controller. Pass
+   * no name to clear the role.
+   */
+  public FrameworkAnnotations withGetMapping(String... annotationNames) {
+    return new FrameworkAnnotations(
+        name,
+        injectable,
+        webController,
+        restController,
+        transactional,
+        eventListener,
+        moduleDeclaration,
+        publishedInterface,
+        persistenceEntity,
+        injectionSite,
+        persistenceMapping,
+        transactionApi,
+        transactionManager,
+        transportStatus,
+        List.of(annotationNames),
+        instanceLocalState);
+  }
+
+  /**
+   * The same preset with a different instance-local-state role — the types, and the methods named
+   * {@code Type.method}, through which an incoming adapter keeps state in the one instance that
+   * serves the request. {@code DCA-HEX-015} forbids calling them. Pass no name to clear the role.
+   */
+  public FrameworkAnnotations withInstanceLocalState(String... names) {
+    return new FrameworkAnnotations(
+        name,
+        injectable,
+        webController,
+        restController,
+        transactional,
+        eventListener,
+        moduleDeclaration,
+        publishedInterface,
+        persistenceEntity,
+        injectionSite,
+        persistenceMapping,
+        transactionApi,
+        transactionManager,
+        transportStatus,
+        getMapping,
+        List.of(names));
+  }
+
+  // ---------------------------------------------------------------------------------------------
   // Queries
   // ---------------------------------------------------------------------------------------------
 

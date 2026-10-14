@@ -68,7 +68,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
             storeInterfacesResideInSharedOutputPorts(layout),
             storeImplementationsResideInOutgoingAdapters(layout),
             storeInterfacesHaveNoRepositorySemantics(),
-            aggregateRootsHaveNoPublicConstructors());
+            aggregateRootsHaveNoPublicConstructors(),
+            valueObjectsHaveOneFactoryPerOrigin());
   }
 
   @Override
@@ -885,9 +886,90 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 + " checked. An empty selection passes.");
   }
 
+  /**
+   * DCA-TAC-024. Two factories with one parameter signature take the same input and differ only in
+   * the checks they run - the caller has to guess which. The neutral {@code of} is the one that
+   * names no origin; two named factories with equal parameters ({@code fromInput(String)}, {@code
+   * fromStored(String)}) name theirs and pass.
+   */
+  public static DcaRule valueObjectsHaveOneFactoryPerOrigin() {
+    return DcaRule.check(
+            "DCA-TAC-024",
+            "Value Objects must not declare a neutral factory beside an origin factory with the same parameters",
+            "A value built from input and a value rebuilt from storage are two origins with"
+                + " different checks - validated and derived on the way in, taken as given on the"
+                + " way back - and each has its own named factory. A second factory that takes the"
+                + " same parameters, such as a neutral of(...) beside them, leaves the caller to"
+                + " guess which checks run",
+            arch -> {
+              List<String> violations = new ArrayList<>();
+              for (JavaClass value :
+                  concreteClassesAssignableTo(arch, arch.layout().markers().value())) {
+                java.util.Map<List<String>, List<String>> bySignature =
+                    new java.util.LinkedHashMap<>();
+                for (JavaMethod method : value.getMethods()) {
+                  Set<JavaModifier> modifiers = method.getModifiers();
+                  if (modifiers.contains(JavaModifier.PUBLIC)
+                      && modifiers.contains(JavaModifier.STATIC)
+                      && !modifiers.contains(JavaModifier.SYNTHETIC)
+                      && method.getRawReturnType().equals(value)
+                      && !isEnumValueOf(value, method)) {
+                    List<String> signature =
+                        method.getRawParameterTypes().stream().map(JavaClass::getName).toList();
+                    bySignature
+                        .computeIfAbsent(signature, key -> new ArrayList<>())
+                        .add(method.getName());
+                  }
+                }
+                bySignature.forEach(
+                    (signature, factories) -> {
+                      if (factories.size() > 1 && factories.contains("of")) {
+                        violations.add(
+                            value.getName()
+                                + " has "
+                                + factories.size()
+                                + " factories taking ("
+                                + String.join(", ", signature)
+                                + "): "
+                                + String.join(", ", factories.stream().sorted().toList()));
+                      }
+                    });
+              }
+              fail(
+                  "Value Objects must not declare a neutral factory beside an origin factory with the same parameters. Fix: remove the neutral of(...) and"
+                      + " keep one named factory for each origin - from input, from storage.",
+                  violations);
+            })
+        .experimental()
+        .selecting(
+            "Non-interface classes anywhere under scan assignable to Value - records, enums and"
+                + " hand-written classes alike - and their public static methods whose raw return"
+                + " type is the class itself.")
+        .checking(
+            "No factory named of takes the same raw parameter types, in the same sequence, as"
+                + " another of these factories. Two named factories with equal parameters"
+                + " (fromInput(String), fromStored(String)) name their origins and pass; factories"
+                + " with different parameters pass, as do constructors, which are not"
+                + " factories by this rule, static methods returning another type, and the"
+                + " valueOf(String) the language declares on an enum. Whether a"
+                + " factory's name says its origin is not checked. An empty selection passes.",
+            "remove the neutral of(...) and keep one named factory for each origin - from input,"
+                + " from storage");
+  }
+
   // ---------------------------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------------------------
+
+  /**
+   * The {@code valueOf(String)} the language declares on every enum - not a factory of the model.
+   */
+  private static boolean isEnumValueOf(JavaClass type, JavaMethod method) {
+    return type.isEnum()
+        && method.getName().equals("valueOf")
+        && method.getRawParameterTypes().size() == 1
+        && method.getRawParameterTypes().get(0).getName().equals("java.lang.String");
+  }
 
   private static List<JavaClass> concreteClassesAssignableTo(DcaArchitecture arch, String marker) {
     return classesMatching(arch, c -> c.isAssignableTo(marker) && !c.isInterface());
