@@ -4,6 +4,27 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Removed
+
+**`DCA-HEX-015` is retired.** The experimental rule "Incoming adapters must not keep state for a
+later request in one instance" checked an operational requirement — several instances behind a load
+balancer without sticky sessions — that a project chooses, not architecture every application
+shares. The id joins the retirement list (`DcaRules.retired()`, `rules.json` `retired`, since
+0.9.0, no replacement) and is never reused. A project that names it in `excluding(…)`,
+`dca.rules.off` or a severity entry keeps loading and gets one retirement notice in the report;
+`onlyIds("DCA-HEX-015")` or `dca.rules.ids=DCA-HEX-015` fails with the reason, as for every retired
+id. Where an application does run that way, the guidance stays in the guide and the catalog.
+`HexagonalRules.incomingAdaptersKeepNoInstanceLocalState()` goes with it — retired ids keep no
+public factory.
+
+### Deprecated
+
+**The `instanceLocalState` role of `FrameworkAnnotations` reads nothing.** `DCA-HEX-015` was its only
+reader, so the record loses the component. Code written against 0.8.0 still compiles: the
+sixteen-role constructor stays as a compatibility constructor that ignores its last argument,
+`withInstanceLocalState(…)` returns the preset unchanged and `instanceLocalState()` returns an empty
+list — all three `@Deprecated(forRemoval = true)`. A preset provider drops the last argument.
+
 ## [0.8.0] - 2026-10-14
 
 ### Added

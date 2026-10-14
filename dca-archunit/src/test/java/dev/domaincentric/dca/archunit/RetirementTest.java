@@ -22,6 +22,16 @@ class RetirementTest {
         IllegalArgumentException.class, () -> DcaRuleSelection.all().excluding("DCA-ADV-999"));
   }
 
+  /** A project that switched the experimental DCA-HEX-015 off gets the notice, not a failure. */
+  @Test
+  void aProjectNamingTheRetiredHex015GetsTheNotice() {
+    var selection = DcaRuleSelection.all().excluding("DCA-HEX-015", "several instances");
+    assertEquals(java.util.Set.of("DCA-HEX-015"), selection.referencedRetiredIds());
+    assertTrue(
+        selection.retirementNotices().get(0).startsWith("DCA-HEX-015 is retired since 0.9.0"),
+        selection.retirementNotices().toString());
+  }
+
   @Test
   void referencedRetiredIdsAreReportedAndCannotBeSelected() {
     var retiredId = DcaRules.retired().keySet().iterator().next();

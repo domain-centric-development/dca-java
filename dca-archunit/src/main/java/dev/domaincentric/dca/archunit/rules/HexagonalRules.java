@@ -50,7 +50,6 @@ public final class HexagonalRules implements DcaRuleSet {
             incomingAdaptersMustNotDependOnDomainServices(),
             outgoingAdaptersMustNotDependOnInputPorts(),
             getHandlersDriveNoCommand(),
-            incomingAdaptersKeepNoInstanceLocalState(),
             adaptersPublishNoEnumMemberName());
   }
 
@@ -545,77 +544,6 @@ public final class HexagonalRules implements DcaRuleSet {
             .anyMatch(parameter -> parameter.getSimpleName().endsWith("Command"))
         || TypeInspection.takesInputEndingWith(
             call.getTargetOwner(), markers.inputPort(), "Command");
-  }
-
-  public DcaRule incomingAdaptersKeepNoInstanceLocalState() {
-    List<String> api = layout.frameworkAnnotations().instanceLocalState();
-    return DcaRule.of(
-            "DCA-HEX-015",
-            "Incoming adapters must not keep state for a later request in one instance",
-            "State a later request needs travels with that request or lives in a store every"
-                + " instance reads. A server session or a message held for the next request is kept"
-                + " by one instance, and behind a load balancer without sticky sessions the next"
-                + " request reaches another one. A message for the page after a redirect is a fixed"
-                + " code in the redirect address, which the page maps to its text",
-            arch ->
-                classes()
-                    .that()
-                    .resideInAnyPackage(arch.allIncomingAdapterPatterns())
-                    .should(callNoInstanceLocalState(api))
-                    .allowEmptyShould(true))
-        .experimental()
-        .selecting("Classes in <module>.adapter.incoming.. of every module root.")
-        .checking(
-            "No code unit calls an entry of the configured instance-local-state role: an entry"
-                + " naming a type matches a call of any method on a type assignable to it, an entry"
-                + " whose last segment starts in lower case (Type.method) a call of that method"
-                + " only. Holding such a type as a parameter or field without calling it is not"
-                + " reported, nor is state kept through an annotation. With an empty role nothing is"
-                + " reported.",
-            "carry the state in the request - a fixed code in the redirect address - or keep it"
-                + " in a store every instance reads");
-  }
-
-  private static ArchCondition<JavaClass> callNoInstanceLocalState(List<String> api) {
-    return new ArchCondition<>("call no instance-local state API") {
-      @Override
-      public void check(JavaClass item, ConditionEvents events) {
-        for (JavaCodeUnit unit : item.getCodeUnits()) {
-          java.util.Set<String> used = new java.util.TreeSet<>();
-          for (JavaMethodCall call : unit.getMethodCallsFromSelf()) {
-            for (String entry : api) {
-              if (matchesInstanceLocalState(call, entry)) {
-                used.add(call.getTargetOwner().getSimpleName() + "." + call.getName());
-              }
-            }
-          }
-          if (!used.isEmpty()) {
-            events.add(
-                SimpleConditionEvent.violated(
-                    item,
-                    item.getName()
-                        + "."
-                        + unit.getName()
-                        + " keeps request state in this instance through "
-                        + String.join(", ", used)));
-          }
-        }
-      }
-    };
-  }
-
-  /**
-   * {@code com.acme.Session} matches every call on a type assignable to it; {@code
-   * com.acme.Redirect.keep} - the last segment in lower case - only calls of {@code keep}.
-   */
-  private static boolean matchesInstanceLocalState(JavaMethodCall call, String entry) {
-    int dot = entry.lastIndexOf('.');
-    String last = entry.substring(dot + 1);
-    if (dot > 0 && !last.isEmpty() && Character.isLowerCase(last.charAt(0))) {
-      return call.getName().equals(last)
-          && call.getTargetOwner().isAssignableTo(entry.substring(0, dot));
-    }
-    return call.getTargetOwner().isAssignableTo(entry);
   }
 
   public DcaRule adaptersPublishNoEnumMemberName() {

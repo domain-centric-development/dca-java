@@ -28,8 +28,6 @@ class HexagonalRulesTest {
         FIXTURES + ".bad",
         // negative fixture in .hexagonal.getmapping
         "DCA-HEX-014",
-        // negative fixture in .hexagonal.instancestate
-        "DCA-HEX-015",
         // informational diagnostic, never fails; observed in .hexagonal.enumnames
         "DCA-HEX-016");
   }
@@ -94,20 +92,6 @@ class HexagonalRulesTest {
   @Test
   void aGetHandlerThatAsksAQueryPasses() {
     Fixtures.passes(FIXTURES + ".getmapping.good", "DCA-HEX-014");
-  }
-
-  @Test
-  void anIncomingAdapterThatKeepsStateInTheInstanceIsReported() {
-    String message = Fixtures.failure(FIXTURES + ".instancestate.bad", "DCA-HEX-015").getMessage();
-
-    assertTrue(message.contains("RedirectAttributes.addFlashAttribute"), message);
-    assertTrue(message.contains("HttpSession.setAttribute"), message);
-  }
-
-  /** A fixed code in the redirect address is a call of the same type, but not of the listed one. */
-  @Test
-  void stateCarriedInTheRedirectAddressPasses() {
-    Fixtures.passes(FIXTURES + ".instancestate.good", "DCA-HEX-015");
   }
 
   /** DCA-HEX-016 lists name() and toString() on an enum of the inner layers. */

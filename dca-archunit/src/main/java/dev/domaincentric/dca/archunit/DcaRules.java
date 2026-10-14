@@ -81,7 +81,15 @@ public final class DcaRules {
                       + " selection named three suffixes a project cannot change; the pattern stays"
                       + " guide and catalog guidance",
                   "none",
-                  "0.5.0"));
+                  "0.5.0"),
+          "DCA-HEX-015",
+              new RetiredRule(
+                  "Keeping no state for a later request in one instance is an operational"
+                      + " requirement - several instances without sticky sessions - that a project"
+                      + " chooses, not architecture every application shares; the pattern stays"
+                      + " guide and catalog guidance for applications that run that way",
+                  "none",
+                  "0.9.0"));
 
   private DcaRules() {}
 

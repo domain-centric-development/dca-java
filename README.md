@@ -345,7 +345,7 @@ rule off.
 
 ## Rule catalog
 
-**119 rule ids in 11 sets: 113 enforced, 6 informational.** Five further ids are retired and keep their meaning in the retirement list. The exact, current list is
+**134 rule ids in 11 sets: 125 enforced, 9 informational; 10 of them experimental.** Six further ids are retired and keep their meaning in the retirement list. The exact, current list is
 [RULES.md](RULES.md) and [rules.json](rules.json), both generated from the code by
 `./gradlew :dca-archunit:rulesCatalog` and verified in CI; every number in this README is taken from
 there. `rules.json` names the library version its texts belong to.

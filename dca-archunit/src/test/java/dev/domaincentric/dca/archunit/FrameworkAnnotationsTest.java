@@ -69,13 +69,36 @@ class FrameworkAnnotationsTest {
     for (FrameworkAnnotations each : adjusted) {
       assertEquals(spring.transportStatus(), each.transportStatus(), each.toString());
       assertEquals(spring.getMapping(), each.getMapping(), each.toString());
-      assertEquals(spring.instanceLocalState(), each.instanceLocalState(), each.toString());
     }
     assertEquals(List.of("x.Get"), spring.withGetMapping("x.Get").getMapping());
-    assertEquals(
-        List.of("x.Flash.keep"),
-        spring.withInstanceLocalState("x.Flash.keep").instanceLocalState());
-    assertEquals(spring.getMapping(), spring.withInstanceLocalState().getMapping());
+  }
+
+  /** A preset written against 0.8.0 still compiles; the role DCA-HEX-015 read is ignored. */
+  @Test
+  @SuppressWarnings("removal")
+  void theRetiredInstanceLocalStateRoleStillCompilesAndIsIgnored() {
+    FrameworkAnnotations spring = FrameworkAnnotations.spring();
+    FrameworkAnnotations written =
+        new FrameworkAnnotations(
+            spring.name(),
+            spring.injectable(),
+            spring.webController(),
+            spring.restController(),
+            spring.transactional(),
+            spring.eventListener(),
+            spring.moduleDeclaration(),
+            spring.publishedInterface(),
+            spring.persistenceEntity(),
+            spring.injectionSite(),
+            spring.persistenceMapping(),
+            spring.transactionApi(),
+            spring.transactionManager(),
+            spring.transportStatus(),
+            spring.getMapping(),
+            List.of("x.Session"));
+    assertEquals(spring, written);
+    assertEquals(spring, spring.withInstanceLocalState("x.Session"));
+    assertEquals(List.of(), spring.instanceLocalState());
   }
 
   @Test
