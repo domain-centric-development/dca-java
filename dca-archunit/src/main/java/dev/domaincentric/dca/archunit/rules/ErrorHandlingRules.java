@@ -365,7 +365,9 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                 + " that is neither assignable to the id or value role, nor a number, a primitive,"
                 + " an enum or a date and time type of the platform, and never fails. Container"
                 + " types such as lists are looked through. The message the base type carries is"
-                + " not a field of the project's failure and is not listed.");
+                + " not a field of the project's failure and is not listed. A string that holds a"
+                + " code rather than display text is listed as well: the type does not tell the"
+                + " two apart, and the remedy is a typed value for the code.");
   }
 
   /** What is wrong with a type a failure's field involves, or {@code null} when it is fine. */

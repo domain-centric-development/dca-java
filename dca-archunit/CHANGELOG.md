@@ -33,6 +33,14 @@ legacy overrides and `additionalSelection()` — so a project whose properties f
 retired id, `DCA-HEX-015` for example, ran without the retirement notice. The merge now keeps the
 retired identities either side refers to, as `DomainCentric.ArchRules` already did.
 
+### Changed
+
+**`DCA-ERR-007` says what to do with a code held in a string.** The experimental diagnostic keeps
+listing a plain string field — the type does not tell a code from display text, and no name or
+shape does so reliably for every domain — and its `checks` text now names the remedy: a typed value
+for the code. A code already held in a value, an id or an enum passes, as before; new fixtures pin
+both cases. The same sentence in both libraries.
+
 ## [0.8.0] - 2026-10-14
 
 ### Added

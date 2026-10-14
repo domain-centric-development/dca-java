@@ -124,10 +124,28 @@ class ErrorHandlingRulesTest {
             .anyMatch(
                 line -> line.contains("AccountNotFoundException.rawAccountId is a plain string")),
         observed.toString());
-    assertEquals(3, observed.size(), observed.toString());
+    assertEquals(5, observed.size(), observed.toString());
   }
 
-  /** Ids, values, numbers and a list of ids pass; the base type's message is not a field. */
+  /** DCA-ERR-007: a code held in a plain string is listed - the type does not tell it from text. */
+  @Test
+  void aCodeHeldInAPlainStringIsListed() {
+    var observed = Fixtures.observed(FIXTURES + ".fieldtypes.bad", "DCA-ERR-007");
+
+    assertTrue(
+        observed.stream()
+            .anyMatch(line -> line.contains("BranchMismatchException.left is a plain string")),
+        observed.toString());
+    assertTrue(
+        observed.stream()
+            .anyMatch(line -> line.contains("BranchMismatchException.right is a plain string")),
+        observed.toString());
+  }
+
+  /**
+   * Ids, values, numbers, an enum, a code typed as a value and a list of ids pass; the base type's
+   * message is not a field.
+   */
   @Test
   void failuresCarryingIdsAndFiguresAreNotListed() {
     assertEquals(
