@@ -120,7 +120,27 @@ class HexagonalRulesTest {
             .anyMatch(
                 line -> line.contains("LedgerController.label(") && line.contains("(toString())")),
         observed.toString());
-    assertTrue(observed.size() == 2, observed.toString());
+    assertTrue(observed.size() == 3, observed.toString());
+  }
+
+  /**
+   * DCA-HEX-016 in a concatenation: the member name called explicitly is listed; the value itself
+   * concatenated reaches the platform as an Object and is not visible - the documented gap.
+   */
+  @Test
+  void anExplicitMemberNameInAConcatenationIsListedTheBareValueIsNot() {
+    var observed = Fixtures.observed(FIXTURES + ".enumnames.bad", "DCA-HEX-016");
+
+    assertTrue(
+        observed.stream()
+            .anyMatch(
+                line ->
+                    line.contains("LedgerController.concatenatedName(")
+                        && line.contains("(name())")),
+        observed.toString());
+    assertTrue(
+        observed.stream().noneMatch(line -> line.contains("LedgerController.concatenated(")),
+        observed.toString());
   }
 
   /** A code per value, and the name of an enum the adapter declares itself, are not listed. */

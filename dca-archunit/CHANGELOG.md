@@ -53,6 +53,16 @@ the entry that matched (`handles @RequestMapping(method=GET)`); `FrameworkAnnota
 spells one entry. A malformed attribute entry is refused. The .NET twin reads
 `AcceptVerbsAttribute#HttpMethods=GET` the same way.
 
+**`DCA-HEX-016` names its boundary in a concatenation.** A member name called explicitly inside a
+concatenation (`"text" + value.name()`) has always been listed; the enum value itself concatenated
+(`"text" + value`) or passed to a formatting call is not, and the `checks` text now says why: the
+compiler hands it to the platform as an `Object` (`String.valueOf(Object)` before the concatenation
+bootstrap, the varargs array of a formatting call), so its type is gone from the class file. Reading
+the bootstrap's descriptor would see it only for code compiled by some compiler versions — a rule
+whose findings change with the toolchain is not deterministic — so the gap stays and is pinned by a
+fixture. The .NET twin sees the bare value, because the C# compiler keeps the enum type in the IL
+(a constrained `ToString` or a `box` of the enum).
+
 ## [0.8.0] - 2026-10-14
 
 ### Added

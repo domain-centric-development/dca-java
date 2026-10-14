@@ -7,9 +7,19 @@ public final class LedgerController {
     return status.code();
   }
 
+  /** Concatenating the explicit code is fine. */
+  public String concatenatedCode(AccountStatus status) {
+    return "status=" + status.code();
+  }
+
   /** An enum of the adapter itself may be spelled by name: it is the mapping. */
   public String view(View view) {
     return view.name().toLowerCase(java.util.Locale.ROOT);
+  }
+
+  /** Concatenating an enum of the adapter itself is fine as well. */
+  public String viewLabel(View view) {
+    return "view=" + view;
   }
 
   enum View {
