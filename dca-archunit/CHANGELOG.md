@@ -4,6 +4,8 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-14
+
 ### Added
 
 **A rule can be experimental.** Beside its kind (`ENFORCED`, `INFORMATIONAL`) every rule now has a
