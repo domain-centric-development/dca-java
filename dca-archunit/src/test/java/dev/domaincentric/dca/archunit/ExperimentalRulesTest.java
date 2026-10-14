@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.tngtech.archunit.core.importer.ClassFileImporter;
+import java.util.List;
 import java.util.Properties;
 import org.junit.jupiter.api.Test;
 
@@ -33,6 +35,63 @@ class ExperimentalRulesTest {
     assertTrue(
         DcaRules.all(LAYOUT).stream().allMatch(r -> r.maturity() == DcaRule.Maturity.RELEASED),
         "every rule of the catalog is released");
+  }
+
+  @Test
+  void everyCatalogRuleIsReleased() {
+    List<String> experimental =
+        DcaRules.all(LAYOUT).stream()
+            .filter(rule -> rule.maturity() != DcaRule.Maturity.RELEASED)
+            .map(DcaRule::id)
+            .toList();
+
+    assertEquals(List.of(), experimental, "the catalog ships no experimental rule");
+  }
+
+  @Test
+  void executionRunsAnExperimentalRuleLikeAnyOther() {
+    String pkg = "dev.domaincentric.dca.archunit.fixtures.naming.bad";
+    DcaArchitecture architecture =
+        DcaArchitecture.of(
+            DcaLayout.forBasePackage(pkg), new ClassFileImporter().importPackages(pkg));
+    DcaRule released =
+        DcaRules.all(architecture.layout()).stream()
+            .filter(rule -> rule.id().equals("DCA-NAM-001"))
+            .findFirst()
+            .orElseThrow();
+    DcaRule experimental =
+        DcaRule.of(
+                "DCA-USE-900",
+                "Fixture experimental rule",
+                "Exists for the test",
+                arch -> released.archRule(arch).orElseThrow())
+            .experimental()
+            .selecting("What DCA-NAM-001 selects; a fixture.")
+            .checking("What DCA-NAM-001 checks; a fixture.");
+    DcaRuleSelection selection = DcaRuleSelection.all().withExperimental();
+
+    assertTrue(selection.includes(SET, experimental));
+    DcaRuleOutcome expected = DcaRuleExecution.execute(released, architecture, selection);
+    DcaRuleOutcome outcome = DcaRuleExecution.execute(experimental, architecture, selection);
+
+    assertEquals(DcaRuleOutcome.Status.FAILED, expected.status(), "the fixture classes violate it");
+    assertEquals(DcaRuleOutcome.Status.FAILED, outcome.status());
+    assertTrue(outcome.message().contains("Architecture Violation"), outcome.message());
+    assertFalse(violationLines(outcome).isEmpty(), outcome.message());
+    assertEquals(violationLines(expected), violationLines(outcome));
+  }
+
+  /**
+   * The reported violations, each without the rule id it is prefixed with; the header and the fix
+   * line, which name the rule, are left out.
+   */
+  private static List<String> violationLines(DcaRuleOutcome outcome) {
+    return outcome
+        .message()
+        .lines()
+        .map(line -> line.replaceFirst("^\\[DCA-[A-Z]+-\\d+\\] ", ""))
+        .filter(line -> line.startsWith("Class <"))
+        .toList();
   }
 
   @Test
