@@ -54,6 +54,7 @@ class RetirementTest {
             "DCA-STR-010",
             "DCA-MAP-013",
             "DCA-NAM-002",
+            "DCA-HEX-016",
             "DCA-NAM-012",
             "DCA-ERR-006",
             "DCA-ERR-007"),

@@ -60,7 +60,8 @@ public final class UseCaseRules implements DcaRuleSet {
             useCasesMustNotInvokeOtherUseCases(layout),
             useCasesExposeOnlyInputPort(layout),
             incomingAdaptersServeOneFeature(layout),
-            queriesHaveNoSideEffect(layout));
+            queriesHaveNoSideEffect(layout),
+            useCasesParseNoRawIds(layout));
   }
 
   public static DcaRule useCasesMustNotInvokeOtherUseCases(DcaLayout layout) {
@@ -1066,4 +1067,33 @@ public final class UseCaseRules implements DcaRuleSet {
       java.util.regex.Pattern.compile(
           "(?:save|delete|remove|add|insert|update|upsert|put|store|write|create|append|archive"
               + "|purge|clear|set|mark)(?:\\p{Upper}.*)?");
+
+  /**
+   * DCA-USE-020. The platform's parse API for the identifier type a project most often wraps; an
+   * id's own value type lives in the domain, outside this selection, and may parse.
+   */
+  public static DcaRule useCasesParseNoRawIds(DcaLayout layout) {
+    return DcaRule.of(
+            "DCA-USE-020",
+            "Use cases must not parse raw input into an id",
+            "The adapter turns raw input into the types the input port takes: an id arrives as the"
+                + " id's value type, parsed at the edge or by the value type's own factory, never as"
+                + " text the use case parses. Text that does not parse is a malformed call the"
+                + " adapter answers itself; the use case never sees it",
+            arch ->
+                noClasses()
+                    .that()
+                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .should()
+                    .callMethod(java.util.UUID.class, "fromString", String.class)
+                    .allowEmptyShould(true))
+        .experimental()
+        .selecting("Classes in <module>.application.. of every module root.")
+        .checking(
+            "No code unit calls the platform's parse API for a universally unique identifier -"
+                + " java.util.UUID.fromString(String). Parsing through another API, or through the"
+                + " id's value type called from the use case, is not reported. An empty selection"
+                + " passes.",
+            "take the id's value type in the command and parse the text in the adapter");
+  }
 }

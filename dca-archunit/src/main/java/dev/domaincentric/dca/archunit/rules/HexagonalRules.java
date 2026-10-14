@@ -50,7 +50,8 @@ public final class HexagonalRules implements DcaRuleSet {
             incomingAdaptersMustNotDependOnDomainServices(),
             outgoingAdaptersMustNotDependOnInputPorts(),
             getHandlersDriveNoCommand(),
-            incomingAdaptersKeepNoInstanceLocalState());
+            incomingAdaptersKeepNoInstanceLocalState(),
+            adaptersPublishNoEnumMemberName());
   }
 
   @Override
@@ -615,5 +616,60 @@ public final class HexagonalRules implements DcaRuleSet {
           && call.getTargetOwner().isAssignableTo(entry.substring(0, dot));
     }
     return call.getTargetOwner().isAssignableTo(entry);
+  }
+
+  public DcaRule adaptersPublishNoEnumMemberName() {
+    return DcaRule.informational(
+            "DCA-HEX-016",
+            "Diagnostic: adapters that publish an enum by its member name",
+            "A value an adapter publishes from an enum is spelled explicitly - a code per value on"
+                + " the enum or a mapping in the adapter - never derived from the member's name."
+                + " Renaming a member is a refactoring inside the code and must not change what a"
+                + " client reads",
+            arch -> {
+              String[] inner =
+                  java.util.stream.Stream.concat(
+                          java.util.Arrays.stream(arch.allDomainPatterns()),
+                          java.util.Arrays.stream(arch.allApplicationPatterns()))
+                      .toArray(String[]::new);
+              java.util.Set<String> observed = new java.util.TreeSet<>();
+              for (JavaClass adapter : arch.classes()) {
+                if (!JavaClass.Predicates.resideInAnyPackage(arch.allAdapterPatterns())
+                    .test(adapter)) {
+                  continue;
+                }
+                for (JavaMethodCall call : adapter.getMethodCallsFromSelf()) {
+                  JavaClass owner = call.getTargetOwner();
+                  // the compiler's lambda deserialisation repeats the calls of a lambda's body
+                  if (call.getOrigin().getName().equals("$deserializeLambda$")) {
+                    continue;
+                  }
+                  if ((call.getName().equals("name") || call.getName().equals("toString"))
+                      && call.getTarget().getRawParameterTypes().isEmpty()
+                      && owner.isEnum()
+                      && JavaClass.Predicates.resideInAnyPackage(inner).test(owner)) {
+                    observed.add(
+                        call.getOrigin().getFullName()
+                            + " spells "
+                            + owner.getSimpleName()
+                            + " by its member name ("
+                            + call.getName()
+                            + "()) - give the enum a code per value, or map it in the adapter");
+                  }
+                }
+              }
+              return new ArrayList<>(observed);
+            })
+        .experimental()
+        .selecting(
+            "Classes in <module>.adapter.. of every module root, incoming and outgoing, and their"
+                + " method calls whose target is an enum declared in <module>.domain.. or"
+                + " <module>.application..")
+        .checking(
+            "Informational diagnostic only: lists every call of name() or toString() on such an"
+                + " enum, and never fails. A member name reached through string concatenation or"
+                + " formatting, or a serializer that writes the name on its own, is not visible in"
+                + " the import model and is not listed; whether the value leaves the process is"
+                + " not established either.");
   }
 }

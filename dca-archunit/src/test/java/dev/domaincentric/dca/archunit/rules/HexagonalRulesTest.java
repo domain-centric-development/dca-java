@@ -29,7 +29,9 @@ class HexagonalRulesTest {
         // negative fixture in .hexagonal.getmapping
         "DCA-HEX-014",
         // negative fixture in .hexagonal.instancestate
-        "DCA-HEX-015");
+        "DCA-HEX-015",
+        // informational diagnostic, never fails; observed in .hexagonal.enumnames
+        "DCA-HEX-016");
   }
 
   /**
@@ -106,5 +108,29 @@ class HexagonalRulesTest {
   @Test
   void stateCarriedInTheRedirectAddressPasses() {
     Fixtures.passes(FIXTURES + ".instancestate.good", "DCA-HEX-015");
+  }
+
+  /** DCA-HEX-016 lists name() and toString() on an enum of the inner layers. */
+  @Test
+  void anAdapterSpellingADomainEnumByItsMemberNameIsListed() {
+    var observed = Fixtures.observed(FIXTURES + ".enumnames.bad", "DCA-HEX-016");
+
+    assertTrue(
+        observed.stream()
+            .anyMatch(
+                line -> line.contains("LedgerController.status(") && line.contains("(name())")),
+        observed.toString());
+    assertTrue(
+        observed.stream()
+            .anyMatch(
+                line -> line.contains("LedgerController.label(") && line.contains("(toString())")),
+        observed.toString());
+    assertTrue(observed.size() == 2, observed.toString());
+  }
+
+  /** A code per value, and the name of an enum the adapter declares itself, are not listed. */
+  @Test
+  void anExplicitCodeAndAnAdapterEnumAreNotListed() {
+    assertTrue(Fixtures.observed(FIXTURES + ".enumnames.good", "DCA-HEX-016").isEmpty());
   }
 }

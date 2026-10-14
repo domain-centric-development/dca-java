@@ -56,6 +56,15 @@ same ids are the .NET library's (`DCA-MAP-014` is Java only).
 - `DCA-MAP-014` (contextmap, enforced): every `allowedDependencies` entry of a module declaration is
   backed by a code dependency; an entry a PLANNED `@Upstream` announces is exempt.
 
+**Two more experimental rules.**
+
+- `DCA-USE-020` (usecase, enforced): no class of the application layer calls
+  `java.util.UUID.fromString` — an id arrives in the command as its value type, parsed by the
+  adapter or by the value type's own factory.
+- `DCA-HEX-016` (hexagonal, informational): lists the adapter calls of `name()` or `toString()` on
+  an enum declared in the domain or application layer — a published value is spelled explicitly,
+  not derived from the member's name.
+
 **Two framework roles.** `FrameworkAnnotations` gains `getMapping` — the annotations that bind a
 handler to GET (Spring `@GetMapping`, JAX-RS `@GET`, Micronaut `@Get`), read by `DCA-HEX-014` — and
 `instanceLocalState` — the types, and the methods named `Type.method`, that keep request state in

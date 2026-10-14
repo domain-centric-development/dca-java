@@ -41,7 +41,9 @@ class UseCaseRulesTest {
         // negative fixture in .usecase.featurecut
         "DCA-USE-018",
         // negative fixture in .usecase.readonly
-        "DCA-USE-019");
+        "DCA-USE-019",
+        // negative fixture in .usecase.rawids
+        "DCA-USE-020");
   }
 
   @Nested
@@ -391,6 +393,25 @@ class UseCaseRulesTest {
     @Test
     void aReadingQueryAndAWritingCommandPass() {
       Fixtures.passes(FIXTURES + ".readonly.good", "DCA-USE-019");
+    }
+  }
+
+  @Nested
+  @DisplayName("DCA-USE-020 — the adapter parses the id")
+  class RawIdsAreParsedAtTheEdge {
+
+    @Test
+    void aUseCaseThatParsesTextIntoAnIdIsReported() {
+      String message = Fixtures.failure(FIXTURES + ".rawids.bad", "DCA-USE-020").getMessage();
+
+      assertTrue(message.contains("CloseAccountUseCase.execute"), message);
+      assertTrue(message.contains("UUID.fromString"), message);
+    }
+
+    /** The adapter and the id's value type may parse; the use case takes the value type. */
+    @Test
+    void parsingInTheAdapterOrTheValueTypePasses() {
+      Fixtures.passes(FIXTURES + ".rawids.good", "DCA-USE-020");
     }
   }
 }
