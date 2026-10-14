@@ -6,6 +6,8 @@ import dev.domaincentric.dca.archunit.fixtures.hexagonal.getmapping.bad.ledger.a
 import dev.domaincentric.dca.archunit.fixtures.hexagonal.getmapping.bad.ledger.application.showbalance.ShowBalanceQuery;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 
 @Controller
 public final class LedgerController {
@@ -26,6 +28,11 @@ public final class LedgerController {
   @GetMapping("/quick-entry")
   public String quickEntry(String account) {
     return book(account);
+  }
+
+  @RequestMapping(value = "/reverse", method = RequestMethod.GET)
+  public String reverse(String account) {
+    return postEntry.execute(new PostEntryCommand(account)).reference();
   }
 
   private String book(String account) {

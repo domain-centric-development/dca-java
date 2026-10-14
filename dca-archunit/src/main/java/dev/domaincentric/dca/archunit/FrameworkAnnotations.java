@@ -75,7 +75,13 @@ import java.util.WeakHashMap;
  *   <li>{@link #getMapping()} — the annotations that bind a handler method to the HTTP method GET
  *       (Spring's {@code @GetMapping}, JAX-RS {@code @GET}, Micronaut's {@code @Get}). A GET
  *       handler of a web controller drives no input port that takes a command ({@code
- *       DCA-HEX-014}). A mapping that names its HTTP method in an attribute is not read.
+ *       DCA-HEX-014}). An entry may also name a general mapping annotation together with the
+ *       attribute value that makes it GET, as {@code <annotation>#<attribute>=<value>} (Spring's
+ *       {@code org.springframework.web.bind.annotation.RequestMapping#method=GET}; JAX-RS's {@code
+ *       jakarta.ws.rs.HttpMethod#value=GET} finds a project's own GET annotation): it matches when
+ *       that attribute holds the value - an enum constant of that name or that string, compared
+ *       ignoring case - directly or on a meta-annotation. A mapping without the attribute, which
+ *       answers every HTTP method, does not match. Only this role reads such entries.
  * </ul>
  *
  * @param name the preset's name, shown in the test report so a reader knows which vocabulary the
@@ -95,7 +101,9 @@ import java.util.WeakHashMap;
  * @param transactionManager types a composition root declares or wires (transaction managers),
  *     matched as class dependencies rather than as annotations
  * @param transportStatus annotations that fix the protocol answer of the type they sit on
- * @param getMapping annotations that bind a handler method to the HTTP method GET
+ * @param getMapping annotations that bind a handler method to the HTTP method GET, or a general
+ *     mapping annotation with the attribute value that makes it GET ({@code
+ *     <annotation>#<attribute>=<value>})
  */
 public record FrameworkAnnotations(
     String name,
@@ -132,6 +140,14 @@ public record FrameworkAnnotations(
     transactionManager = role(transactionManager, "transactionManager");
     transportStatus = role(transportStatus, "transportStatus");
     getMapping = role(getMapping, "getMapping");
+    for (String entry : getMapping) {
+      if (entry.contains("#") && !entry.matches("[^#=]+#\\w+=[^#=]+")) {
+        throw new IllegalArgumentException(
+            "getMapping entry '"
+                + entry
+                + "' must be an annotation name or <annotation>#<attribute>=<value>");
+      }
+    }
   }
 
   /**
@@ -385,7 +401,9 @@ public record FrameworkAnnotations(
             "org.springframework.transaction.ReactiveTransactionManager",
             "jakarta.transaction.TransactionManager"),
         List.of("org.springframework.web.bind.annotation.ResponseStatus"),
-        List.of("org.springframework.web.bind.annotation.GetMapping"));
+        List.of(
+            "org.springframework.web.bind.annotation.GetMapping",
+            "org.springframework.web.bind.annotation.RequestMapping#method=GET"));
   }
 
   /**
@@ -421,7 +439,7 @@ public record FrameworkAnnotations(
         List.of("jakarta.transaction.UserTransaction"),
         List.of("jakarta.transaction.TransactionManager"),
         List.of(),
-        List.of("jakarta.ws.rs.GET"));
+        List.of("jakarta.ws.rs.GET", "jakarta.ws.rs.HttpMethod#value=GET"));
   }
 
   /**
@@ -459,7 +477,7 @@ public record FrameworkAnnotations(
             "jakarta.transaction.UserTransaction", "io.quarkus.narayana.jta.QuarkusTransaction"),
         List.of("jakarta.transaction.TransactionManager"),
         List.of(),
-        List.of("jakarta.ws.rs.GET"));
+        List.of("jakarta.ws.rs.GET", "jakarta.ws.rs.HttpMethod#value=GET"));
   }
 
   /**
@@ -917,8 +935,9 @@ public record FrameworkAnnotations(
 
   /**
    * The same preset with a different GET-mapping role — the annotations that bind a handler method
-   * to the HTTP method GET. {@code DCA-HEX-014} reads them on the methods of a web controller. Pass
-   * no name to clear the role.
+   * to the HTTP method GET, or a general mapping annotation with the attribute value that makes it
+   * GET ({@code <annotation>#<attribute>=<value>}). {@code DCA-HEX-014} reads them on the methods
+   * of a web controller. Pass no name to clear the role.
    */
   public FrameworkAnnotations withGetMapping(String... annotationNames) {
     return new FrameworkAnnotations(
@@ -980,12 +999,23 @@ public record FrameworkAnnotations(
     }
     List<String> names = new ArrayList<>();
     for (String fqn : role) {
-      String simple = "@" + fqn.substring(fqn.lastIndexOf('.') + 1);
+      String simple = describe(fqn);
       if (!names.contains(simple)) {
         names.add(simple);
       }
     }
     return String.join("/", names);
+  }
+
+  /**
+   * One role entry as a reader writes it: {@code @GetMapping}, or
+   * {@code @RequestMapping(method=GET)} for an entry with an attribute value.
+   */
+  public static String describe(String entry) {
+    int hash = entry.indexOf('#');
+    String type = hash < 0 ? entry : entry.substring(0, hash);
+    String simple = "@" + type.substring(type.lastIndexOf('.') + 1);
+    return hash < 0 ? simple : simple + "(" + entry.substring(hash + 1) + ")";
   }
 
   @Override

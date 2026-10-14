@@ -41,6 +41,18 @@ shape does so reliably for every domain — and its `checks` text now names the 
 for the code. A code already held in a value, an id or an enum passes, as before; new fixtures pin
 both cases. The same sentence in both libraries.
 
+**`DCA-HEX-014` reads the method attribute of a general mapping.** An entry of the `getMapping` role
+may now name a general mapping annotation with the attribute value that makes it GET,
+`<annotation>#<attribute>=<value>`; it matches when that attribute holds the value — an enum
+constant of that name or that string, ignoring case — directly or on a meta-annotation. The Spring
+preset adds `org.springframework.web.bind.annotation.RequestMapping#method=GET`, so a handler mapped
+with `@RequestMapping(method = GET)` is selected like one with `@GetMapping`; the Jakarta and Quarkus
+presets add `jakarta.ws.rs.HttpMethod#value=GET`, which finds a project's own GET annotation. A
+mapping without a method attribute answers every method and stays unselected. The violation names
+the entry that matched (`handles @RequestMapping(method=GET)`); `FrameworkAnnotations.describe(String)`
+spells one entry. A malformed attribute entry is refused. The .NET twin reads
+`AcceptVerbsAttribute#HttpMethods=GET` the same way.
+
 ## [0.8.0] - 2026-10-14
 
 ### Added

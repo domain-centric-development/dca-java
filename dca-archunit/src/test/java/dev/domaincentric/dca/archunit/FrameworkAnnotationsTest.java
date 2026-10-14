@@ -108,6 +108,22 @@ class FrameworkAnnotationsTest {
     assertThrows(IllegalArgumentException.class, () -> FrameworkAnnotations.none().named(""));
   }
 
+  /** The GET-mapping role takes a general mapping with the attribute value that makes it GET. */
+  @Test
+  void theGetMappingRoleTakesAnAttributeEntry() {
+    assertTrue(
+        FrameworkAnnotations.spring()
+            .getMapping()
+            .contains("org.springframework.web.bind.annotation.RequestMapping#method=GET"));
+    assertEquals(
+        "@RequestMapping(method=GET)",
+        FrameworkAnnotations.describe(
+            "org.springframework.web.bind.annotation.RequestMapping#method=GET"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> FrameworkAnnotations.none().withGetMapping("x.Mapping#method"));
+  }
+
   @Test
   void describeCollapsesToDistinctSimpleNames() {
     assertEquals(

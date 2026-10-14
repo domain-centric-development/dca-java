@@ -492,14 +492,17 @@ public final class HexagonalRules implements DcaRuleSet {
             "Classes in <module>.adapter.incoming.. of every module root that are directly"
                 + " annotated with one of the configured web-controller stereotypes; within them,"
                 + " the methods carrying, directly or as a meta-annotation, an annotation of the"
-                + " configured GET-mapping role.")
+                + " configured GET-mapping role - or, for an entry that names an attribute value, an"
+                + " annotation of that type whose attribute holds the value (a general mapping"
+                + " annotation restricted to GET).")
         .checking(
             "No such method - or a method of the same class it reaches through calls within the"
                 + " class - calls a type assignable to the configured input-port role whose input"
                 + " ends with Command: a parameter of the called method, of a public method of the"
-                + " port, or a type argument of the input port it extends. A mapping that names its"
-                + " HTTP method in an attribute is not read. With an empty web-controller or"
-                + " GET-mapping role nothing is selected and the rule passes.",
+                + " port, or a type argument of the input port it extends. A general mapping"
+                + " without a method attribute answers every HTTP method and is not selected. With"
+                + " an empty web-controller or GET-mapping role nothing is selected and the rule"
+                + " passes.",
             "map the handler to POST, PUT or DELETE, or let the GET handler ask a query");
   }
 
@@ -510,7 +513,8 @@ public final class HexagonalRules implements DcaRuleSet {
       public void check(JavaClass item, ConditionEvents events) {
         IntraClassCalls calls = new IntraClassCalls(item);
         for (JavaCodeUnit handler : item.getCodeUnits()) {
-          if (!AnnotationRoles.isMetaAnnotatedWithAny(handler, getMapping)) {
+          String mapping = AnnotationRoles.matchingEntry(handler, getMapping);
+          if (mapping == null) {
             continue;
           }
           java.util.Set<String> commands = new java.util.TreeSet<>();
@@ -530,7 +534,7 @@ public final class HexagonalRules implements DcaRuleSet {
                         + "."
                         + handler.getName()
                         + " handles "
-                        + FrameworkAnnotations.describe(getMapping, "a GET request")
+                        + FrameworkAnnotations.describe(mapping)
                         + " and drives a command through "
                         + String.join(", ", commands)));
           }

@@ -1,13 +1,18 @@
 package dev.domaincentric.dca.archunit.rules;
 
 import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaAnnotation;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaCodeUnit;
+import com.tngtech.archunit.core.domain.JavaEnumConstant;
 import com.tngtech.archunit.core.domain.properties.CanBeAnnotated;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.conditions.ArchConditions;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Turns a role of {@code FrameworkAnnotations} — a list of fully qualified annotation names,
@@ -85,6 +90,65 @@ final class AnnotationRoles {
         ? DescribedPredicate.<JavaClass>alwaysFalse()
             .as("a configured annotation exists (none does)")
         : DescribedPredicate.<JavaClass>alwaysTrue().as("a configured annotation exists");
+  }
+
+  /**
+   * The first entry of the role the code unit carries, directly or as a meta-annotation, or {@code
+   * null}. An entry {@code <annotation>#<attribute>=<value>} matches an annotation of that type
+   * whose attribute holds the value - an enum constant of that name, or that string, compared
+   * ignoring case; a plain entry matches the annotation type alone.
+   */
+  static String matchingEntry(JavaCodeUnit unit, List<String> role) {
+    for (String entry : role) {
+      int hash = entry.indexOf('#');
+      if (hash < 0) {
+        if (unit.isMetaAnnotatedWith(entry)) {
+          return entry;
+        }
+        continue;
+      }
+      String type = entry.substring(0, hash);
+      String[] attribute = entry.substring(hash + 1).split("=", 2);
+      if (carries(unit.getAnnotations(), type, attribute[0], attribute[1], new HashSet<>())) {
+        return entry;
+      }
+    }
+    return null;
+  }
+
+  private static boolean carries(
+      Iterable<? extends JavaAnnotation<?>> annotations,
+      String type,
+      String attribute,
+      String value,
+      Set<String> visited) {
+    for (JavaAnnotation<?> annotation : annotations) {
+      String name = annotation.getRawType().getName();
+      if (name.equals(type) && annotation.get(attribute).map(v -> holds(v, value)).orElse(false)) {
+        return true;
+      }
+      if (visited.add(name)
+          && carries(annotation.getRawType().getAnnotations(), type, attribute, value, visited)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean holds(Object attributeValue, String value) {
+    if (attributeValue instanceof Object[] values) {
+      for (Object each : values) {
+        if (holds(each, value)) {
+          return true;
+        }
+      }
+      return false;
+    }
+    String actual =
+        attributeValue instanceof JavaEnumConstant constant
+            ? constant.name()
+            : String.valueOf(attributeValue);
+    return actual.equalsIgnoreCase(value);
   }
 
   /** Meta-annotated with any annotation of the role; false for an empty role. */

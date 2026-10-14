@@ -88,6 +88,17 @@ class HexagonalRulesTest {
     assertTrue(message.contains("LedgerController.quickEntry handles @GetMapping"), message);
   }
 
+  /** DCA-HEX-014 reads the method attribute of a general mapping the preset names. */
+  @Test
+  void aGeneralMappingRestrictedToGetIsSelected() {
+    String message = Fixtures.failure(FIXTURES + ".getmapping.bad", "DCA-HEX-014").getMessage();
+
+    assertTrue(
+        message.contains(
+            "LedgerController.reverse handles @RequestMapping(method=GET) and drives a command"),
+        message);
+  }
+
   /** A GET handler that asks a query passes; a handler without the GET mapping is not selected. */
   @Test
   void aGetHandlerThatAsksAQueryPasses() {
