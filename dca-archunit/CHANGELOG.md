@@ -42,7 +42,8 @@ same ids are the .NET library's (`DCA-MAP-014` is Java only).
 - `DCA-NAM-013` (naming, enforced): no use case, input port or method of a published `api` type is
   named `set…` or `update…` followed by a capital.
 - `DCA-USE-018` (usecase, enforced): in a module grouped by feature, an incoming adapter class
-  depends on the input ports of one feature only.
+  drives the commands of one feature only — input ports whose input ends in `Command`; reading a
+  neighbouring feature's query is allowed.
 - `DCA-USE-019` (usecase, enforced): a use case whose input ends in `Query` calls no repository or
   store write — a method named by a write verb (`save`, `delete`, `remove`, `add`, `insert`,
   `update`, `upsert`, `put`, `store`, `write`, `create`, `append`, `archive`, `purge`, `clear`,

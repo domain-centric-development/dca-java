@@ -359,18 +359,21 @@ class UseCaseRulesTest {
   class OneFeaturePerAdapter {
 
     @Test
-    void aControllerOverTwoFeaturesIsReported() {
+    void aControllerOverTheCommandsOfTwoFeaturesIsReported() {
       String message = Fixtures.violation(FIXTURES + ".featurecut.bad", "DCA-USE-018").getMessage();
 
-      assertTrue(
-          message.contains("LedgerController drives the input ports of 2 features"), message);
+      assertTrue(message.contains("LedgerController drives the commands of 2 features"), message);
       assertTrue(message.contains("booking=[PostEntryInputPort]"), message);
-      assertTrue(message.contains("reporting=[ShowBalanceInputPort]"), message);
+      assertTrue(message.contains("reporting=[ExportStatementInputPort]"), message);
+      assertFalse(message.contains("ShowBalanceInputPort"), message);
     }
 
-    /** One controller per feature passes; a flat module has no features to cut along. */
+    /**
+     * One controller per feature passes, as does one that changes state through one feature and
+     * reads a neighbouring feature's query; a flat module has no features to cut along.
+     */
     @Test
-    void oneControllerPerFeatureAndAFlatModulePass() {
+    void oneFeaturesCommandsPlusANeighboursQueryAndAFlatModulePass() {
       Fixtures.passes(FIXTURES + ".featurecut.good", "DCA-USE-018");
     }
   }

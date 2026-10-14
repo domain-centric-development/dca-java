@@ -879,12 +879,13 @@ public final class UseCaseRules implements DcaRuleSet {
   public static DcaRule incomingAdaptersServeOneFeature(DcaLayout layout) {
     return DcaRule.check(
             "DCA-USE-018",
-            "In a module grouped by feature, incoming adapters must drive the input ports of one"
+            "In a module grouped by feature, incoming adapters must drive the commands of one"
                 + " feature only",
             "Once the application is grouped, the incoming adapter is cut the same way: one"
-                + " controller serves the use cases of one feature. A class that drives the input"
-                + " ports of two features grows with every use case of both and hides the cut the"
-                + " application already made",
+                + " controller changes state through the use cases of one feature. A class that"
+                + " drives the commands of two features grows with every use case of both and hides"
+                + " the cut the application already made. Reading a neighbouring feature's query is"
+                + " no reason to cut",
             arch -> checkOneFeaturePerAdapter(arch, layout))
         .experimental()
         .selecting(
@@ -894,10 +895,12 @@ public final class UseCaseRules implements DcaRuleSet {
                 + " <module>.adapter.incoming.. of that module. Modules with flat use case packages"
                 + " are not selected.")
         .checking(
-            "The types assignable to the configured input-port role that the class depends on"
-                + " directly - inside the same module - belong to at most one feature, the feature"
-                + " being the first segment below the application package. A dependency on an input"
-                + " port of another module is not counted here. Nested classes are counted on their"
+            "The types assignable to the configured input-port role whose input ends with"
+                + " Command - a parameter of a public method, or a type argument of the input port"
+                + " they extend - that the class depends on directly, inside the same module, belong"
+                + " to at most one feature, the feature being the first segment below the"
+                + " application package. Input ports whose input ends with Query, or with neither"
+                + " suffix, are not counted, and neither is an input port of another module. Nested classes are counted on their"
                 + " own. An empty selection passes.",
             "cut the class along the features, one incoming adapter per feature, mirroring"
                 + " application.<feature> below the protocol segment");
@@ -922,6 +925,8 @@ public final class UseCaseRules implements DcaRuleSet {
           JavaClass target = dependency.getTargetClass();
           String pkg = target.getPackageName();
           if (!target.isAssignableTo(layout.markers().inputPort())
+              || !TypeInspection.takesInputEndingWith(
+                  target, layout.markers().inputPort(), "Command")
               || !DcaArchitecture.inPackageTree(pkg, application)
               || DcaArchitecture.inPackageTree(pkg, shared)) {
             continue;
@@ -937,7 +942,7 @@ public final class UseCaseRules implements DcaRuleSet {
         if (portsByFeature.size() > 1) {
           violations.add(
               adapter.getName()
-                  + " drives the input ports of "
+                  + " drives the commands of "
                   + portsByFeature.size()
                   + " features "
                   + portsByFeature
@@ -947,7 +952,7 @@ public final class UseCaseRules implements DcaRuleSet {
     }
     if (!violations.isEmpty()) {
       throw new DcaRuleViolation(
-          "In a module grouped by feature, incoming adapters must drive the input ports of one"
+          "In a module grouped by feature, incoming adapters must drive the commands of one"
               + " feature only",
           violations);
     }
