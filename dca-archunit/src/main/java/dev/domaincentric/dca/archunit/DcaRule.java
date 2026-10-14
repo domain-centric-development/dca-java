@@ -174,7 +174,7 @@ public interface DcaRule {
      * only where the selection opts in. Releasing it means removing this call.
      *
      * <pre>{@code
-     * DcaRule.of("DCA-USE-099", title, rationale, rule)
+     * DcaRule.of(id, title, rationale, rule)
      *     .experimental()
      *     .selecting("…")
      *     .checking("…");
