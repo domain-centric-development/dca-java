@@ -282,7 +282,8 @@ public final class DcaRuleSelection {
 
   /**
    * This selection with {@code other} applied on top — {@code other} wins per rule. The
-   * experimental rules run when either side opts in.
+   * experimental rules run when either side opts in, and the retired identities either side refers
+   * to are all reported.
    */
   public DcaRuleSelection mergedWith(DcaRuleSelection other) {
     Objects.requireNonNull(other, "other");
@@ -290,13 +291,15 @@ public final class DcaRuleSelection {
     merged.putAll(other.settings);
     Set<String> frozen = new LinkedHashSet<>(frozenIds);
     frozen.addAll(other.frozenIds);
+    Set<String> retired = new LinkedHashSet<>(referencedRetiredIds);
+    retired.addAll(other.referencedRetiredIds);
     return new DcaRuleSelection(
         other.includedSets != null ? other.includedSets : includedSets,
         other.includedIds != null ? other.includedIds : includedIds,
         merged,
         frozen,
         other.freezeStore != null ? other.freezeStore : freezeStore,
-        Set.of(),
+        retired,
         experimental || other.experimental);
   }
 

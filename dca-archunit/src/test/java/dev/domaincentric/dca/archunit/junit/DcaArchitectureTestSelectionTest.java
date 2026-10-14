@@ -52,6 +52,25 @@ class DcaArchitectureTestSelectionTest {
     assertEquals("from the code", selection.reasonFor("DCA-STR-003").orElseThrow());
   }
 
+  /**
+   * A properties file written for an earlier release names a retired id; the notice must survive
+   * the merge with the selection made in code, on whichever side the retired id stands.
+   */
+  @Test
+  void aRetiredIdTheFileNamesIsStillReportedAfterTheMerge() {
+    DcaRuleSelection file = DcaRuleSelection.all().excluding("DCA-HEX-015", "several instances");
+    DcaRuleSelection code = DcaRuleSelection.all().warning("DCA-TAC-009", "from the code");
+
+    assertEquals(Set.of("DCA-HEX-015"), file.mergedWith(code).referencedRetiredIds());
+    assertEquals(Set.of("DCA-HEX-015"), code.mergedWith(file).referencedRetiredIds());
+    assertEquals(
+        Set.of("DCA-HEX-015"),
+        file.mergedWith(DcaRuleSelection.all())
+            .mergedWith(DcaRuleSelection.all())
+            .referencedRetiredIds(),
+        "the chain DcaArchitectureTest builds: file, legacy overrides, additional selection");
+  }
+
   @Test
   void anEmptyAdditionalSelectionChangesNothing() {
     DcaRuleSelection selection = FILE.mergedWith(DcaRuleSelection.all());

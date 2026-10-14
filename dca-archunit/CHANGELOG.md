@@ -25,6 +25,14 @@ sixteen-role constructor stays as a compatibility constructor that ignores its l
 `withInstanceLocalState(…)` returns the preset unchanged and `instanceLocalState()` returns an empty
 list — all three `@Deprecated(forRemoval = true)`. A preset provider drops the last argument.
 
+### Fixed
+
+**A retired id named in `dca-archunit.properties` is reported again.** `DcaRuleSelection.mergedWith`
+dropped the retired identities of both sides, and `DcaArchitectureTest` merges the file with the
+legacy overrides and `additionalSelection()` — so a project whose properties file still named a
+retired id, `DCA-HEX-015` for example, ran without the retirement notice. The merge now keeps the
+retired identities either side refers to, as `DomainCentric.ArchRules` already did.
+
 ## [0.8.0] - 2026-10-14
 
 ### Added
