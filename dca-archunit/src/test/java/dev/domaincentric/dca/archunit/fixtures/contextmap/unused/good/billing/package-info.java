@@ -10,7 +10,9 @@
     via = Upstream.Consumes.EVENTS,
     status = Upstream.Status.PLANNED,
     rationale = "Posted entries will be consumed as published")
-@ApplicationModule(allowedDependencies = {"ledger :: api", "ledger :: events", "sharedkernel"})
+// "platform" names no module of the scan and is skipped, as in the .NET twin
+@ApplicationModule(
+    allowedDependencies = {"ledger :: api", "ledger :: events", "sharedkernel", "platform"})
 package dev.domaincentric.dca.archunit.fixtures.contextmap.unused.good.billing;
 
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.BoundedContext;

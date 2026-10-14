@@ -108,7 +108,10 @@ class ContextMapRulesTest {
         violation.getMessage());
   }
 
-  /** DCA-MAP-014: every allowed dependency is used, unless a PLANNED upstream announces it. */
+  /**
+   * DCA-MAP-014: every allowed dependency is used, unless a PLANNED upstream announces it or it
+   * names no module of the scan.
+   */
   @Test
   void anAllowedDependencyNoClassUsesIsReported() {
     String message =
