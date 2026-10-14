@@ -4,6 +4,33 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Added
+
+**A rule can be experimental.** Beside its kind (`ENFORCED`, `INFORMATIONAL`) every rule now has a
+maturity, `DcaRule.Maturity` — `RELEASED` or `EXPERIMENTAL`, read with `maturity()`. A rule is
+declared experimental where it is defined: `DcaRule.of(…).experimental().selecting(…).checking(…)`.
+It keeps its final id and set, so releasing it is removing that one call. Every rule of the catalog
+is released; no experimental rule ships yet.
+
+**Experimental rules run only on opt-in.** `DcaRuleSelection.all()` means every released rule.
+`DcaRuleSelection.all().withExperimental()` adds the experimental ones and composes with the scope
+and severity methods; `dca.rules.experimental=true` in `dca-archunit.properties` does the same
+without code. `DcaRules.allExcept` and `DcaRules.only` return released rules; `DcaRules.all` stays
+the whole catalog. `DcaRuleSelection.includes(String, DcaRule)` reads scope and maturity together.
+
+`dca.rules.experimental` takes `true` or `false` in any case; blank or absent is no opt-in, and any
+other value fails with an `IllegalArgumentException` naming the key.
+
+**The report shows them apart.** `DcaArchitectureTest` lists the experimental rules in scope in a
+container of their own, `experimental`, after the rule sets. With the opt-in they run there; without
+it each is an aborted test with the reason `not run — experimental; opt in with
+dca.rules.experimental = true or withExperimental()`. The summary line counts them separately:
+`118 enforced, 6 informational, 0 experimental`. `rules()` returns the rules in scope, experimental
+ones included.
+
+**`rules.json` carries the maturity.** Every rule has `"maturity": "released"` or
+`"experimental"`; `RULES.md` marks an experimental rule `(experimental)`.
+
 ## [0.7.0] - 2026-10-12
 
 **Migration from 0.6.0.** Three new rules, all `error`, can turn a suite red that was green. Each

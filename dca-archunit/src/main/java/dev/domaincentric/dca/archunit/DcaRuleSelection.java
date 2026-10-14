@@ -22,10 +22,12 @@ import java.util.regex.PatternSyntaxException;
  *
  * <p>The catalog is opinionated on purpose, but no team adopts all of it on day one — and a rule
  * that a team disagrees with should be a recorded decision, not a reason to drop the library. A
- * selection expresses four things:
+ * selection expresses five things:
  *
  * <ul>
  *   <li><b>scope</b> — {@link #onlySets(String...)} / {@link #onlyIds(String...)} narrow the run
+ *   <li><b>maturity</b> — {@link #withExperimental()} adds the {@link DcaRule.Maturity#EXPERIMENTAL
+ *       experimental} rules, which no selection runs otherwise
  *   <li><b>severity</b> — {@link #warning(String, String)} reports instead of failing, {@link
  *       #excluding(String, String)} skips; both stay visible in the report with their reason
  *   <li><b>exceptions</b> — {@link #ignoringViolationsMatching(String, String)} tolerates
@@ -53,7 +55,7 @@ public final class DcaRuleSelection {
   public static final String DEFAULT_RESOURCE = "dca-archunit.properties";
 
   private static final DcaRuleSelection ALL =
-      new DcaRuleSelection(null, null, Map.of(), Set.of(), null, Set.of());
+      new DcaRuleSelection(null, null, Map.of(), Set.of(), null, Set.of(), false);
 
   private final Set<String> includedSets; // null = every set
   private final Set<String> includedIds; // null = every rule
@@ -61,15 +63,7 @@ public final class DcaRuleSelection {
   private final Set<String> frozenIds;
   private final Path freezeStore;
   private final Set<String> referencedRetiredIds;
-
-  private DcaRuleSelection(
-      Set<String> includedSets,
-      Set<String> includedIds,
-      Map<String, RuleSettings> settings,
-      Set<String> frozenIds,
-      Path freezeStore) {
-    this(includedSets, includedIds, settings, frozenIds, freezeStore, Set.of());
-  }
+  private final boolean experimental;
 
   private DcaRuleSelection(
       Set<String> includedSets,
@@ -77,13 +71,15 @@ public final class DcaRuleSelection {
       Map<String, RuleSettings> settings,
       Set<String> frozenIds,
       Path freezeStore,
-      Set<String> referencedRetiredIds) {
+      Set<String> referencedRetiredIds,
+      boolean experimental) {
     this.includedSets = includedSets == null ? null : Set.copyOf(includedSets);
     this.includedIds = includedIds == null ? null : Set.copyOf(includedIds);
     this.settings = Map.copyOf(settings);
     this.frozenIds = Set.copyOf(frozenIds);
     this.freezeStore = freezeStore;
     this.referencedRetiredIds = Set.copyOf(referencedRetiredIds);
+    this.experimental = experimental;
   }
 
   /**
@@ -112,9 +108,32 @@ public final class DcaRuleSelection {
     return notices;
   }
 
-  /** Every rule of every set, all at {@link DcaSeverity#ERROR}. */
+  /**
+   * Every released rule of every set, all at {@link DcaSeverity#ERROR}. Experimental rules are not
+   * part of it; {@link #withExperimental()} adds them.
+   */
   public static DcaRuleSelection all() {
     return ALL;
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Maturity
+  // ---------------------------------------------------------------------------------------------
+
+  /**
+   * Adds the {@link DcaRule.Maturity#EXPERIMENTAL experimental} rules to the run. They are subject
+   * to scope and severity like every other rule — {@link #onlySets(String...)}, {@link
+   * #excluding(String, String)} and {@link #warning(String, String)} apply to them as written. The
+   * properties equivalent is {@code dca.rules.experimental=true}.
+   */
+  public DcaRuleSelection withExperimental() {
+    return new DcaRuleSelection(
+        includedSets, includedIds, settings, frozenIds, freezeStore, referencedRetiredIds, true);
+  }
+
+  /** Whether this selection runs the experimental rules; see {@link #withExperimental()}. */
+  public boolean includesExperimental() {
+    return experimental;
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -126,7 +145,7 @@ public final class DcaRuleSelection {
     Set<String> names = new LinkedHashSet<>(List.of(ruleSetNames));
     names.forEach(DcaRuleSelection::requireKnownSet);
     return new DcaRuleSelection(
-        names, includedIds, settings, frozenIds, freezeStore, referencedRetiredIds);
+        names, includedIds, settings, frozenIds, freezeStore, referencedRetiredIds, experimental);
   }
 
   /** Restricts the run to the given rule identifiers. */
@@ -134,7 +153,7 @@ public final class DcaRuleSelection {
     Set<String> ids = new LinkedHashSet<>(List.of(ruleIds));
     ids.forEach(DcaRuleSelection::requireActiveId);
     return new DcaRuleSelection(
-        includedSets, ids, settings, frozenIds, freezeStore, referencedRetiredIds);
+        includedSets, ids, settings, frozenIds, freezeStore, referencedRetiredIds, experimental);
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -184,7 +203,8 @@ public final class DcaRuleSelection {
     if (DcaRules.retired().containsKey(ruleId)) {
       retired.add(ruleId);
     }
-    return new DcaRuleSelection(includedSets, includedIds, merged, frozenIds, freezeStore, retired);
+    return new DcaRuleSelection(
+        includedSets, includedIds, merged, frozenIds, freezeStore, retired, experimental);
   }
 
   private DcaRuleSelection withSeverityForSet(
@@ -219,7 +239,13 @@ public final class DcaRuleSelection {
     patterns.add(regex);
     merged.put(ruleId, new RuleSettings(current.severity(), current.reason(), patterns));
     return new DcaRuleSelection(
-        includedSets, includedIds, merged, frozenIds, freezeStore, referencedRetiredIds);
+        includedSets,
+        includedIds,
+        merged,
+        frozenIds,
+        freezeStore,
+        referencedRetiredIds,
+        experimental);
   }
 
   /**
@@ -235,7 +261,7 @@ public final class DcaRuleSelection {
       ids.add(id);
     }
     return new DcaRuleSelection(
-        includedSets, includedIds, settings, ids, freezeStore, referencedRetiredIds);
+        includedSets, includedIds, settings, ids, freezeStore, referencedRetiredIds, experimental);
   }
 
   /** Directory holding the frozen baselines. Default: ArchUnit's own {@code archunit_store}. */
@@ -246,14 +272,18 @@ public final class DcaRuleSelection {
         settings,
         frozenIds,
         Objects.requireNonNull(directory),
-        referencedRetiredIds);
+        referencedRetiredIds,
+        experimental);
   }
 
   // ---------------------------------------------------------------------------------------------
   // Combining
   // ---------------------------------------------------------------------------------------------
 
-  /** This selection with {@code other} applied on top — {@code other} wins per rule. */
+  /**
+   * This selection with {@code other} applied on top — {@code other} wins per rule. The
+   * experimental rules run when either side opts in.
+   */
   public DcaRuleSelection mergedWith(DcaRuleSelection other) {
     Objects.requireNonNull(other, "other");
     Map<String, RuleSettings> merged = new LinkedHashMap<>(settings);
@@ -265,7 +295,9 @@ public final class DcaRuleSelection {
         other.includedIds != null ? other.includedIds : includedIds,
         merged,
         frozen,
-        other.freezeStore != null ? other.freezeStore : freezeStore);
+        other.freezeStore != null ? other.freezeStore : freezeStore,
+        Set.of(),
+        experimental || other.experimental);
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -277,6 +309,7 @@ public final class DcaRuleSelection {
    *
    * <pre>{@code
    * dca.rules.sets              = tactical,hexagonal
+   * dca.rules.experimental      = true
    * dca.rules.off               = DCA-NAM-002,DCA-NAM-006
    * dca.rules.warn              = DCA-TAC-009
    * dca.rules.warn.sets         = naming
@@ -292,6 +325,9 @@ public final class DcaRuleSelection {
    * second expression for the same rule uses an indexed key ({@code .ignore.1}, {@code .ignore.2},
    * …, applied after the unindexed one, in numeric order). Lists of rule ids and set names are
    * comma-separated as before.
+   *
+   * <p>{@code dca.rules.experimental} takes {@code true} or {@code false}, in any case; blank or
+   * absent means no opt-in, and any other value fails.
    *
    * <p>An unknown rule identifier or set name fails immediately — a typo must not silently leave a
    * rule enforced.
@@ -336,6 +372,9 @@ public final class DcaRuleSelection {
     Objects.requireNonNull(properties, "properties");
     DcaRuleSelection selection = all();
 
+    if (flag(properties, "dca.rules.experimental")) {
+      selection = selection.withExperimental();
+    }
     List<String> sets = split(properties.getProperty("dca.rules.sets"));
     if (!sets.isEmpty()) {
       selection = selection.onlySets(sets.toArray(String[]::new));
@@ -401,6 +440,26 @@ public final class DcaRuleSelection {
     return ordered;
   }
 
+  /**
+   * A boolean key: {@code true} or {@code false} in any case; blank or absent is {@code false}. Any
+   * other value fails — a misspelt flag must not silently leave the default in place.
+   */
+  private static boolean flag(Properties properties, String key) {
+    String value = properties.getProperty(key);
+    if (value == null || value.isBlank()) {
+      return false;
+    }
+    String trimmed = value.trim();
+    if (trimmed.equalsIgnoreCase("true")) {
+      return true;
+    }
+    if (trimmed.equalsIgnoreCase("false")) {
+      return false;
+    }
+    throw new IllegalArgumentException(
+        "Not a boolean for " + key + ": " + trimmed + ". Use true or false.");
+  }
+
   private static String reasonFor(Properties properties, String id) {
     return properties.getProperty("dca.rule." + id + ".reason");
   }
@@ -422,7 +481,22 @@ public final class DcaRuleSelection {
   // Reading the selection
   // ---------------------------------------------------------------------------------------------
 
-  /** Whether a rule of the given set takes part in the run at all. */
+  /**
+   * Whether a rule of the given set takes part in the run at all: in scope, and released or opted
+   * in with {@link #withExperimental()}.
+   */
+  public boolean includes(String ruleSetName, DcaRule rule) {
+    Objects.requireNonNull(rule, "rule");
+    if (rule.maturity() == DcaRule.Maturity.EXPERIMENTAL && !experimental) {
+      return false;
+    }
+    return includes(ruleSetName, rule.id());
+  }
+
+  /**
+   * Whether a rule of the given set and identifier is in scope — by set and identifier alone; its
+   * maturity is read by {@link #includes(String, DcaRule)}.
+   */
   public boolean includes(String ruleSetName, String ruleId) {
     if (includedSets != null && !includedSets.contains(ruleSetName)) {
       return false;
@@ -507,6 +581,9 @@ public final class DcaRuleSelection {
       parts.add("retired " + referencedRetiredIds);
     }
     parts.add(includedSets == null ? "all sets" : "sets " + includedSets);
+    if (experimental) {
+      parts.add("with experimental");
+    }
     if (includedIds != null) {
       parts.add("ids " + includedIds);
     }

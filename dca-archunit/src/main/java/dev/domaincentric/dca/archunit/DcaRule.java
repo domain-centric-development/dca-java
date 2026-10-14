@@ -23,12 +23,27 @@ import java.util.function.Function;
  * <em>not</em> count. They are mandatory — the factories return a builder that only becomes a
  * {@code DcaRule} once both are given — so a reader of the rule catalog can predict whether a rule
  * applies to a class and what it will say, without reading the rule's source.
+ *
+ * <p>Two properties of a rule are independent of each other: its {@link Kind} says what a violation
+ * does, its {@link Maturity} whether the rule is released. An experimental rule carries its final
+ * identifier and set, runs only where a selection opts in ({@link
+ * DcaRuleSelection#withExperimental()}), and is released by changing its maturity alone.
  */
 public interface DcaRule {
 
   enum Kind {
     ENFORCED,
     INFORMATIONAL
+  }
+
+  /**
+   * Whether a rule is part of the released catalog. A {@link #RELEASED} rule runs under every
+   * selection that includes it; an {@link #EXPERIMENTAL} rule runs only where the selection opts in
+   * with {@link DcaRuleSelection#withExperimental()} or {@code dca.rules.experimental=true}.
+   */
+  enum Maturity {
+    RELEASED,
+    EXPERIMENTAL
   }
 
   /**
@@ -43,6 +58,11 @@ public interface DcaRule {
   /** Whether this entry asserts policy or only reports information. */
   default Kind kind() {
     return Kind.ENFORCED;
+  }
+
+  /** Whether this rule is released or still experimental; see {@link Maturity}. */
+  default Maturity maturity() {
+    return Maturity.RELEASED;
   }
 
   /** Stable identifier, e.g. {@code DCA-TAC-001}. */
@@ -128,6 +148,7 @@ public interface DcaRule {
   /** A rule whose mechanics are not yet described; not a {@code DcaRule} until they are. */
   final class Undescribed {
     private Kind kind = Kind.ENFORCED;
+    private Maturity maturity = Maturity.RELEASED;
     private Function<DcaArchitecture, List<String>> report;
     private final String id;
     private final String title;
@@ -146,6 +167,22 @@ public interface DcaRule {
       this.rationale = Objects.requireNonNull(rationale);
       this.check = check;
       this.archRule = archRule;
+    }
+
+    /**
+     * Declares the rule {@link Maturity#EXPERIMENTAL}: it keeps its identifier and set, and runs
+     * only where the selection opts in. Releasing it means removing this call.
+     *
+     * <pre>{@code
+     * DcaRule.of("DCA-USE-099", title, rationale, rule)
+     *     .experimental()
+     *     .selecting("…")
+     *     .checking("…");
+     * }</pre>
+     */
+    public Undescribed experimental() {
+      maturity = Maturity.EXPERIMENTAL;
+      return this;
     }
 
     /** Names the classes the rule looks at; see {@link DcaRule#selects()}. */
@@ -184,6 +221,7 @@ public interface DcaRule {
           rule.check,
           rule.archRule,
           rule.kind,
+          rule.maturity,
           rule.report);
     }
   }
@@ -212,10 +250,16 @@ public interface DcaRule {
   /** Default implementation used by the factories. */
   final class SimpleRule implements DcaRule {
     private final Kind kind;
+    private final Maturity maturity;
 
     @Override
     public Kind kind() {
       return kind;
+    }
+
+    @Override
+    public Maturity maturity() {
+      return maturity;
     }
 
     @Override
@@ -243,8 +287,10 @@ public interface DcaRule {
         Consumer<DcaArchitecture> check,
         Function<DcaArchitecture, ArchRule> archRule,
         Kind kind,
+        Maturity maturity,
         Function<DcaArchitecture, List<String>> report) {
       this.kind = kind;
+      this.maturity = Objects.requireNonNull(maturity);
       this.report = report;
       this.id = Objects.requireNonNull(id);
       this.title = Objects.requireNonNull(title);

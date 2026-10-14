@@ -25,10 +25,13 @@ import java.util.stream.Stream;
  *
  * <pre>{@code
  * DcaArchitecture arch = DcaArchitecture.load(DcaLayout.forBasePackage("com.acme.shop"));
- * for (DcaRule rule : DcaRules.all(arch.layout())) {
- *   rule.check(arch);
- * }
+ * DcaRules.checkAll(arch, DcaRuleSelection.all());
  * }</pre>
+ *
+ * <p>{@link #all(DcaLayout)} is the catalog and lists the experimental rules too; {@link
+ * #select(DcaLayout, DcaRuleSelection)}, {@link #allExcept(DcaLayout, Set)} and {@link
+ * #only(DcaLayout, String...)} return the rules to run and leave them out unless a selection opts
+ * in.
  *
  * <p>For JUnit 5, extend {@link dev.domaincentric.dca.archunit.junit.DcaArchitectureTest} instead —
  * it turns every rule into a dynamic test.
@@ -98,23 +101,26 @@ public final class DcaRules {
         new ErrorHandlingRules(layout));
   }
 
-  /** Every rule of every set. */
+  /** Every rule of every set, the experimental ones included — the catalog, not a selection. */
   public static List<DcaRule> all(DcaLayout layout) {
     return ruleSets(layout).stream().flatMap(s -> s.rules().stream()).toList();
   }
 
   /**
-   * Every rule except the given identifiers. An identifier that is neither in the catalog nor
-   * retired is rejected: it would exclude nothing and leave the caller believing it had.
+   * Every released rule except the given identifiers. An identifier that is neither in the catalog
+   * nor retired is rejected: it would exclude nothing and leave the caller believing it had.
    */
   public static List<DcaRule> allExcept(DcaLayout layout, Set<String> excludedIds) {
     excludedIds.forEach(DcaRuleSelection::requireKnownId);
-    return all(layout).stream().filter(r -> !excludedIds.contains(r.id())).toList();
+    return all(layout).stream()
+        .filter(r -> r.maturity() == DcaRule.Maturity.RELEASED)
+        .filter(r -> !excludedIds.contains(r.id()))
+        .toList();
   }
 
   /**
-   * The rules of the named sets only ({@code "tactical"}, {@code "hexagonal"}, …). An unknown set
-   * name is rejected rather than silently selecting no rule.
+   * The released rules of the named sets only ({@code "tactical"}, {@code "hexagonal"}, …). An
+   * unknown set name is rejected rather than silently selecting no rule.
    */
   public static List<DcaRule> only(DcaLayout layout, String... ruleSetNames) {
     Set<String> names = new LinkedHashSet<>(List.of(ruleSetNames));
@@ -122,15 +128,20 @@ public final class DcaRules {
     return ruleSets(layout).stream()
         .filter(s -> names.contains(s.name()))
         .flatMap(s -> s.rules().stream())
+        .filter(r -> r.maturity() == DcaRule.Maturity.RELEASED)
         .toList();
   }
 
-  /** The sets and rules the selection asks for, in catalog order, empty sets removed. */
+  /**
+   * The sets and rules the selection asks for, in catalog order, empty sets removed. An
+   * experimental rule is among them only where the selection opts in ({@link
+   * DcaRuleSelection#withExperimental()}).
+   */
   public static List<DcaRuleSet> select(DcaLayout layout, DcaRuleSelection selection) {
     List<DcaRuleSet> selected = new ArrayList<>();
     for (DcaRuleSet set : ruleSets(layout)) {
       List<DcaRule> rules =
-          set.rules().stream().filter(r -> selection.includes(set.name(), r.id())).toList();
+          set.rules().stream().filter(r -> selection.includes(set.name(), r)).toList();
       if (!rules.isEmpty()) {
         selected.add(new SelectedRuleSet(set.name(), rules));
       }
@@ -143,7 +154,9 @@ public final class DcaRules {
     return select(layout, selection).stream().flatMap(s -> s.rules().stream()).toList();
   }
 
-  /** Convenience: run every rule against the architecture, failing on the first violation. */
+  /**
+   * Convenience: run every released rule against the architecture, failing on the first violation.
+   */
   public static void checkAll(DcaArchitecture architecture) {
     checkAll(architecture, DcaRuleSelection.all());
   }

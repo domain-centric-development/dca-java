@@ -53,10 +53,23 @@ import org.junit.jupiter.api.TestFactory;
  * off are reported as aborted tests carrying their recorded reason, so a decision to skip a rule
  * stays visible instead of disappearing from the report.
  *
+ * <p>Experimental rules in scope are listed in a container of their own, {@code experimental},
+ * after the rule sets, and the summary line counts them apart from the released ones ({@code 120
+ * enforced, 4 informational, 2 experimental}). They run only where the selection opts in ({@link
+ * DcaRuleSelection#withExperimental()}, {@code dca.rules.experimental=true}); without it each is
+ * reported as an aborted test that names the opt-in, the way a switched-off rule is.
+ *
  * <p>Requires JUnit Jupiter on the test class path (it is a {@code compileOnly} dependency of this
  * library).
  */
 public abstract class DcaArchitectureTest {
+
+  /** Name of the container the experimental rules run in, beside the rule-set containers. */
+  public static final String EXPERIMENTAL_CONTAINER = "experimental";
+
+  /** Why an experimental rule in scope did not run: the selection did not opt in. */
+  public static final String EXPERIMENTAL_NOT_RUN =
+      "not run — experimental; opt in with dca.rules.experimental = true or withExperimental()";
 
   private DcaArchitecture architecture;
 
@@ -96,9 +109,13 @@ public abstract class DcaArchitectureTest {
     return Set.of();
   }
 
-  /** The rules to run. Default: whatever {@link #selection()} asks for. */
+  /**
+   * The rules in scope. Default: whatever {@link #selection()} asks for, with the experimental
+   * rules in its scope added — they run only where the selection opts in, and are reported as not
+   * run otherwise.
+   */
   protected List<DcaRule> rules() {
-    return DcaRules.selectFlat(effectiveLayout(), selection());
+    return DcaRules.selectFlat(effectiveLayout(), selection().withExperimental());
   }
 
   /** The imported architecture; loaded once per test instance. */
@@ -151,15 +168,27 @@ public abstract class DcaArchitectureTest {
     DcaArchitecture arch = architecture();
     DcaRuleSelection selection = selection();
     var selectedRules = rules();
+    List<DcaRule> released =
+        selectedRules.stream().filter(r -> r.maturity() == DcaRule.Maturity.RELEASED).toList();
+    List<DcaRule> experimental =
+        selectedRules.stream().filter(r -> r.maturity() == DcaRule.Maturity.EXPERIMENTAL).toList();
     long informational =
-        selectedRules.stream().filter(r -> r.kind() == DcaRule.Kind.INFORMATIONAL).count();
+        released.stream().filter(r -> r.kind() == DcaRule.Kind.INFORMATIONAL).count();
     String counts =
-        (selectedRules.size() - informational) + " enforced, " + informational + " informational";
+        (released.size() - informational)
+            + " enforced, "
+            + informational
+            + " informational, "
+            + experimental.size()
+            + " experimental";
     System.out.println(counts);
     selection.retirementNotices().forEach(System.out::println);
-    Map<String, List<DcaRule>> bySet = groupBySet(selectedRules);
+    Map<String, List<DcaRule>> containers = new LinkedHashMap<>(groupBySet(released));
+    if (!experimental.isEmpty()) {
+      containers.put(EXPERIMENTAL_CONTAINER, experimental);
+    }
     Stream<DynamicNode> sets =
-        bySet.entrySet().stream()
+        containers.entrySet().stream()
             .map(
                 entry ->
                     DynamicContainer.dynamicContainer(
@@ -222,6 +251,10 @@ public abstract class DcaArchitectureTest {
     return DynamicTest.dynamicTest(
         "[" + rule.id() + "] " + rule.title(),
         () -> {
+          if (rule.maturity() == DcaRule.Maturity.EXPERIMENTAL
+              && !selection.includesExperimental()) {
+            Assumptions.abort(EXPERIMENTAL_NOT_RUN);
+          }
           DcaRuleOutcome outcome = DcaRuleExecution.execute(rule, arch, selection);
           switch (outcome.status()) {
             case FAILED -> throw new AssertionError(outcome.message());

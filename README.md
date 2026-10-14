@@ -251,12 +251,22 @@ dca.rule.DCA-STR-003.ignore = .*legacy.*
 dca.rule.DCA-STR-003.ignore.1 = Generated.{1,3}Client
 dca.rules.freeze            = DCA-ONI-002
 dca.rules.freeze.store      = arch/frozen
+dca.rules.experimental      = true
 ```
 
 An unknown rule id or set name fails the run immediately — a typo must never leave a rule silently
 enforced. The value of an `.ignore` key is **one** regular expression, commas included (`{1,3}` is a
 quantifier, not a separator); a second expression for the same rule goes into an indexed key
 (`.ignore.1`, `.ignore.2`, …). Rule-id and set lists stay comma-separated.
+
+**Experimental rules are off by default.** A new rule can ship as experimental first: it carries its
+final id and set, but no selection runs it unless the project opts in — `dca.rules.experimental = true`
+in the file, or `DcaRuleSelection.all().withExperimental()` in code, which composes with every method
+above. The key takes `true` or `false`; any other value fails the run. In the report the experimental
+rules in scope sit in a container of their own, `experimental`, after the rule sets: with the opt-in
+they run there, without it each is an aborted test that names the opt-in. When such a rule is
+released it keeps its id, so a project that opted in changes nothing. `rules.json` marks every rule
+`"maturity": "released"` or `"experimental"`.
 
 Both sources combine: the file is the base, `additionalSelection()` is merged on top, and the later
 entry wins per rule id. Override `additionalSelection()`, not `selection()` — the latter *replaces*

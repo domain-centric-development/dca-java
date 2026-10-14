@@ -44,10 +44,13 @@ public final class RuleCatalog {
   private static String counts() {
     var all = DcaRules.all(PLACEHOLDER_LAYOUT);
     long info = all.stream().filter(r -> r.kind() == DcaRule.Kind.INFORMATIONAL).count();
+    long experimental =
+        all.stream().filter(r -> r.maturity() == DcaRule.Maturity.EXPERIMENTAL).count();
     return (all.size() - info)
         + " enforced, "
         + info
         + " informational, "
+        + (experimental == 0 ? "" : experimental + " of them experimental, ")
         + DcaRules.retired().size()
         + " retired, 0 n/a";
   }
@@ -73,6 +76,7 @@ public final class RuleCatalog {
             .append("` | ")
             .append(escapeCell(rule.title()))
             .append(rule.kind() == DcaRule.Kind.INFORMATIONAL ? " (informational)" : "")
+            .append(rule.maturity() == DcaRule.Maturity.EXPERIMENTAL ? " (experimental)" : "")
             .append(" | ")
             .append(escapeCell(rule.rationale()))
             .append(" | ")
@@ -116,8 +120,9 @@ public final class RuleCatalog {
   }
 
   /**
-   * The catalog as JSON: {@code [{"set":…,"id":…,"title":…,"rationale":…,"selects":…,"checks":…},
-   * …]}.
+   * The catalog as JSON: {@code [{"set":…,"id":…,"title":…,"rationale":…,"selects":…,"checks":…,
+   * "status":…,"maturity":…}, …]}. {@code status} is the kind ({@code enforced} or {@code
+   * informational}), {@code maturity} is {@code released} or {@code experimental}.
    */
   public static String json() {
     StringBuilder sb =
@@ -147,6 +152,8 @@ public final class RuleCatalog {
             .append(quote(rule.checks()))
             .append(", \"status\": ")
             .append(quote(rule.kind().name().toLowerCase(java.util.Locale.ROOT)))
+            .append(", \"maturity\": ")
+            .append(quote(rule.maturity().name().toLowerCase(java.util.Locale.ROOT)))
             .append('}');
       }
     }
