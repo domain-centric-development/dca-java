@@ -4,6 +4,8 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-15
+
 ### Removed
 
 **`DCA-HEX-015` is retired.** The experimental rule "Incoming adapters must not keep state for a
