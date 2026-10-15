@@ -124,6 +124,31 @@ class FrameworkAnnotationsTest {
         () -> FrameworkAnnotations.none().withGetMapping("x.Mapping#method"));
   }
 
+  /**
+   * The GET-mapping role names a general mapping without a method value where the framework routes
+   * such a handler for every method; a path without an HTTP method is a locator elsewhere.
+   */
+  @Test
+  void theGetMappingRoleTakesAMappingThatNamesNoMethod() {
+    assertTrue(
+        FrameworkAnnotations.spring()
+            .getMapping()
+            .contains("org.springframework.web.bind.annotation.RequestMapping#method="));
+    assertEquals(
+        "@RequestMapping without method",
+        FrameworkAnnotations.describe(
+            "org.springframework.web.bind.annotation.RequestMapping#method="));
+    for (FrameworkAnnotations preset :
+        List.of(
+            FrameworkAnnotations.jakarta(),
+            FrameworkAnnotations.quarkus(),
+            FrameworkAnnotations.micronaut())) {
+      assertTrue(
+          preset.getMapping().stream().noneMatch(entry -> entry.endsWith("=")),
+          preset + " " + preset.getMapping());
+    }
+  }
+
   @Test
   void describeCollapsesToDistinctSimpleNames() {
     assertEquals(

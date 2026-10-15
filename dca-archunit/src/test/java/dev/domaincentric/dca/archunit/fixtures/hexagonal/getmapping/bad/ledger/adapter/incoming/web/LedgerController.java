@@ -35,6 +35,12 @@ public final class LedgerController {
     return postEntry.execute(new PostEntryCommand(account)).reference();
   }
 
+  /** A general mapping that names no method answers every method, GET included. */
+  @RequestMapping("/entries/any")
+  public String anyMethod(String account) {
+    return postEntry.execute(new PostEntryCommand(account)).reference();
+  }
+
   private String book(String account) {
     return postEntry.execute(new PostEntryCommand(account)).reference();
   }

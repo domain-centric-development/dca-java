@@ -99,6 +99,23 @@ class HexagonalRulesTest {
         message);
   }
 
+  /**
+   * DCA-HEX-014 selects a general mapping that names no method - it answers GET too - and reads the
+   * method the same mapping names on the class.
+   */
+  @Test
+  void aMappingThatNamesNoMethodIsAGetHandler() {
+    String message = Fixtures.failure(FIXTURES + ".getmapping.bad", "DCA-HEX-014").getMessage();
+
+    assertTrue(
+        message.contains(
+            "LedgerController.anyMethod handles @RequestMapping without method and drives a command"),
+        message);
+    assertTrue(
+        message.contains("JournalController.undo handles @RequestMapping(method=GET) and drives"),
+        message);
+  }
+
   /** A GET handler that asks a query passes; a handler without the GET mapping is not selected. */
   @Test
   void aGetHandlerThatAsksAQueryPasses() {

@@ -47,11 +47,23 @@ may now name a general mapping annotation with the attribute value that makes it
 constant of that name or that string, ignoring case — directly or on a meta-annotation. The Spring
 preset adds `org.springframework.web.bind.annotation.RequestMapping#method=GET`, so a handler mapped
 with `@RequestMapping(method = GET)` is selected like one with `@GetMapping`; the Jakarta and Quarkus
-presets add `jakarta.ws.rs.HttpMethod#value=GET`, which finds a project's own GET annotation. A
-mapping without a method attribute answers every method and stays unselected. The violation names
+presets add `jakarta.ws.rs.HttpMethod#value=GET`, which finds a project's own GET annotation. The
+violation names
 the entry that matched (`handles @RequestMapping(method=GET)`); `FrameworkAnnotations.describe(String)`
 spells one entry. A malformed attribute entry is refused. The .NET twin reads
 `AcceptVerbsAttribute#HttpMethods=GET` the same way.
+
+**`DCA-HEX-014` counts a mapping that names no HTTP method as a GET handler.** Such a mapping answers
+every method, GET included, so a command behind it changes state on GET. A `getMapping` entry
+without a value, `<annotation>#<attribute>=`, matches when the attribute holds none; the Spring
+preset adds `org.springframework.web.bind.annotation.RequestMapping#method=`, so
+`@RequestMapping("/x")` is selected (violation: `handles @RequestMapping without method`). Both
+attribute forms now read the same annotation on the declaring class too, as Spring combines the
+two: a class-level `@RequestMapping(method = POST)` keeps a method-level `@RequestMapping("/x")`
+out, a class-level `GET` brings it in; a class-level mapping alone makes no method a handler. The
+Jakarta and Quarkus presets add no such entry — a JAX-RS method with `@Path` and no HTTP-method
+annotation is a sub-resource locator, not a handler. The rule stays experimental. The .NET twin
+selects a controller action that names no HTTP method the same way.
 
 **`DCA-HEX-016` names its boundary in a concatenation.** A member name called explicitly inside a
 concatenation (`"text" + value.name()`) has always been listed; the enum value itself concatenated

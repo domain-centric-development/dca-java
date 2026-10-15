@@ -41,10 +41,4 @@ public final class LedgerController {
   public String quickEntry(String account) {
     return postEntry.execute(new PostEntryCommand(account)).reference();
   }
-
-  /** A general mapping without a method attribute is not selected (documented in the rule). */
-  @RequestMapping("/entries/any")
-  public String anyMethod(String account) {
-    return postEntry.execute(new PostEntryCommand(account)).reference();
-  }
 }
