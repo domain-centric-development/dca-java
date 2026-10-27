@@ -1,23 +1,25 @@
 package dev.domaincentric.dca.buildingblocks.hexagonal.port.in;
 
 /**
- * Marker interface for Input Ports (Hexagonal Architecture) / Use Cases (Clean Architecture).
+ * The most common kind of {@link InputPort}: one operation that takes a command or query and
+ * answers with a result - a Use Case in Clean Architecture terms.
  *
- * <p>An input port represents an entry point to the application layer, defining a single use case
- * or application feature. In Hexagonal Architecture, input ports are called by primary/driving
- * adapters (e.g., REST controllers, event consumers, CLI handlers).
+ * <p>Every use case is an input port; not every input port is a use case. An input port that only
+ * receives an incoming event or serves operations without a result model extends {@link InputPort}
+ * directly. A use case is called by primary/driving adapters (e.g., REST controllers, event
+ * consumers, CLI handlers).
  *
- * <p><b>Characteristics of Input Ports:</b>
+ * <p><b>Characteristics of a Use Case:</b>
  *
  * <ul>
- *   <li>Represent a single user action or system operation
- *   <li>Define the interface that use cases implement
- *   <li>Accept Input models (Commands or Queries) as parameters
- *   <li>Return Output models, not domain entities
+ *   <li>Represents a single user action or system operation
+ *   <li>Is the interface the application-layer implementation implements
+ *   <li>Accepts an Input model (Command or Query) as its parameter
+ *   <li>Returns an Output model, not a domain entity
  *   <li>Technology-agnostic (no framework dependencies)
  * </ul>
  *
- * <p><b>Input/Output Pattern:</b> Input ports accept Input models and return Output models to
+ * <p><b>Input/Output Pattern:</b> A use case accepts an Input model and returns an Output model to
  * decouple the application layer from presentation and infrastructure concerns.
  *
  * <p><b>Example:</b>
