@@ -39,10 +39,16 @@ import java.util.Objects;
  * of the project's vocabulary. A vocabulary that has no common port supertype cannot express that
  * here - switch {@code DCA-HEX-009} off rather than pointing the role at an unrelated type.
  *
- * <p>What the roles do <em>not</em> cover are the strategic annotations ({@code @BoundedContext},
- * {@code @Upstream}, {@code @Partnership} and their siblings). The rules do not only select on
- * them, they read their members — the context a relationship names, the dependencies a module
- * allows — and a name alone does not carry members. Those annotations stay the library's own.
+ * <p><b>Three roles name annotations</b>, not supertypes: {@code boundedContext} and {@code
+ * sharedKernel} on a {@code package-info}, {@code integrationEventType} on an integration event.
+ * They are matched by name on the imported bytecode, never by loading a class, and the members the
+ * rules read are read by name: a project's own {@code @BoundedContext(name, description)} serves
+ * like the library's. A member the rules need and the annotation lacks is reported by name.
+ *
+ * <p>What the roles do <em>not</em> cover are the relationship annotations ({@code @Upstream},
+ * {@code @ExternalUpstream}, {@code @Partnership}, {@code @OpenHostService}). The rules read their
+ * nested values and enum constants — the channels a relationship consumes, its translation and its
+ * status — and those stay the library's own.
  *
  * <p><b>A role names a type, never a method.</b> Four method names are fixed, and pointing a role
  * at your own type does not rename them: {@code save} and {@code deleteById} / {@code delete} on
@@ -72,7 +78,10 @@ import java.util.Objects;
  * @param useCaseException the base type of a use-case failure
  * @param transactionBoundary the explicit transaction boundary of the application layer
  * @param inputPort the base type of every incoming (driving) port
- * @param useCase the input port that takes a command or query and answers with a result
+ * @param useCase the input port that takes a command or query and answers with a result - read only
+ *     by {@code DCA-NAM-001}; every other use-case rule selects through {@code inputPort} or the
+ *     use-case suffix. A vocabulary with several use-case shapes (one that answers, one that
+ *     answers nothing) points this role at their common supertype, which may be the input port
  * @param outputPort the base type of every outgoing (driven) port
  * @param repository the outgoing port that loads and stores an aggregate
  * @param store the outgoing port that holds data no aggregate owns
@@ -81,6 +90,11 @@ import java.util.Objects;
  *     {@code DCA-USE-013}, which separates the output ports that live inside the transaction from
  *     those that may leave the process. The .NET twin carries the role without a caller, because
  *     that rule is not applicable there
+ * @param boundedContext the annotation that declares a bounded context on a {@code package-info};
+ *     its members {@code name} and {@code description} are read by name
+ * @param sharedKernel the annotation that declares the shared kernel on a {@code package-info}
+ * @param integrationEventType the annotation that gives an integration event its contract identity
+ *     - {@code DCA-ADV-005} reads its presence
  */
 public record DcaMarkers(
     String name,
@@ -102,7 +116,10 @@ public record DcaMarkers(
     String repository,
     String store,
     String domainEventPublisher,
-    String integrationEventPublisher) {
+    String integrationEventPublisher,
+    String boundedContext,
+    String sharedKernel,
+    String integrationEventType) {
 
   /** The package the default vocabulary lives in. */
   public static final String DCA_BUILDING_BLOCKS = "dev.domaincentric.dca.buildingblocks";
@@ -130,6 +147,9 @@ public record DcaMarkers(
     store = type(store, "store");
     domainEventPublisher = type(domainEventPublisher, "domainEventPublisher");
     integrationEventPublisher = type(integrationEventPublisher, "integrationEventPublisher");
+    boundedContext = type(boundedContext, "boundedContext");
+    sharedKernel = type(sharedKernel, "sharedKernel");
+    integrationEventType = type(integrationEventType, "integrationEventType");
   }
 
   private static String type(String fqn, String role) {
@@ -165,7 +185,10 @@ public record DcaMarkers(
         DCA_BUILDING_BLOCKS + ".hexagonal.port.out.Repository",
         DCA_BUILDING_BLOCKS + ".hexagonal.port.out.Store",
         DCA_BUILDING_BLOCKS + ".hexagonal.port.out.DomainEventPublisher",
-        DCA_BUILDING_BLOCKS + ".hexagonal.port.out.IntegrationEventPublisher");
+        DCA_BUILDING_BLOCKS + ".hexagonal.port.out.IntegrationEventPublisher",
+        DCA_BUILDING_BLOCKS + ".ddd.strategic.BoundedContext",
+        DCA_BUILDING_BLOCKS + ".ddd.strategic.relationships.SharedKernel",
+        DCA_BUILDING_BLOCKS + ".ddd.tactical.IntegrationEventType");
   }
 
   /** The same vocabulary under a different name, which the test report shows. */
@@ -209,7 +232,10 @@ public record DcaMarkers(
         roles.get("repository"),
         roles.get("store"),
         roles.get("domainEventPublisher"),
-        roles.get("integrationEventPublisher"));
+        roles.get("integrationEventPublisher"),
+        roles.get("boundedContext"),
+        roles.get("sharedKernel"),
+        roles.get("integrationEventType"));
   }
 
   public DcaMarkers withAggregateRoot(String fqn) {
@@ -286,6 +312,31 @@ public record DcaMarkers(
 
   public DcaMarkers withIntegrationEventPublisher(String fqn) {
     return withRole("integrationEventPublisher", fqn);
+  }
+
+  /**
+   * The annotation that declares a bounded context on a {@code package-info}. The rules read its
+   * members {@code name} and {@code description} by name, so the project's own annotation must
+   * declare {@code name}; {@code description} may be absent.
+   */
+  public DcaMarkers withBoundedContext(String fqn) {
+    return withRole("boundedContext", fqn);
+  }
+
+  /**
+   * The annotation that declares the shared kernel on a {@code package-info}. Only its presence is
+   * read; a member {@code description} is read when the annotation has one.
+   */
+  public DcaMarkers withSharedKernel(String fqn) {
+    return withRole("sharedKernel", fqn);
+  }
+
+  /**
+   * The annotation that gives an integration event its contract identity. {@code DCA-ADV-005} reads
+   * only its presence on the event class.
+   */
+  public DcaMarkers withIntegrationEventType(String fqn) {
+    return withRole("integrationEventType", fqn);
   }
 
   /**
@@ -387,6 +438,9 @@ public record DcaMarkers(
     roles.put("store", store);
     roles.put("domainEventPublisher", domainEventPublisher);
     roles.put("integrationEventPublisher", integrationEventPublisher);
+    roles.put("boundedContext", boundedContext);
+    roles.put("sharedKernel", sharedKernel);
+    roles.put("integrationEventType", integrationEventType);
     return roles;
   }
 

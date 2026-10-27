@@ -741,14 +741,22 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .haveSimpleNameEndingWith(arch.layout().storeSuffix())
                     .and()
                     .doNotHaveSimpleName(arch.layout().storeSuffix())
+                    .and()
+                    .doNotHaveFullyQualifiedName(arch.layout().markers().store())
+                    .and()
+                    .resideOutsideOfPackages(arch.allAdapterPatterns())
+                    .and()
+                    .resideOutsideOfPackages(arch.allInfrastructurePatterns())
                     .should()
                     .beAssignableTo(arch.layout().markers().store())
                     .andShould()
                     .notBeAssignableTo(arch.layout().markers().repository())
                     .allowEmptyShould(true))
         .selecting(
-            "Interfaces anywhere under scan whose simple name ends with Store, the marker "
-                + "Store itself excluded.")
+            "Interfaces under scan whose simple name ends with Store, the marker Store itself"
+                + " and the type the store role names excluded, outside every adapter and"
+                + " infrastructure package - an interface there is an adapter's own abstraction,"
+                + " never a port.")
         .checking(
             "The interface is assignable to the Store marker and not assignable to "
                 + "Repository; both must hold. An interface not named *Store is never reported; "

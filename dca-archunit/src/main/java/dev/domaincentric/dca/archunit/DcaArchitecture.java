@@ -1,6 +1,7 @@
 package dev.domaincentric.dca.archunit;
 
 import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaAnnotation;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
@@ -9,6 +10,7 @@ import com.tngtech.archunit.core.importer.Location;
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.BoundedContext;
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.relationships.SharedKernel;
 import java.lang.annotation.Annotation;
+import java.lang.annotation.Repeatable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -35,11 +37,11 @@ public final class DcaArchitecture {
   private Optional<String> sharedKernelPackage;
 
   /**
-   * {@code package-info} lookups are reflective and miss far more often than they hit — context
-   * discovery walks every ancestor package of every class. Cached per architecture instance,
-   * empties included.
+   * {@code package-info} annotations by package. Lookups miss far more often than they hit —
+   * context discovery walks every ancestor package of every class. Cached per architecture
+   * instance, empties included.
    */
-  private final Map<String, Optional<Class<?>>> packageInfoCache = new HashMap<>();
+  private final Map<String, List<JavaAnnotation<?>>> packageInfoCache = new HashMap<>();
 
   /** Memoised {@link #isContextRoot(String)}, for the same reason. */
   private final Map<String, Boolean> contextRootCache = new HashMap<>();
@@ -48,7 +50,18 @@ public final class DcaArchitecture {
 
   private DcaArchitecture(DcaLayout layout, JavaClasses classes) {
     this.layout = Objects.requireNonNull(layout);
-    this.classes = Objects.requireNonNull(classes);
+    this.classes = withoutExcludedPackages(layout, Objects.requireNonNull(classes));
+  }
+
+  private static JavaClasses withoutExcludedPackages(DcaLayout layout, JavaClasses classes) {
+    List<String> excluded = layout.excludedPackages();
+    if (excluded.isEmpty()) {
+      return classes;
+    }
+    return classes.that(
+        DescribedPredicate.describe(
+            "reside outside the excluded packages " + excluded,
+            c -> excluded.stream().noneMatch(p -> inPackageTree(c.getPackageName(), p))));
   }
 
   /**
@@ -149,8 +162,11 @@ public final class DcaArchitecture {
   }
 
   /**
-   * The package annotated with {@link SharedKernel}, at whatever depth below the base package it
-   * sits.
+   * The package annotated with {@link SharedKernel} — or with the annotation the {@code
+   * sharedKernel} marker role names — at whatever depth below the base package it sits. Where no
+   * package carries it, the conventional package {@code <base>.<sharedKernelSubpackage>} is the
+   * shared kernel when it holds classes: a project that has not declared its kernel yet still gets
+   * the kernel's exemption from module isolation.
    */
   public Optional<String> sharedKernelPackage() {
     if (sharedKernelPackage == null) {
@@ -164,6 +180,12 @@ public final class DcaArchitecture {
             found = Optional.of(root);
             break;
           }
+        }
+      }
+      if (found.isEmpty()) {
+        String conventional = layout.sharedKernelPackage();
+        if (classes.stream().anyMatch(c -> inPackageTree(c.getPackageName(), conventional))) {
+          found = Optional.of(conventional);
         }
       }
       sharedKernelPackage = found;
@@ -276,38 +298,80 @@ public final class DcaArchitecture {
   // package-info annotations
   // ---------------------------------------------------------------------------------------------
 
-  /** A single annotation from the package's {@code package-info} class, if present. */
+  /**
+   * A single annotation from the package's {@code package-info}, if present.
+   *
+   * <p>Read from the imported bytecode, never by loading the {@code package-info} class: the
+   * classes under test need not be loadable, and an annotation retained only in the class file is
+   * enough. For {@link BoundedContext} and {@link SharedKernel} the annotation looked for is the
+   * one the layout's marker role names ({@link DcaMarkers#boundedContext()}, {@link
+   * DcaMarkers#sharedKernel()}); a project's own annotation is then answered as the library type,
+   * its members read by name.
+   */
   public <T extends Annotation> Optional<T> packageAnnotation(
       String packageName, Class<T> annotationType) {
-    return packageInfo(packageName).map(c -> c.getAnnotation(annotationType));
+    String declared = declaredAnnotationName(annotationType);
+    return packageInfoAnnotations(packageName).stream()
+        .filter(a -> a.getRawType().getName().equals(declared))
+        .findFirst()
+        .map(a -> PackageAnnotations.as(annotationType, a, packageName));
   }
 
-  /** All instances of a repeatable annotation from the package's {@code package-info} class. */
+  /**
+   * All instances of a repeatable annotation from the package's {@code package-info} — the one
+   * written directly and those inside its container — read from the bytecode like {@link
+   * #packageAnnotation(String, Class)}.
+   */
   public <T extends Annotation> List<T> packageAnnotations(
       String packageName, Class<T> annotationType) {
-    return packageInfo(packageName)
-        .map(c -> List.of(c.getAnnotationsByType(annotationType)))
-        .orElse(List.of());
-  }
-
-  private Optional<Class<?>> packageInfo(String packageName) {
-    return packageInfoCache.computeIfAbsent(packageName, DcaArchitecture::loadPackageInfo);
-  }
-
-  private static Optional<Class<?>> loadPackageInfo(String packageName) {
-    try {
-      return Optional.of(
-          Class.forName(
-              packageName + ".package-info",
-              false,
-              Thread.currentThread().getContextClassLoader()));
-    } catch (ClassNotFoundException e) {
-      try {
-        return Optional.of(Class.forName(packageName + ".package-info"));
-      } catch (ClassNotFoundException ignored) {
-        return Optional.empty();
+    String declared = declaredAnnotationName(annotationType);
+    Repeatable repeatable = annotationType.getAnnotation(Repeatable.class);
+    String container = repeatable == null ? null : repeatable.value().getName();
+    List<T> found = new ArrayList<>();
+    for (JavaAnnotation<?> annotation : packageInfoAnnotations(packageName)) {
+      String name = annotation.getRawType().getName();
+      if (name.equals(declared)) {
+        found.add(PackageAnnotations.as(annotationType, annotation, packageName));
+      } else if (name.equals(container)) {
+        annotation
+            .get("value")
+            .filter(JavaAnnotation[].class::isInstance)
+            .map(JavaAnnotation[].class::cast)
+            .ifPresent(
+                values -> {
+                  for (JavaAnnotation<?> value : values) {
+                    found.add(PackageAnnotations.as(annotationType, value, packageName));
+                  }
+                });
       }
     }
+    return found;
+  }
+
+  /** The name of the annotation the layout declares for the given library annotation. */
+  private String declaredAnnotationName(Class<? extends Annotation> annotationType) {
+    if (annotationType == BoundedContext.class) {
+      return layout.markers().boundedContext();
+    }
+    if (annotationType == SharedKernel.class) {
+      return layout.markers().sharedKernel();
+    }
+    return annotationType.getName();
+  }
+
+  private List<JavaAnnotation<?>> packageInfoAnnotations(String packageName) {
+    return packageInfoCache.computeIfAbsent(packageName, this::readPackageInfo);
+  }
+
+  private List<JavaAnnotation<?>> readPackageInfo(String packageName) {
+    if (!classes.containPackage(packageName)) {
+      return List.of();
+    }
+    return classes
+        .getPackage(packageName)
+        .tryGetPackageInfo()
+        .map(info -> List.<JavaAnnotation<?>>copyOf(info.getAnnotations()))
+        .orElse(List.of());
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -352,6 +416,38 @@ public final class DcaArchitecture {
       moduleRoots = List.copyOf(roots);
     }
     return moduleRoots;
+  }
+
+  /**
+   * A finding about the layout itself, or empty: the base package resolves as a module root next to
+   * other module roots. That happens when a package directly below the base package is named like a
+   * layer - a boot module in {@code <base>.application}, say - and it makes every module a
+   * neighbour of every other, because each one lies inside {@code <base>..}. {@link
+   * DcaLayout#withExcludedPackages(String...)} leaves such a module out.
+   */
+  public Optional<String> baseModuleRootNotice() {
+    String base = layout.basePackage();
+    List<String> roots = moduleRoots();
+    if (!roots.contains(base) || roots.size() < 2) {
+      return Optional.empty();
+    }
+    List<String> layerPackages =
+        classes.stream()
+            .map(JavaClass::getPackageName)
+            .filter(p -> base.equals(moduleRootOf(p)))
+            .map(p -> base + "." + p.substring(base.length() + 1).split("\\.")[0])
+            .distinct()
+            .sorted()
+            .toList();
+    return Optional.of(
+        "the base package "
+            + base
+            + " is a module root next to "
+            + (roots.size() - 1)
+            + " others, because of classes in "
+            + String.join(", ", layerPackages)
+            + " - every module then lies inside it. If that is a module that only assembles the"
+            + " application, leave it out with DcaLayout.withExcludedPackages(..)");
   }
 
   /**

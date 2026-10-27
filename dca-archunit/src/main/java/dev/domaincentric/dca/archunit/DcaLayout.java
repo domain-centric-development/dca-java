@@ -77,6 +77,7 @@ public final class DcaLayout {
   private final String apiSubpackage;
   private final String eventsSubpackage;
   private final String useCaseSuffix;
+  private final String inputPortSuffix;
   private final List<String> operationContainers;
   private final String controllerSuffix;
   private final String restControllerSuffix;
@@ -87,6 +88,8 @@ public final class DcaLayout {
   private final String specificationSuffix;
   private final List<String> timestampTypes;
   private final List<String> thirdPartyPackagesAllowedInDomain;
+  private final List<String> excludedPackages;
+  private final List<String> localOutputPorts;
   private final DcaMarkers markers;
   private final FrameworkAnnotations frameworkAnnotations;
   private final FrameworkAnnotationsOrigin frameworkAnnotationsOrigin;
@@ -135,6 +138,7 @@ public final class DcaLayout {
               + "' may not also be an operation container");
     }
     this.useCaseSuffix = requireSuffix(settings.useCaseSuffix, "useCaseSuffix");
+    this.inputPortSuffix = requireSuffix(settings.inputPortSuffix, "inputPortSuffix");
     this.controllerSuffix = requireSuffix(settings.controllerSuffix, "controllerSuffix");
     this.restControllerSuffix =
         requireSuffix(settings.restControllerSuffix, "restControllerSuffix");
@@ -148,6 +152,20 @@ public final class DcaLayout {
         List.copyOf(
             Objects.requireNonNull(
                 settings.thirdPartyPackagesAllowedInDomain, "thirdPartyPackagesAllowedInDomain"));
+    this.excludedPackages = List.copyOf(settings.excludedPackages);
+    for (String excluded : this.excludedPackages) {
+      requirePackage(excluded, "excludedPackages");
+      if (!excluded.startsWith(this.basePackage + ".")) {
+        throw new IllegalArgumentException(
+            "An excluded package lies below the base package '"
+                + this.basePackage
+                + "', was '"
+                + excluded
+                + "' - excluding the base package itself would leave nothing to check");
+      }
+    }
+    this.localOutputPorts = List.copyOf(settings.localOutputPorts);
+    this.localOutputPorts.forEach(type -> requireNotBlank(type, "localOutputPorts"));
     this.markers = Objects.requireNonNull(settings.markers, "markers");
     this.frameworkAnnotations =
         Objects.requireNonNull(settings.frameworkAnnotations, "frameworkAnnotations");
@@ -179,6 +197,7 @@ public final class DcaLayout {
     defaults.apiSubpackage = "api";
     defaults.eventsSubpackage = "events";
     defaults.useCaseSuffix = "UseCase";
+    defaults.inputPortSuffix = "InputPort";
     defaults.controllerSuffix = "Controller";
     defaults.restControllerSuffix = "Resource";
     defaults.aggregateRootSuffix = "AggregateRoot";
@@ -374,6 +393,16 @@ public final class DcaLayout {
   }
 
   /**
+   * Suffix of input-port interfaces, {@code "InputPort"} by default - read by {@code DCA-NAM-003}.
+   * A project that names its input ports {@code *UseCase} and their implementations {@code
+   * *ApplicationService} sets this to {@code "UseCase"} and {@link #withUseCaseSuffix(String)} to
+   * {@code "ApplicationService"}.
+   */
+  public DcaLayout withInputPortSuffix(String value) {
+    return copy(settings -> settings.inputPortSuffix = value);
+  }
+
+  /**
    * Suffix of MVC (server-rendered) controllers, e.g. {@code "Controller"} (default) or {@code
    * "Page"}. Read by the naming rule for classes carrying the configured {@code @Controller}
    * annotation and by the rule that keeps controllers away from repositories; the REST suffix is
@@ -440,6 +469,39 @@ public final class DcaLayout {
    */
   public DcaLayout withThirdPartyPackagesAllowedInDomain(List<String> patterns) {
     return copy(settings -> settings.thirdPartyPackagesAllowedInDomain = patterns);
+  }
+
+  /**
+   * Packages below the base package whose classes are not part of the architecture under test -
+   * each package with everything below it. Meant for a module that only assembles the application
+   * (the entry point, the wiring) and is named like a layer: a boot module in {@code
+   * <base>.application} would otherwise make the base package itself a module root, and every
+   * context would count as a neighbour of every other. {@link DcaArchitecture#load(DcaLayout)} and
+   * {@link DcaArchitecture#of(DcaLayout, com.tngtech.archunit.core.domain.JavaClasses)} leave the
+   * classes out; a dependency on them is still a dependency.
+   */
+  public DcaLayout withExcludedPackages(String... packages) {
+    return copy(settings -> settings.excludedPackages = List.of(packages));
+  }
+
+  /** The packages {@link #withExcludedPackages(String...)} left out of the architecture. */
+  public List<String> excludedPackages() {
+    return excludedPackages;
+  }
+
+  /**
+   * Output ports that never leave the process - a hasher, a clock, an id source, a metrics counter.
+   * Each name is a type matched by assignability: a single port, or a project's own supertype that
+   * all its local ports extend. {@code DCA-USE-013} counts them with the transactional resources
+   * instead of reporting them as remote-capable.
+   */
+  public DcaLayout withLocalOutputPorts(String... typeNames) {
+    return copy(settings -> settings.localOutputPorts = List.of(typeNames));
+  }
+
+  /** The types {@link #withLocalOutputPorts(String...)} declared local. */
+  public List<String> localOutputPorts() {
+    return localOutputPorts;
   }
 
   /** Adds third-party packages to the domain allow-list. */
@@ -520,6 +582,7 @@ public final class DcaLayout {
     settings.apiSubpackage = apiSubpackage;
     settings.eventsSubpackage = eventsSubpackage;
     settings.useCaseSuffix = useCaseSuffix;
+    settings.inputPortSuffix = inputPortSuffix;
     settings.operationContainers = operationContainers;
     settings.controllerSuffix = controllerSuffix;
     settings.restControllerSuffix = restControllerSuffix;
@@ -530,6 +593,8 @@ public final class DcaLayout {
     settings.specificationSuffix = specificationSuffix;
     settings.timestampTypes = timestampTypes;
     settings.thirdPartyPackagesAllowedInDomain = thirdPartyPackagesAllowedInDomain;
+    settings.excludedPackages = excludedPackages;
+    settings.localOutputPorts = localOutputPorts;
     settings.markers = markers;
     settings.frameworkAnnotations = frameworkAnnotations;
     settings.frameworkAnnotationsOrigin = frameworkAnnotationsOrigin;
@@ -555,6 +620,7 @@ public final class DcaLayout {
     String apiSubpackage;
     String eventsSubpackage;
     String useCaseSuffix;
+    String inputPortSuffix;
     List<String> operationContainers = List.of();
     String controllerSuffix;
     String restControllerSuffix;
@@ -565,6 +631,8 @@ public final class DcaLayout {
     String specificationSuffix;
     List<String> timestampTypes;
     List<String> thirdPartyPackagesAllowedInDomain;
+    List<String> excludedPackages = List.of();
+    List<String> localOutputPorts = List.of();
     DcaMarkers markers;
     FrameworkAnnotations frameworkAnnotations;
     FrameworkAnnotationsOrigin frameworkAnnotationsOrigin;
@@ -646,6 +714,11 @@ public final class DcaLayout {
 
   public String useCaseSuffix() {
     return useCaseSuffix;
+  }
+
+  /** Name suffix of an input-port interface, {@code InputPort} by default. */
+  public String inputPortSuffix() {
+    return inputPortSuffix;
   }
 
   public String controllerSuffix() {

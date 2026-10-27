@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 /**
  * Use case and mapping patterns: the generic input-port contract, Command/Query/Result models, HTTP
@@ -111,14 +112,28 @@ public final class UseCaseRules implements DcaRuleSet {
                     .and(
                         JavaClass.Predicates.simpleName("InputPort")
                             .or(JavaClass.Predicates.simpleName("IInputPort")))
+                    .and()
+                    .doNotHaveFullyQualifiedName(arch.layout().markers().inputPort())
                     .should()
-                    .resideInAPackage(DcaLayout.BUILDING_BLOCKS_PORT_IN_PACKAGE)
+                    .resideInAnyPackage(
+                        Stream.concat(
+                                Stream.of(DcaLayout.BUILDING_BLOCKS_PORT_IN_PACKAGE),
+                                arch
+                                    .layout()
+                                    .markers()
+                                    .declaringPackagePatternsOf(List.of("inputPort"))
+                                    .stream())
+                            .distinct()
+                            .toArray(String[]::new))
                     .allowEmptyShould(true))
         .selecting(
             "Interfaces named InputPort or IInputPort anywhere on the classpath under scan - both"
-                + " spellings, so the rule means the same in both languages.")
+                + " spellings, so the rule means the same in both languages - except the type the"
+                + " inputPort role names.")
         .checking(
-            "The interface resides in the building-blocks package hexagonal.port.in - the generic contract is not redeclared in the project.");
+            "The interface resides in the building-blocks package hexagonal.port.in or in the"
+                + " package of the configured inputPort role - the generic contract is declared"
+                + " once, by the vocabulary in use, and not redeclared elsewhere in the project.");
   }
 
   public static DcaRule commandsResideInApplication(DcaLayout layout) {
@@ -166,7 +181,7 @@ public final class UseCaseRules implements DcaRuleSet {
             "Use case commands should be immutable (value objects)",
             arch -> immutableApplicationModels(arch, "Command"))
         .selecting(
-            "Non-interface classes, including records, in <module>.application.. whose simple name ends with Command.")
+            "Non-interface, non-enum classes, including records, in <module>.application.. whose simple name ends with Command.")
         .checking(
             "The type is final or a record with final inherited instance fields and no instance setter methods - a name heuristic: set followed by an upper-case letter, with parameters, returning void (settle(x) is not a setter). Referenced objects and collection contents are not inspected.");
   }
@@ -178,7 +193,7 @@ public final class UseCaseRules implements DcaRuleSet {
             "Use case queries should be immutable (value objects)",
             arch -> immutableApplicationModels(arch, "Query"))
         .selecting(
-            "Non-interface classes, including records, in <module>.application.. whose simple name ends with Query.")
+            "Non-interface, non-enum classes, including records, in <module>.application.. whose simple name ends with Query.")
         .checking(
             "The type is final or a record with final inherited instance fields and no instance setter methods - a name heuristic: set followed by an upper-case letter, with parameters, returning void (settle(x) is not a setter). Referenced objects and collection contents are not inspected.");
   }
@@ -197,13 +212,19 @@ public final class UseCaseRules implements DcaRuleSet {
                     .resideInAnyPackage(layout.basePackage() + "..")
                     .and()
                     .areNotAssignableTo(arch.layout().markers().value())
+                    .and(DescribedPredicate.not(sealedDomainOutcome(arch)))
                     .should()
                     .resideInAnyPackage(arch.allApplicationPatterns())
                     .allowEmptyShould(true))
         .selecting(
-            "Classes under the base package whose simple name ends with Result and that do not implement Value.")
+            "Classes under the base package whose simple name ends with Result, that do not"
+                + " implement Value and that are not a sealed domain outcome - a sealed type in a"
+                + " domain package, or a case of one.")
         .checking(
-            "Each resides in an application package of some module root (<module>.application..). A domain value object named *Result is exempt because it implements Value.");
+            "Each resides in an application package of some module root (<module>.application..)."
+                + " A domain value object named *Result is exempt because it implements Value, and"
+                + " a sealed outcome type of the domain - a sum type whose cases the domain"
+                + " returns - is exempt because it is part of the model.");
   }
 
   public static DcaRule resultsAreImmutable(DcaLayout layout) {
@@ -213,7 +234,7 @@ public final class UseCaseRules implements DcaRuleSet {
             "Use case result models should be immutable (value objects)",
             arch -> immutableApplicationModels(arch, "Result"))
         .selecting(
-            "Non-interface classes, including records, in <module>.application.. whose simple name ends with Result.")
+            "Non-interface, non-enum classes, including records, in <module>.application.. whose simple name ends with Result.")
         .checking(
             "The type is final or a record with final inherited instance fields and no instance setter methods - a name heuristic: set followed by an upper-case letter, with parameters, returning void (settle(x) is not a setter). Referenced objects and collection contents are not inspected.");
   }
@@ -333,8 +354,26 @@ public final class UseCaseRules implements DcaRuleSet {
             layout.useCaseSuffix());
   }
 
+  /**
+   * A sealed type in a domain package, or a direct case of one: a sum type the domain returns,
+   * whatever it is named.
+   */
+  private static DescribedPredicate<JavaClass> sealedDomainOutcome(DcaArchitecture arch) {
+    DescribedPredicate<JavaClass> inDomain =
+        JavaClass.Predicates.resideInAnyPackage(arch.allDomainPatterns());
+    return DescribedPredicate.describe(
+        "a sealed domain outcome",
+        type ->
+            inDomain.test(type)
+                && (type.isSealed()
+                    || type.getRawSuperclass().map(JavaClass::isSealed).orElse(false)
+                    || type.getRawInterfaces().stream().anyMatch(JavaClass::isSealed)));
+  }
+
   private static com.tngtech.archunit.lang.ArchRule immutableApplicationModels(
       DcaArchitecture arch, String suffix) {
+    // An enum is immutable by construction; on recent platforms its inherited state carries a
+    // non-final cache field, which the shape check would report.
     return classes()
         .that()
         .haveSimpleNameEndingWith(suffix)
@@ -342,6 +381,8 @@ public final class UseCaseRules implements DcaRuleSet {
         .resideInAnyPackage(arch.allApplicationPatterns())
         .and()
         .areNotInterfaces()
+        .and()
+        .areNotEnums()
         .should(TypeInspection.haveImmutableShape())
         .allowEmptyShould(true);
   }
@@ -414,15 +455,18 @@ public final class UseCaseRules implements DcaRuleSet {
                     .that(useCases(arch, layout))
                     .should(
                         notCallRemotePortsWhenTransactional(
-                            layout.frameworkAnnotations().transactional(), layout.markers()))
+                            layout.frameworkAnnotations().transactional(),
+                            layout.markers(),
+                            layout.localOutputPorts()))
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes in <module>.application.. that implement InputPort or whose simple name ends with the configured use-case suffix.")
         .checking(
             "Every method that runs under one of the configured transactional annotations - on the"
                 + " class, on itself, or on a method that reaches it within the class - calls no"
-                + " OutputPort other than Repository, Store, DomainEventPublisher or"
-                + " IntegrationEventPublisher. A use case without such an annotation (explicit"
+                + " OutputPort other than Repository, Store, DomainEventPublisher,"
+                + " IntegrationEventPublisher or a port the layout declares local (a hasher, a"
+                + " clock, an id source - DcaLayout.withLocalOutputPorts). A use case without such an annotation (explicit"
                 + " TransactionBoundary or none) is selected but never reported; with an empty role"
                 + " nothing is ever reported.");
   }
@@ -721,7 +765,7 @@ public final class UseCaseRules implements DcaRuleSet {
   }
 
   private static ArchCondition<JavaClass> notCallRemotePortsWhenTransactional(
-      List<String> transactional, DcaMarkers markers) {
+      List<String> transactional, DcaMarkers markers, List<String> localOutputPorts) {
     return new ArchCondition<>("not call remote-capable output ports while transactional") {
       @Override
       public void check(JavaClass item, ConditionEvents events) {
@@ -735,6 +779,7 @@ public final class UseCaseRules implements DcaRuleSet {
                   .map(call -> call.getTargetOwner())
                   .filter(owner -> owner.isAssignableTo(markers.outputPort()))
                   .filter(owner -> !isTransactionalResource(owner, markers))
+                  .filter(owner -> localOutputPorts.stream().noneMatch(owner::isAssignableTo))
                   .map(JavaClass::getSimpleName)
                   .distinct()
                   .sorted()
