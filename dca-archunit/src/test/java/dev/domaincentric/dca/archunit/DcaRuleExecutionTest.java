@@ -48,6 +48,41 @@ class DcaRuleExecutionTest {
         DcaRuleOutcome.Status.PASSED, execute(GOOD, ARCH_RULE, DcaRuleSelection.all()).status());
   }
 
+  /** A rule that selected classes passes without a note. */
+  @Test
+  void aSatisfiedRuleThatSelectedClassesCarriesNoNote() {
+    assertNull(execute(GOOD, ARCH_RULE, DcaRuleSelection.all()).message());
+  }
+
+  /** A rule whose selection is empty passes, and says that it held for nothing. */
+  @Test
+  void aRuleThatSelectedNothingPassesWithANote() {
+    DcaArchitecture architecture = arch(GOOD);
+    DcaRule nothing =
+        DcaRule.of(
+                "DCA-TST-001",
+                "Classes nowhere must be public",
+                "A fixture rule whose selection matches no class",
+                arch ->
+                    com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes()
+                        .that()
+                        .resideInAPackage("..nowhere..")
+                        .should()
+                        .bePublic()
+                        .allowEmptyShould(true))
+            .selecting("Classes in a package named nowhere.")
+            .checking("Each is public.");
+
+    DcaRuleOutcome outcome =
+        DcaRuleExecution.execute(nothing, architecture, DcaRuleSelection.all());
+
+    assertEquals(DcaRuleOutcome.Status.PASSED, outcome.status());
+    assertTrue(outcome.message().contains("DCA-TST-001"), outcome.message());
+    assertTrue(outcome.message().contains("selected nothing"), outcome.message());
+    assertTrue(
+        outcome.message().contains("Classes in a package named nowhere."), outcome.message());
+  }
+
   @Test
   void aViolatedRuleFails() {
     DcaRuleOutcome outcome = execute(BAD, ARCH_RULE, DcaRuleSelection.all());

@@ -4,6 +4,14 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Changed
+
+**A rule that selected nothing says so.** A rule built on a single ArchUnit rule is evaluated with an empty
+selection forbidden; when no class of the scan matched, it passes with the note `selected nothing` and its
+`selects()` text, shown as an `INFO` outcome. A selection that a layout or a framework role misses — as
+`DCA-HEX-014` missed REST controllers — no longer passes in silence. Rules that run their own checks cannot
+tell and stay silent. No extra evaluation: each rule still runs once.
+
 ### Fixed
 
 **`DCA-HEX-014` selects REST endpoint classes too.** It took the web-controller role alone, so a project

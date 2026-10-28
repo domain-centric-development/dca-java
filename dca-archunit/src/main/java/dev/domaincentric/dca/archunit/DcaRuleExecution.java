@@ -23,6 +23,18 @@ import java.util.regex.Pattern;
  */
 public final class DcaRuleExecution {
 
+  /**
+   * The note a passing rule carries when its selection was empty: no class of the scan matched what
+   * the rule selects, so it held for nothing. Only rules built on a single ArchUnit rule can say
+   * so.
+   */
+  public static final String SELECTED_NOTHING =
+      "selected nothing - no class of the scan matched, so the rule held for nothing; if the project"
+          + " has such classes, the layout or a framework role misses them.";
+
+  /** The phrase ArchUnit uses when a rule that forbids an empty selection checked no class. */
+  private static final String ARCHUNIT_EMPTY_SELECTION = "failed to check any classes";
+
   private DcaRuleExecution() {}
 
   /** Evaluates one rule under the given selection. */
@@ -51,6 +63,12 @@ public final class DcaRuleExecution {
     Optional<String> violations = evaluate(rule, architecture, selection, ignored);
     if (violations.isEmpty()) {
       return new DcaRuleOutcome(rule.id(), DcaRuleOutcome.Status.PASSED, null);
+    }
+    if (violations.get().startsWith(SELECTED_NOTHING)) {
+      return new DcaRuleOutcome(
+          rule.id(),
+          DcaRuleOutcome.Status.PASSED,
+          withRuleId(violations.get() + " Selects: " + rule.selects(), rule.id()));
     }
     String message =
         withRuleId(
@@ -81,11 +99,23 @@ public final class DcaRuleExecution {
       return runAndCatch(rule, architecture, ignored);
     }
 
+    // The rule is evaluated once, with an empty selection forbidden: a rule that selected nothing
+    // passes, but says so, because a selection a layout or a framework role misses passes in
+    // silence otherwise.
+    ArchRule requiringClasses = archRule.get().allowEmptyShould(false);
     ArchRule effective =
         frozen
-            ? FreezingArchRule.freeze(archRule.get()).persistIn(store(selection))
-            : archRule.get();
-    EvaluationResult result = effective.evaluate(architecture.classes());
+            ? FreezingArchRule.freeze(requiringClasses).persistIn(store(selection))
+            : requiringClasses;
+    EvaluationResult result;
+    try {
+      result = effective.evaluate(architecture.classes());
+    } catch (AssertionError empty) {
+      if (empty.getMessage() != null && empty.getMessage().contains(ARCHUNIT_EMPTY_SELECTION)) {
+        return Optional.of(SELECTED_NOTHING);
+      }
+      throw empty;
+    }
     if (!ignored.isEmpty()) {
       result = result.filterDescriptionsMatching(description -> !matchesAny(description, ignored));
     }
