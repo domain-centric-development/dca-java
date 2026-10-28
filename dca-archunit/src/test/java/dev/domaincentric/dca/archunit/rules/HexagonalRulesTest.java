@@ -29,7 +29,9 @@ class HexagonalRulesTest {
         // negative fixture in .hexagonal.getmapping
         "DCA-HEX-014",
         // informational diagnostic, never fails; observed in .hexagonal.enumnames
-        "DCA-HEX-016");
+        "DCA-HEX-016",
+        // negative fixture in .hexagonal.listeners
+        "DCA-HEX-017");
   }
 
   /**
@@ -120,6 +122,30 @@ class HexagonalRulesTest {
   @Test
   void aGetHandlerThatAsksAQueryPasses() {
     Fixtures.passes(FIXTURES + ".getmapping.good", "DCA-HEX-014");
+  }
+
+  /** DCA-HEX-017: synchronously, after the commit without a transaction, and through a helper. */
+  @Test
+  void aListenerThatDrivesAnInputPortInTheRaisingTransactionIsReported() {
+    String message = Fixtures.failure(FIXTURES + ".listeners.bad", "DCA-HEX-017").getMessage();
+
+    assertTrue(
+        message.contains(
+            "PostingNotifier.onPosted drives NotifyPostingInputPort.execute inside the transaction"
+                + " that raised the event"),
+        message);
+    assertTrue(
+        message.contains(
+            "PostingNotifier.afterPosted drives NotifyPostingInputPort.execute after the commit"
+                + " without a transaction of its own"),
+        message);
+    assertTrue(message.contains("PostingNotifier.viaHelper drives"), message);
+  }
+
+  /** A transactional listener passes; a synchronous listener that calls an output port passes. */
+  @Test
+  void aTransactionalListenerAndASynchronousTranslatorPass() {
+    Fixtures.passes(FIXTURES + ".listeners.good", "DCA-HEX-017");
   }
 
   /** DCA-HEX-016 lists name() and toString() on an enum of the inner layers. */

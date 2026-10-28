@@ -7,7 +7,10 @@ import java.util.UUID;
  * Interface for Domain Events.
  *
  * <p>Domain Events represent something that happened in the domain that domain experts care about.
- * They are internal to a bounded context and can evolve freely without versioning concerns.
+ * They are internal to a bounded context: no published contract and no version number. Once an
+ * outbox or event publication registry stores them for a transactional listener, the next
+ * deployment reads what the previous one wrote, so a change follows what a database migration needs
+ * — tolerant reading, renames in two steps.
  *
  * <p><b>Characteristics:</b>
  *
@@ -17,7 +20,7 @@ import java.util.UUID;
  *   <li>Include timestamp, unique ID, and event-specific data
  *   <li>Carries no container stereotype and no listener annotation - it is data, not a bean
  *   <li>Part of the Ubiquitous Language
- *   <li>Internal to a bounded context — no versioning needed
+ *   <li>Internal to a bounded context — no contract, but readable across one deployment
  * </ul>
  *
  * <p><b>Use Cases:</b>

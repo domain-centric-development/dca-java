@@ -50,7 +50,8 @@ public final class HexagonalRules implements DcaRuleSet {
             incomingAdaptersMustNotDependOnDomainServices(),
             outgoingAdaptersMustNotDependOnInputPorts(),
             getHandlersDriveNoCommand(),
-            adaptersPublishNoEnumMemberName());
+            adaptersPublishNoEnumMemberName(),
+            listenersThatDriveAnInputPortRunAfterTheCommit());
   }
 
   @Override
@@ -553,6 +554,98 @@ public final class HexagonalRules implements DcaRuleSet {
             .anyMatch(parameter -> parameter.getSimpleName().endsWith("Command"))
         || TypeInspection.takesInputEndingWith(
             call.getTargetOwner(), markers.inputPort(), "Command");
+  }
+
+  /**
+   * DCA-HEX-017. A reaction to an event drives a use case after the publishing transaction
+   * committed, in a transaction of its own. A listener method is found through the event-listener
+   * role; the call to an input port is followed through the class's own helpers.
+   */
+  public DcaRule listenersThatDriveAnInputPortRunAfterTheCommit() {
+    FrameworkAnnotations roles = layout.frameworkAnnotations();
+    return DcaRule.of(
+            "DCA-HEX-017",
+            "Event listeners that drive an input port must run after the commit in their own"
+                + " transaction",
+            "A reaction to an event changes state or performs an external effect through a use"
+                + " case. Run inside the transaction that raised the event, it changes a second"
+                + " aggregate in the first one's transaction, a failure in the reaction rolls back"
+                + " the fact that caused it, and a retry of the request runs the reaction again. A"
+                + " listener that only translates or measures calls output ports and may run in"
+                + " that transaction",
+            arch ->
+                classes()
+                    .should(driveAnInputPortOnlyAfterTheCommit(roles, layout.markers()))
+                    .allowEmptyShould(true))
+        .experimental()
+        .selecting(
+            "Classes of every module root; within them, the methods carrying, directly or as a"
+                + " meta-annotation, an annotation of the configured event-listener role. With an"
+                + " empty event-listener or transactional-event-listener role nothing is selected"
+                + " and the rule passes.")
+        .checking(
+            "A selected method that - itself or a method of the same class it reaches through"
+                + " calls within the class - calls a type assignable to the configured input-port"
+                + " role carries, directly or as a meta-annotation, an annotation of the configured"
+                + " transactional-event-listener role, and an annotation of the configured"
+                + " transactional role on the method or its class. The rule reads the listener's"
+                + " phase and transaction, not whether a durable publication store backs it; an"
+                + " input port reached through a second class is not followed. An empty selection"
+                + " passes.",
+            "deliver the reaction after the commit in its own transaction - a transactional event"
+                + " listener backed by an outbox or an event publication registry - or let the"
+                + " listener call only output ports");
+  }
+
+  private static ArchCondition<JavaClass> driveAnInputPortOnlyAfterTheCommit(
+      FrameworkAnnotations roles, DcaMarkers markers) {
+    return new ArchCondition<>("drive an input port only after the commit") {
+      @Override
+      public void check(JavaClass item, ConditionEvents events) {
+        if (roles.eventListener().isEmpty() || roles.transactionalEventListener().isEmpty()) {
+          return;
+        }
+        IntraClassCalls calls = null;
+        for (JavaCodeUnit listener : item.getCodeUnits()) {
+          if (AnnotationRoles.matchingEntry(listener, roles.eventListener()) == null) {
+            continue;
+          }
+          if (calls == null) {
+            calls = new IntraClassCalls(item);
+          }
+          java.util.Set<String> ports = new java.util.TreeSet<>();
+          for (JavaCodeUnit unit : calls.reachableFrom(listener)) {
+            for (JavaMethodCall call : unit.getMethodCallsFromSelf()) {
+              JavaClass owner = call.getTargetOwner();
+              if (owner.isAssignableTo(markers.inputPort())) {
+                ports.add(owner.getSimpleName() + "." + call.getName());
+              }
+            }
+          }
+          if (ports.isEmpty()) {
+            continue;
+          }
+          boolean afterCommit =
+              AnnotationRoles.matchingEntry(listener, roles.transactionalEventListener()) != null;
+          boolean ownTransaction =
+              AnnotationRoles.isMetaAnnotatedWithAny(listener, roles.transactional())
+                  || AnnotationRoles.isMetaAnnotatedWithAny(item, roles.transactional());
+          if (!afterCommit || !ownTransaction) {
+            events.add(
+                SimpleConditionEvent.violated(
+                    item,
+                    item.getName()
+                        + "."
+                        + listener.getName()
+                        + " drives "
+                        + String.join(", ", ports)
+                        + (afterCommit
+                            ? " after the commit without a transaction of its own"
+                            : " inside the transaction that raised the event")));
+          }
+        }
+      }
+    };
   }
 
   public DcaRule adaptersPublishNoEnumMemberName() {

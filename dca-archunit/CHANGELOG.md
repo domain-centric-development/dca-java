@@ -4,6 +4,31 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Added
+
+**`DCA-HEX-017` (experimental): event listeners that drive an input port must run after the commit
+in their own transaction.** A listener method — a method carrying the event-listener role, directly
+or as a meta-annotation — that calls an input port, itself or through a helper of its class, carries
+an annotation of the new `transactionalEventListener` role and the transactional role on the method
+or its class. A synchronous listener that drives a use case is reported as running inside the
+transaction that raised the event; an after-commit listener without a transactional annotation as
+running without a transaction of its own. A listener that calls only output ports is not checked.
+The rule reads the phase and the transaction, not whether an outbox backs the listener.
+
+**`FrameworkAnnotations.transactionalEventListener()`**, a sixteenth role, with
+`withTransactionalEventListener(...)`: the annotations that deliver an event after the publishing
+transaction committed. `spring()` names `TransactionalEventListener` (Spring Modulith's
+`ApplicationModuleListener` carries it as a meta-annotation), `micronaut()` its own; `jakarta()`,
+`quarkus()` and `none()` leave it empty — CDI expresses the phase on a parameter — and the rule then
+selects nothing. A preset written against 0.9.0, with fifteen roles, still compiles and gets the role
+empty.
+
+### Removed
+
+The constructor for presets written against 0.8.0, deprecated for removal since 0.9.0: its sixteenth
+argument was the retired `DCA-HEX-015` role, and a sixteen-argument call now names the
+transactional-event-listener role. Drop the last argument of such a call, or pass the new role.
+
 ## [0.9.0] - 2026-10-15
 
 ### Removed

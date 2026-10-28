@@ -51,6 +51,7 @@ class ExperimentalRulesTest {
         List.of(
             "DCA-HEX-014",
             "DCA-HEX-016",
+            "DCA-HEX-017",
             "DCA-TAC-024",
             "DCA-MAP-014",
             "DCA-USE-018",

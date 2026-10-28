@@ -73,10 +73,10 @@ class FrameworkAnnotationsTest {
     assertEquals(List.of("x.Get"), spring.withGetMapping("x.Get").getMapping());
   }
 
-  /** A preset written against 0.8.0 still compiles; the role DCA-HEX-015 read is ignored. */
+  /** A preset written against 0.9.0 still compiles; it has no transactional-event-listener role. */
   @Test
   @SuppressWarnings("removal")
-  void theRetiredInstanceLocalStateRoleStillCompilesAndIsIgnored() {
+  void aPresetWithoutTheTransactionalEventListenerRoleStillCompiles() {
     FrameworkAnnotations spring = FrameworkAnnotations.spring();
     FrameworkAnnotations written =
         new FrameworkAnnotations(
@@ -94,11 +94,31 @@ class FrameworkAnnotationsTest {
             spring.transactionApi(),
             spring.transactionManager(),
             spring.transportStatus(),
-            spring.getMapping(),
-            List.of("x.Session"));
-    assertEquals(spring, written);
+            spring.getMapping());
+    assertEquals(List.of(), written.transactionalEventListener());
+    assertEquals(
+        spring,
+        written.withTransactionalEventListener(
+            spring.transactionalEventListener().toArray(String[]::new)));
     assertEquals(spring, spring.withInstanceLocalState("x.Session"));
     assertEquals(List.of(), spring.instanceLocalState());
+  }
+
+  /** Adjusting another role keeps the transactional-event-listener role. */
+  @Test
+  void adjustingARoleKeepsTheTransactionalEventListenerRole() {
+    FrameworkAnnotations spring = FrameworkAnnotations.spring();
+    assertEquals(
+        List.of("org.springframework.transaction.event.TransactionalEventListener"),
+        spring.transactionalEventListener());
+    assertEquals(
+        spring.transactionalEventListener(),
+        spring
+            .withGetMapping("x.Get")
+            .named("custom")
+            .withTransactional("x.Tx")
+            .transactionalEventListener());
+    assertEquals(List.of(), FrameworkAnnotations.none().transactionalEventListener());
   }
 
   @Test

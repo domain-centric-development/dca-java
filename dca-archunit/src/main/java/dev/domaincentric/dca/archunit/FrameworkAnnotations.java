@@ -90,6 +90,12 @@ import java.util.WeakHashMap;
  *       where its framework routes such a method as a handler - JAX-RS treats a method with a path
  *       and no HTTP method as a sub-resource locator, so the Jakarta and Quarkus presets leave it
  *       out. Only this role reads such entries.
+ *   <li>{@link #transactionalEventListener()} — the annotations that deliver an event to a listener
+ *       method after the publishing transaction committed (Spring's and Micronaut's {@code
+ *       TransactionalEventListener}). A listener method that drives an input port carries one of
+ *       them and the transactional role ({@code DCA-HEX-017}). Empty where the framework expresses
+ *       the phase differently (CDI observes with a parameter annotation); the rule then selects
+ *       nothing.
  * </ul>
  *
  * @param name the preset's name, shown in the test report so a reader knows which vocabulary the
@@ -113,6 +119,8 @@ import java.util.WeakHashMap;
  *     mapping annotation with the attribute value that makes it GET ({@code
  *     <annotation>#<attribute>=<value>}) or with no value ({@code <annotation>#<attribute>=}, a
  *     mapping that names no HTTP method and answers GET too)
+ * @param transactionalEventListener annotations that deliver an event to a listener method after
+ *     the publishing transaction committed
  */
 public record FrameworkAnnotations(
     String name,
@@ -129,7 +137,8 @@ public record FrameworkAnnotations(
     List<String> transactionApi,
     List<String> transactionManager,
     List<String> transportStatus,
-    List<String> getMapping) {
+    List<String> getMapping,
+    List<String> transactionalEventListener) {
 
   public FrameworkAnnotations {
     if (name == null || name.isBlank()) {
@@ -149,6 +158,7 @@ public record FrameworkAnnotations(
     transactionManager = role(transactionManager, "transactionManager");
     transportStatus = role(transportStatus, "transportStatus");
     getMapping = role(getMapping, "getMapping");
+    transactionalEventListener = role(transactionalEventListener, "transactionalEventListener");
     for (String entry : getMapping) {
       if (entry.contains("#") && !entry.matches("[^#=]+#\\w+=[^#=]*")) {
         throw new IllegalArgumentException(
@@ -160,13 +170,9 @@ public record FrameworkAnnotations(
   }
 
   /**
-   * Compatibility constructor for presets written against 0.8.0, which had a sixteenth role for
-   * {@code DCA-HEX-015}. The rule is retired and nothing reads the role, so the last argument is
-   * ignored.
-   *
-   * @deprecated drop the last argument; {@code DCA-HEX-015} is retired
+   * Compatibility constructor for presets written against 0.9.0, without the
+   * transactional-event-listener role (empty).
    */
-  @Deprecated(since = "0.9.0", forRemoval = true)
   public FrameworkAnnotations(
       String name,
       List<String> injectable,
@@ -182,8 +188,7 @@ public record FrameworkAnnotations(
       List<String> transactionApi,
       List<String> transactionManager,
       List<String> transportStatus,
-      List<String> getMapping,
-      List<String> instanceLocalState) {
+      List<String> getMapping) {
     this(
         name,
         injectable,
@@ -199,7 +204,8 @@ public record FrameworkAnnotations(
         transactionApi,
         transactionManager,
         transportStatus,
-        getMapping);
+        getMapping,
+        List.of());
   }
 
   /** Compatibility constructor for presets without the GET-mapping role (empty). */
@@ -413,7 +419,8 @@ public record FrameworkAnnotations(
         List.of(
             "org.springframework.web.bind.annotation.GetMapping",
             "org.springframework.web.bind.annotation.RequestMapping#method=GET",
-            "org.springframework.web.bind.annotation.RequestMapping#method="));
+            "org.springframework.web.bind.annotation.RequestMapping#method="),
+        List.of("org.springframework.transaction.event.TransactionalEventListener"));
   }
 
   /**
@@ -449,7 +456,8 @@ public record FrameworkAnnotations(
         List.of("jakarta.transaction.UserTransaction"),
         List.of("jakarta.transaction.TransactionManager"),
         List.of(),
-        List.of("jakarta.ws.rs.GET", "jakarta.ws.rs.HttpMethod#value=GET"));
+        List.of("jakarta.ws.rs.GET", "jakarta.ws.rs.HttpMethod#value=GET"),
+        List.of());
   }
 
   /**
@@ -487,7 +495,8 @@ public record FrameworkAnnotations(
             "jakarta.transaction.UserTransaction", "io.quarkus.narayana.jta.QuarkusTransaction"),
         List.of("jakarta.transaction.TransactionManager"),
         List.of(),
-        List.of("jakarta.ws.rs.GET", "jakarta.ws.rs.HttpMethod#value=GET"));
+        List.of("jakarta.ws.rs.GET", "jakarta.ws.rs.HttpMethod#value=GET"),
+        List.of());
   }
 
   /**
@@ -535,7 +544,8 @@ public record FrameworkAnnotations(
             "jakarta.transaction.UserTransaction"),
         List.of("jakarta.transaction.TransactionManager"),
         List.of("io.micronaut.http.annotation.Status"),
-        List.of("io.micronaut.http.annotation.Get"));
+        List.of("io.micronaut.http.annotation.Get"),
+        List.of("io.micronaut.transaction.annotation.TransactionalEventListener"));
   }
 
   /**
@@ -547,7 +557,7 @@ public record FrameworkAnnotations(
   public static FrameworkAnnotations none() {
     return new FrameworkAnnotations(
         "none", List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
-        List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+        List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -688,7 +698,8 @@ public record FrameworkAnnotations(
         transactionApi,
         transactionManager,
         transportStatus,
-        getMapping);
+        getMapping,
+        transactionalEventListener);
   }
 
   public FrameworkAnnotations withInjectable(String... annotationNames) {
@@ -707,7 +718,8 @@ public record FrameworkAnnotations(
         transactionApi,
         transactionManager,
         transportStatus,
-        getMapping);
+        getMapping,
+        transactionalEventListener);
   }
 
   public FrameworkAnnotations withWebController(String... annotationNames) {
@@ -726,7 +738,8 @@ public record FrameworkAnnotations(
         transactionApi,
         transactionManager,
         transportStatus,
-        getMapping);
+        getMapping,
+        transactionalEventListener);
   }
 
   public FrameworkAnnotations withRestController(String... annotationNames) {
@@ -745,7 +758,8 @@ public record FrameworkAnnotations(
         transactionApi,
         transactionManager,
         transportStatus,
-        getMapping);
+        getMapping,
+        transactionalEventListener);
   }
 
   public FrameworkAnnotations withTransactional(String... annotationNames) {
@@ -764,7 +778,8 @@ public record FrameworkAnnotations(
         transactionApi,
         transactionManager,
         transportStatus,
-        getMapping);
+        getMapping,
+        transactionalEventListener);
   }
 
   public FrameworkAnnotations withEventListener(String... annotationNames) {
@@ -783,7 +798,8 @@ public record FrameworkAnnotations(
         transactionApi,
         transactionManager,
         transportStatus,
-        getMapping);
+        getMapping,
+        transactionalEventListener);
   }
 
   public FrameworkAnnotations withModuleDeclaration(String... annotationNames) {
@@ -802,7 +818,8 @@ public record FrameworkAnnotations(
         transactionApi,
         transactionManager,
         transportStatus,
-        getMapping);
+        getMapping,
+        transactionalEventListener);
   }
 
   public FrameworkAnnotations withPublishedInterface(String... annotationNames) {
@@ -821,7 +838,8 @@ public record FrameworkAnnotations(
         transactionApi,
         transactionManager,
         transportStatus,
-        getMapping);
+        getMapping,
+        transactionalEventListener);
   }
 
   public FrameworkAnnotations withPersistenceEntity(String... annotationNames) {
@@ -840,7 +858,8 @@ public record FrameworkAnnotations(
         transactionApi,
         transactionManager,
         transportStatus,
-        getMapping);
+        getMapping,
+        transactionalEventListener);
   }
 
   public FrameworkAnnotations withInjectionSite(String... annotationNames) {
@@ -859,7 +878,8 @@ public record FrameworkAnnotations(
         transactionApi,
         transactionManager,
         transportStatus,
-        getMapping);
+        getMapping,
+        transactionalEventListener);
   }
 
   public FrameworkAnnotations withPersistenceMapping(String... annotationNames) {
@@ -878,7 +898,8 @@ public record FrameworkAnnotations(
         transactionApi,
         transactionManager,
         transportStatus,
-        getMapping);
+        getMapping,
+        transactionalEventListener);
   }
 
   public FrameworkAnnotations withTransactionApi(String... typeNames) {
@@ -897,7 +918,8 @@ public record FrameworkAnnotations(
         List.of(typeNames),
         transactionManager,
         transportStatus,
-        getMapping);
+        getMapping,
+        transactionalEventListener);
   }
 
   public FrameworkAnnotations withTransactionManager(String... typeNames) {
@@ -916,7 +938,8 @@ public record FrameworkAnnotations(
         transactionApi,
         List.of(typeNames),
         transportStatus,
-        getMapping);
+        getMapping,
+        transactionalEventListener);
   }
 
   /**
@@ -940,7 +963,8 @@ public record FrameworkAnnotations(
         transactionApi,
         transactionManager,
         List.of(annotationNames),
-        getMapping);
+        getMapping,
+        transactionalEventListener);
   }
 
   /**
@@ -966,6 +990,31 @@ public record FrameworkAnnotations(
         transactionApi,
         transactionManager,
         transportStatus,
+        List.of(annotationNames),
+        transactionalEventListener);
+  }
+
+  /**
+   * This set with another transactional-event-listener role: the annotations that deliver an event
+   * to a listener method after the publishing transaction committed.
+   */
+  public FrameworkAnnotations withTransactionalEventListener(String... annotationNames) {
+    return new FrameworkAnnotations(
+        name,
+        injectable,
+        webController,
+        restController,
+        transactional,
+        eventListener,
+        moduleDeclaration,
+        publishedInterface,
+        persistenceEntity,
+        injectionSite,
+        persistenceMapping,
+        transactionApi,
+        transactionManager,
+        transportStatus,
+        getMapping,
         List.of(annotationNames));
   }
 

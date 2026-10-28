@@ -7,5 +7,5 @@ import java.lang.annotation.Target;
 
 /** Test shim — mirrors the framework annotation by name only. */
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.METHOD})
+@Target({ElementType.METHOD, ElementType.ANNOTATION_TYPE})
 public @interface EventListener {}
