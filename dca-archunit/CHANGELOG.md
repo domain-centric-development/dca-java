@@ -45,9 +45,11 @@ The rule reads the phase and the transaction, not whether an outbox backs the li
 **`FrameworkAnnotations.transactionalEventListener()`**, a sixteenth role, with
 `withTransactionalEventListener(...)`: the annotations that deliver an event after the publishing
 transaction committed. `spring()` names `TransactionalEventListener` (Spring Modulith's
-`ApplicationModuleListener` carries it as a meta-annotation), `micronaut()` its own; `jakarta()`,
-`quarkus()` and `none()` leave it empty — CDI expresses the phase on a parameter — and the rule then
-selects nothing. A preset written against 0.9.0, with fifteen roles, still compiles and gets the role
+`ApplicationModuleListener` carries it as a meta-annotation), `micronaut()` its own, and `jakarta()` and
+`quarkus()` the CDI observer of the phase after a successful commit,
+`jakarta.enterprise.event.Observes#during=AFTER_SUCCESS` — the role reads attribute entries as `getMapping`
+does, and on a parameter as well as on the method, where CDI puts its observer. `none()` leaves it empty and the
+rule then selects nothing. A preset written against 0.9.0, with fifteen roles, still compiles and gets the role
 empty.
 
 ### Removed

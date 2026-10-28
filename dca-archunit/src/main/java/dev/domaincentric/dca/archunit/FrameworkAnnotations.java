@@ -89,13 +89,15 @@ import java.util.WeakHashMap;
  *       mapping alone makes no method a handler. A preset names the entry without a value only
  *       where its framework routes such a method as a handler - JAX-RS treats a method with a path
  *       and no HTTP method as a sub-resource locator, so the Jakarta and Quarkus presets leave it
- *       out. Only this role reads such entries.
+ *       out. This role and {@link #transactionalEventListener()} read such entries.
  *   <li>{@link #transactionalEventListener()} — the annotations that deliver an event to a listener
  *       method after the publishing transaction committed (Spring's and Micronaut's {@code
- *       TransactionalEventListener}). A listener method that drives an input port carries one of
- *       them and the transactional role ({@code DCA-HEX-017}). Empty where the framework expresses
- *       the phase differently (CDI observes with a parameter annotation); the rule then selects
- *       nothing.
+ *       TransactionalEventListener}, and in CDI the observer of the phase after a successful
+ *       commit, {@code jakarta.enterprise.event.Observes#during=AFTER_SUCCESS}). A listener method
+ *       that drives an input port carries one of them, on the method or on a parameter, and the
+ *       transactional role ({@code DCA-HEX-017}). An entry {@code <annotation>#<attribute>=<value>}
+ *       asks for that attribute value, as for {@link #getMapping()}. Empty in {@code none()}; the
+ *       rule then selects nothing.
  * </ul>
  *
  * @param name the preset's name, shown in the test report so a reader knows which vocabulary the
@@ -159,14 +161,8 @@ public record FrameworkAnnotations(
     transportStatus = role(transportStatus, "transportStatus");
     getMapping = role(getMapping, "getMapping");
     transactionalEventListener = role(transactionalEventListener, "transactionalEventListener");
-    for (String entry : getMapping) {
-      if (entry.contains("#") && !entry.matches("[^#=]+#\\w+=[^#=]*")) {
-        throw new IllegalArgumentException(
-            "getMapping entry '"
-                + entry
-                + "' must be an annotation name or <annotation>#<attribute>=[<value>]");
-      }
-    }
+    requireAttributeEntries(getMapping, "getMapping");
+    requireAttributeEntries(transactionalEventListener, "transactionalEventListener");
   }
 
   /**
@@ -357,6 +353,22 @@ public record FrameworkAnnotations(
         List.of());
   }
 
+  /**
+   * A role that reads attribute entries takes an annotation name or {@code
+   * <annotation>#<attribute>=[<value>]}.
+   */
+  private static void requireAttributeEntries(List<String> entries, String role) {
+    for (String entry : entries) {
+      if (entry.contains("#") && !entry.matches("[^#=]+#\\w+=[^#=]*")) {
+        throw new IllegalArgumentException(
+            role
+                + " entry '"
+                + entry
+                + "' must be an annotation name or <annotation>#<attribute>=[<value>]");
+      }
+    }
+  }
+
   private static List<String> role(List<String> names, String role) {
     Objects.requireNonNull(names, role);
     for (String fqn : names) {
@@ -457,7 +469,7 @@ public record FrameworkAnnotations(
         List.of("jakarta.transaction.TransactionManager"),
         List.of(),
         List.of("jakarta.ws.rs.GET", "jakarta.ws.rs.HttpMethod#value=GET"),
-        List.of());
+        List.of("jakarta.enterprise.event.Observes#during=AFTER_SUCCESS"));
   }
 
   /**
@@ -496,7 +508,7 @@ public record FrameworkAnnotations(
         List.of("jakarta.transaction.TransactionManager"),
         List.of(),
         List.of("jakarta.ws.rs.GET", "jakarta.ws.rs.HttpMethod#value=GET"),
-        List.of());
+        List.of("jakarta.enterprise.event.Observes#during=AFTER_SUCCESS"));
   }
 
   /**

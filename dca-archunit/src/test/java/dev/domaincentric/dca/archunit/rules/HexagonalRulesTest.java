@@ -145,8 +145,8 @@ class HexagonalRulesTest {
 
     assertTrue(
         message.contains(
-            "PostingNotifier.onPosted drives NotifyPostingInputPort.execute inside the transaction"
-                + " that raised the event"),
+            "PostingNotifier.onPosted drives NotifyPostingInputPort.execute outside the phase after a"
+                + " successful commit"),
         message);
     assertTrue(
         message.contains(
@@ -176,6 +176,47 @@ class HexagonalRulesTest {
   @Test
   void controllersInTheIncomingAdaptersPass() {
     Fixtures.passes(FIXTURES + ".controllerplace.good", "DCA-HEX-018");
+  }
+
+  private static void checkUnderQuarkus(String pkg) {
+    var layout =
+        dev.domaincentric.dca.archunit.DcaLayout.forBasePackage(pkg)
+            .withFrameworkAnnotations(
+                dev.domaincentric.dca.archunit.FrameworkAnnotations.quarkus());
+    var arch =
+        dev.domaincentric.dca.archunit.DcaArchitecture.of(
+            layout, new com.tngtech.archunit.core.importer.ClassFileImporter().importPackages(pkg));
+    new HexagonalRules(layout).listenersThatDriveAnInputPortRunAfterTheCommit().check(arch);
+  }
+
+  /** DCA-HEX-017 under CDI: the observer phase sits on the parameter. */
+  @Test
+  void aCdiObserverThatDrivesAnInputPortOutsideTheCommitPhaseIsReported() {
+    AssertionError error =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            AssertionError.class, () -> checkUnderQuarkus(FIXTURES + ".listeners.bad"));
+    String message = error.getMessage();
+
+    assertTrue(
+        message.contains(
+            "CdiPostingNotifier.onPosted drives NotifyPostingInputPort.execute outside the phase"
+                + " after a successful commit"),
+        message);
+    assertTrue(
+        message.contains(
+            "CdiPostingNotifier.afterPosted drives NotifyPostingInputPort.execute after the commit"
+                + " without a transaction of its own"),
+        message);
+    assertTrue(
+        message.contains(
+            "CdiPostingNotifier.afterAnyEnd drives NotifyPostingInputPort.execute outside the phase"),
+        message);
+  }
+
+  /** A CDI observer after a successful commit, in its own transaction, passes. */
+  @Test
+  void aCdiObserverAfterASuccessfulCommitInItsOwnTransactionPasses() {
+    checkUnderQuarkus(FIXTURES + ".listeners.good");
   }
 
   /** DCA-HEX-016 lists name() and toString() on an enum of the inner layers. */

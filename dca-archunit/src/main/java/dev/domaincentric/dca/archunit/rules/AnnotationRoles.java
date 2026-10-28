@@ -5,6 +5,7 @@ import com.tngtech.archunit.core.domain.JavaAnnotation;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaCodeUnit;
 import com.tngtech.archunit.core.domain.JavaEnumConstant;
+import com.tngtech.archunit.core.domain.JavaParameter;
 import com.tngtech.archunit.core.domain.properties.CanBeAnnotated;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ConditionEvents;
@@ -124,6 +125,46 @@ final class AnnotationRoles {
               : values.stream().anyMatch(v -> v.equalsIgnoreCase(attribute[1]));
       if (matches) {
         return entry;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * The first entry of the role a listener method carries - on the method itself, as {@link
+   * #matchingEntry} reads it, or on one of its parameters, where a framework such as CDI puts the
+   * observer annotation and its phase. On a parameter, a plain entry matches the annotation type,
+   * directly or as a meta-annotation, and an entry {@code <annotation>#<attribute>=<value>} matches
+   * when the parameter's annotation of that type holds the value; the declaring class plays no
+   * part. {@code null} when neither does.
+   */
+  static String listenerEntry(JavaCodeUnit unit, List<String> role) {
+    String onMethod = matchingEntry(unit, role);
+    if (onMethod != null) {
+      return onMethod;
+    }
+    for (JavaParameter parameter : unit.getParameters()) {
+      for (String entry : role) {
+        int hash = entry.indexOf('#');
+        if (hash < 0) {
+          if (parameter.isMetaAnnotatedWith(entry)) {
+            return entry;
+          }
+          continue;
+        }
+        String type = entry.substring(0, hash);
+        String[] attribute = entry.substring(hash + 1).split("=", 2);
+        Set<String> values = new HashSet<>();
+        if (!collect(parameter.getAnnotations(), type, attribute[0], values, new HashSet<>())) {
+          continue;
+        }
+        boolean matches =
+            attribute[1].isEmpty()
+                ? values.isEmpty()
+                : values.stream().anyMatch(v -> v.equalsIgnoreCase(attribute[1]));
+        if (matches) {
+          return entry;
+        }
       }
     }
     return null;

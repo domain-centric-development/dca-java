@@ -584,14 +584,17 @@ public final class HexagonalRules implements DcaRuleSet {
         .experimental()
         .selecting(
             "Classes of every module root; within them, the methods carrying, directly or as a"
-                + " meta-annotation, an annotation of the configured event-listener role. With an"
+                + " meta-annotation, an annotation of the configured event-listener role - on the"
+                + " method or on one of its parameters, where CDI puts its observer. With an"
                 + " empty event-listener or transactional-event-listener role nothing is selected"
                 + " and the rule passes.")
         .checking(
             "A selected method that - itself or a method of the same class it reaches through"
                 + " calls within the class - calls a type assignable to the configured input-port"
                 + " role carries, directly or as a meta-annotation, an annotation of the configured"
-                + " transactional-event-listener role, and an annotation of the configured"
+                + " transactional-event-listener role - on the method or a parameter; an entry"
+                + " <annotation>#<attribute>=<value> asks for that attribute value, as CDI's"
+                + " observer phase - and an annotation of the configured"
                 + " transactional role on the method or its class. The rule reads the listener's"
                 + " phase and transaction, not whether a durable publication store backs it; an"
                 + " input port reached through a second class is not followed. An empty selection"
@@ -611,7 +614,7 @@ public final class HexagonalRules implements DcaRuleSet {
         }
         IntraClassCalls calls = null;
         for (JavaCodeUnit listener : item.getCodeUnits()) {
-          if (AnnotationRoles.matchingEntry(listener, roles.eventListener()) == null) {
+          if (AnnotationRoles.listenerEntry(listener, roles.eventListener()) == null) {
             continue;
           }
           if (calls == null) {
@@ -630,7 +633,7 @@ public final class HexagonalRules implements DcaRuleSet {
             continue;
           }
           boolean afterCommit =
-              AnnotationRoles.matchingEntry(listener, roles.transactionalEventListener()) != null;
+              AnnotationRoles.listenerEntry(listener, roles.transactionalEventListener()) != null;
           boolean ownTransaction =
               AnnotationRoles.isMetaAnnotatedWithAny(listener, roles.transactional())
                   || AnnotationRoles.isMetaAnnotatedWithAny(item, roles.transactional());
@@ -645,7 +648,8 @@ public final class HexagonalRules implements DcaRuleSet {
                         + String.join(", ", ports)
                         + (afterCommit
                             ? " after the commit without a transaction of its own"
-                            : " inside the transaction that raised the event")));
+                            : " outside the phase after a successful commit - inside the"
+                                + " transaction that raised the event, or whatever its outcome")));
           }
         }
       }
