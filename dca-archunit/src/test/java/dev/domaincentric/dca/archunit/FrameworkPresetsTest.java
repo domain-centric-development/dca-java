@@ -185,4 +185,22 @@ class FrameworkPresetsTest {
               assertDoesNotThrow(() -> rule(arch, "DCA-USE-012").check(arch));
             }));
   }
+
+  /**
+   * DCA-HEX-018 under the Quarkus and Jakarta presets: the REST-controller role is JAX-RS's path,
+   * which a declarative REST client in an outgoing adapter carries as well. The client is an
+   * interface and is not selected; the resource in the incoming adapter passes.
+   */
+  @TestFactory
+  Stream<DynamicTest> aRestClientInterfaceIsNoControllerUnderTheJaxRsPresets() {
+    return Stream.of(FrameworkAnnotations.quarkus(), FrameworkAnnotations.jakarta())
+        .map(
+            preset ->
+                DynamicTest.dynamicTest(
+                    preset + " preset",
+                    () -> {
+                      DcaArchitecture arch = arch("jakarta", preset);
+                      assertDoesNotThrow(() -> rule(arch, "DCA-HEX-018").check(arch));
+                    }));
+  }
 }

@@ -8,7 +8,9 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 **`DCA-HEX-018` (experimental): controllers must reside in an incoming adapter package.** A class carrying
 the web-controller or REST-controller role outside `<module>.adapter.incoming..` was outside the selection of every
-rule written for incoming adapters and passed them all. Selected by role, never by name.
+rule written for incoming adapters and passed them all. Selected by role, never by name; an interface carrying
+the role — a declarative REST client, which under the Jakarta and Quarkus presets carries JAX-RS's `@Path` — is
+not selected.
 
 ### Changed
 

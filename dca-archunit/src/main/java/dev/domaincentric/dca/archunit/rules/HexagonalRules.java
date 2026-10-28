@@ -668,15 +668,18 @@ public final class HexagonalRules implements DcaRuleSet {
                 + " rules, the boundary rules - and passes them all",
             arch ->
                 classes()
-                    .that(AnnotationRoles.annotatedWithAny(webControllers, restControllers))
+                    .that()
+                    .areNotInterfaces()
+                    .and(AnnotationRoles.annotatedWithAny(webControllers, restControllers))
                     .should()
                     .resideInAnyPackage(arch.allIncomingAdapterPatterns())
                     .allowEmptyShould(true))
         .experimental()
         .selecting(
-            "Classes anywhere on the classpath under scan that are directly annotated with one of"
-                + " the configured web-controller or REST-controller stereotypes. A class is not"
-                + " selected for its name. With empty web-controller and REST-controller roles"
+            "Non-interface classes anywhere on the classpath under scan that are directly annotated"
+                + " with one of the configured web-controller or REST-controller stereotypes. An"
+                + " interface carrying the same annotation - a declarative REST client in an outgoing"
+                + " adapter - is not selected, and a class is not selected for its name. With empty web-controller and REST-controller roles"
                 + " nothing is selected and the rule passes.")
         .checking(
             "Each resides in <module>.adapter.incoming.. of some module root. Where in the incoming"
