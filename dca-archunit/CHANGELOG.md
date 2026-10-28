@@ -4,6 +4,12 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Added
+
+**`DCA-HEX-018` (experimental): controllers must reside in an incoming adapter package.** A class carrying
+the web-controller or REST-controller role outside `<module>.adapter.incoming..` was outside the selection of every
+rule written for incoming adapters and passed them all. Selected by role, never by name.
+
 ### Changed
 
 **`DCA-ERR-006` stays quiet where it cannot see failures.** When no class of the scan is assignable to the

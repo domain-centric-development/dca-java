@@ -31,7 +31,9 @@ class HexagonalRulesTest {
         // informational diagnostic, never fails; observed in .hexagonal.enumnames
         "DCA-HEX-016",
         // negative fixture in .hexagonal.listeners
-        "DCA-HEX-017");
+        "DCA-HEX-017",
+        // negative fixture in .hexagonal.controllerplace
+        "DCA-HEX-018");
   }
 
   /**
@@ -158,6 +160,22 @@ class HexagonalRulesTest {
   @Test
   void aTransactionalListenerAndASynchronousTranslatorPass() {
     Fixtures.passes(FIXTURES + ".listeners.good", "DCA-HEX-017");
+  }
+
+  /** DCA-HEX-018: a controller and a REST endpoint class outside the incoming adapters. */
+  @Test
+  void aControllerOutsideTheIncomingAdaptersIsReported() {
+    String message =
+        Fixtures.failure(FIXTURES + ".controllerplace.bad", "DCA-HEX-018").getMessage();
+
+    assertTrue(message.contains("LedgerController"), message);
+    assertTrue(message.contains("LedgerResource"), message);
+  }
+
+  /** Controllers in the incoming adapters pass; a class only named like one is not selected. */
+  @Test
+  void controllersInTheIncomingAdaptersPass() {
+    Fixtures.passes(FIXTURES + ".controllerplace.good", "DCA-HEX-018");
   }
 
   /** DCA-HEX-016 lists name() and toString() on an enum of the inner layers. */

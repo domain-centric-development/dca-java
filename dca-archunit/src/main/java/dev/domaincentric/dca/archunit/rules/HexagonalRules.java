@@ -51,7 +51,8 @@ public final class HexagonalRules implements DcaRuleSet {
             outgoingAdaptersMustNotDependOnInputPorts(),
             getHandlersDriveNoCommand(),
             adaptersPublishNoEnumMemberName(),
-            listenersThatDriveAnInputPortRunAfterTheCommit());
+            listenersThatDriveAnInputPortRunAfterTheCommit(),
+            controllersResideInIncomingAdapters());
   }
 
   @Override
@@ -649,6 +650,38 @@ public final class HexagonalRules implements DcaRuleSet {
         }
       }
     };
+  }
+
+  /**
+   * DCA-HEX-018. A controller is an incoming adapter: it lives where the incoming adapters live, or
+   * every rule that selects incoming adapters passes it by.
+   */
+  public DcaRule controllersResideInIncomingAdapters() {
+    List<String> webControllers = layout.frameworkAnnotations().webController();
+    List<String> restControllers = layout.frameworkAnnotations().restController();
+    return DcaRule.of(
+            "DCA-HEX-018",
+            "Controllers must reside in an incoming adapter package",
+            "A controller turns a request into a command or a query and is an incoming adapter."
+                + " Outside the incoming adapter packages it is outside the selection of every rule"
+                + " written for incoming adapters - the GET-handler rule, the controller naming"
+                + " rules, the boundary rules - and passes them all",
+            arch ->
+                classes()
+                    .that(AnnotationRoles.annotatedWithAny(webControllers, restControllers))
+                    .should()
+                    .resideInAnyPackage(arch.allIncomingAdapterPatterns())
+                    .allowEmptyShould(true))
+        .experimental()
+        .selecting(
+            "Classes anywhere on the classpath under scan that are directly annotated with one of"
+                + " the configured web-controller or REST-controller stereotypes. A class is not"
+                + " selected for its name. With empty web-controller and REST-controller roles"
+                + " nothing is selected and the rule passes.")
+        .checking(
+            "Each resides in <module>.adapter.incoming.. of some module root. Where in the incoming"
+                + " adapters it sits - which protocol segment - is not checked.",
+            "move the controller into the incoming adapter package of its module");
   }
 
   public DcaRule adaptersPublishNoEnumMemberName() {
