@@ -473,7 +473,8 @@ public final class HexagonalRules implements DcaRuleSet {
    * it: the input port takes a type whose simple name ends with {@code Command}.
    */
   public DcaRule getHandlersDriveNoCommand() {
-    List<String> controllers = layout.frameworkAnnotations().webController();
+    List<String> webControllers = layout.frameworkAnnotations().webController();
+    List<String> restControllers = layout.frameworkAnnotations().restController();
     List<String> getMapping = layout.frameworkAnnotations().getMapping();
     return DcaRule.of(
             "DCA-HEX-014",
@@ -486,13 +487,14 @@ public final class HexagonalRules implements DcaRuleSet {
                 classes()
                     .that()
                     .resideInAnyPackage(arch.allIncomingAdapterPatterns())
-                    .and(AnnotationRoles.annotatedWithAny(controllers))
+                    .and(AnnotationRoles.annotatedWithAny(webControllers, restControllers))
                     .should(driveNoCommandFromGet(getMapping, layout.markers()))
                     .allowEmptyShould(true))
         .experimental()
         .selecting(
             "Classes in <module>.adapter.incoming.. of every module root that are directly"
-                + " annotated with one of the configured web-controller stereotypes; within them,"
+                + " annotated with one of the configured web-controller or REST-controller"
+                + " stereotypes; within them,"
                 + " the methods carrying, directly or as a meta-annotation, an annotation of the"
                 + " configured GET-mapping role - or, for an entry that names an attribute value, an"
                 + " annotation of that type whose attribute holds the value (a general mapping"
@@ -507,8 +509,9 @@ public final class HexagonalRules implements DcaRuleSet {
                 + " class - calls a type assignable to the configured input-port role whose input"
                 + " ends with Command: a parameter of the called method, of a public method of the"
                 + " port, or a type argument of the input port it extends. A mapping that names no"
-                + " HTTP method is checked like a GET handler. With an empty web-controller or"
-                + " GET-mapping role nothing is selected and the rule passes.",
+                + " HTTP method is checked like a GET handler. With empty web-controller and"
+                + " REST-controller roles, or an empty GET-mapping role, nothing is selected and the"
+                + " rule passes.",
             "map the handler to POST, PUT or DELETE, or let the GET handler ask a query");
   }
 

@@ -4,6 +4,12 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Fixed
+
+**`DCA-HEX-014` selects REST endpoint classes too.** It took the web-controller role alone, so a project
+with only `@RestController` classes got an empty selection and a silent pass. It now selects the web-controller
+and the REST-controller role, as `DCA-HEX-003` does; the .NET rule already recognised API controllers.
+
 ### Added
 
 **`DCA-HEX-017` (experimental): event listeners that drive an input port must run after the commit

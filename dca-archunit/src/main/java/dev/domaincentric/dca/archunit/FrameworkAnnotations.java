@@ -74,7 +74,7 @@ import java.util.WeakHashMap;
  *       Empty where the framework answers through a mapper class instead of an annotation.
  *   <li>{@link #getMapping()} — the annotations that bind a handler method to the HTTP method GET
  *       (Spring's {@code @GetMapping}, JAX-RS {@code @GET}, Micronaut's {@code @Get}). A GET
- *       handler of a web controller drives no input port that takes a command ({@code
+ *       handler of a web or REST controller drives no input port that takes a command ({@code
  *       DCA-HEX-014}). An entry may also name a general mapping annotation together with the
  *       attribute value that makes it GET, as {@code <annotation>#<attribute>=<value>} (Spring's
  *       {@code org.springframework.web.bind.annotation.RequestMapping#method=GET}; JAX-RS's {@code

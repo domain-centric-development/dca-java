@@ -90,6 +90,18 @@ class HexagonalRulesTest {
     assertTrue(message.contains("LedgerController.quickEntry handles @GetMapping"), message);
   }
 
+  /** DCA-HEX-014 selects REST endpoint classes as well as server-rendering controllers. */
+  @Test
+  void aRestEndpointWhoseGetHandlerDrivesACommandIsReported() {
+    String message = Fixtures.failure(FIXTURES + ".getmapping.bad", "DCA-HEX-014").getMessage();
+
+    assertTrue(
+        message.contains(
+            "LedgerResource.quick handles @GetMapping and drives a command through"
+                + " PostEntryInputPort.execute"),
+        message);
+  }
+
   /** DCA-HEX-014 reads the method attribute of a general mapping the preset names. */
   @Test
   void aGeneralMappingRestrictedToGetIsSelected() {
