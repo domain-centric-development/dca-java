@@ -198,7 +198,7 @@ public abstract class DcaArchitectureTest {
                             .toList()));
     return Stream.concat(
         Stream.of(
-            layoutDiagnostics(arch.layout()),
+            layoutDiagnostics(arch),
             DynamicTest.dynamicTest(counts, () -> {}),
             DynamicContainer.dynamicContainer(
                 "retired identities referenced by the selection ("
@@ -214,20 +214,44 @@ public abstract class DcaArchitectureTest {
    * rules resolved their annotations with, and the vocabulary they resolved their building blocks
    * with.
    */
-  private DynamicContainer layoutDiagnostics(DcaLayout layout) {
+  private DynamicContainer layoutDiagnostics(DcaArchitecture arch) {
+    DcaLayout layout = arch.layout();
+    List<DynamicTest> notices = new ArrayList<>();
+    if (!layout.excludedPackages().isEmpty()) {
+      notices.add(
+          DynamicTest.dynamicTest(
+              "excluded packages: " + String.join(", ", layout.excludedPackages()),
+              () -> {
+                // diagnostic only - what the architecture under test leaves out
+              }));
+    }
+    arch.baseModuleRootNotice()
+        .ifPresent(
+            notice -> {
+              System.out.println("DCA layout: " + notice);
+              notices.add(
+                  DynamicTest.dynamicTest(
+                      "module roots: " + notice,
+                      () -> {
+                        // diagnostic only - the rules still run, but every module counts as a
+                        // neighbour of every other
+                      }));
+            });
     return DynamicContainer.dynamicContainer(
         "layout",
-        List.of(
-            DynamicTest.dynamicTest(
-                "framework annotations: " + layout.frameworkAnnotationsReport(),
-                () -> {
-                  // diagnostic only - the preset in use, named in the report
-                }),
-            DynamicTest.dynamicTest(
-                "building block markers: " + layout.markersReport(),
-                () -> {
-                  // diagnostic only - the vocabulary the rules select on, named in the report
-                })));
+        Stream.concat(
+            notices.stream(),
+            Stream.of(
+                DynamicTest.dynamicTest(
+                    "framework annotations: " + layout.frameworkAnnotationsReport(),
+                    () -> {
+                      // diagnostic only - the preset in use, named in the report
+                    }),
+                DynamicTest.dynamicTest(
+                    "building block markers: " + layout.markersReport(),
+                    () -> {
+                      // diagnostic only - the vocabulary the rules select on, named in the report
+                    }))));
   }
 
   /** Groups the rules to run by the catalog set they belong to, keeping the catalog's order. */

@@ -16,7 +16,6 @@ import dev.domaincentric.dca.archunit.DcaMarkers;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
 import dev.domaincentric.dca.archunit.DcaRuleViolation;
-import dev.domaincentric.dca.buildingblocks.ddd.tactical.IntegrationEventType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -148,13 +147,14 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                     .and()
                     .areNotInterfaces()
                     .should()
-                    .beAnnotatedWith(IntegrationEventType.class)
+                    .beAnnotatedWith(arch.layout().markers().integrationEventType())
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes anywhere on the classpath under scan that are assignable to"
                 + " IntegrationEvent - records, enums and abstract classes included.")
         .checking(
-            "The class itself is annotated with @IntegrationEventType. An annotation on a supertype does not"
+            "The class itself is annotated with @IntegrationEventType - or with the annotation the"
+                + " integrationEventType marker role names. An annotation on a supertype does not"
                 + " count; the annotation's name and version values are not checked. An empty selection passes.");
   }
 

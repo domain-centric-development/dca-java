@@ -117,9 +117,10 @@ public final class NamingRules implements DcaRuleSet {
   public static DcaRule inputPortInterfacesEndWithInputPort(DcaLayout layout) {
     // Matched by marker, not by package: DCA places each input port in its own use-case folder,
     // so there is no single ..application.port.in.. package to point at.
+    String suffix = layout.inputPortSuffix();
     return DcaRule.of(
             "DCA-NAM-003",
-            "InputPort interfaces must end with 'InputPort'",
+            "InputPort interfaces must end with '" + suffix + "'",
             "Input port interfaces should follow consistent naming conventions (Hexagonal Architecture)",
             arch ->
                 classes()
@@ -130,22 +131,29 @@ public final class NamingRules implements DcaRuleSet {
                     .and()
                     .areAssignableTo(arch.layout().markers().inputPort())
                     .and()
+                    .doNotHaveFullyQualifiedName(arch.layout().markers().inputPort())
+                    .and()
+                    .doNotHaveFullyQualifiedName(arch.layout().markers().useCase())
+                    .and()
                     .doNotHaveSimpleName("InputPort")
                     .and()
                     .doNotHaveSimpleName("UseCase")
                     .should()
-                    .haveSimpleNameEndingWith("InputPort")
+                    .haveSimpleNameEndingWith(suffix)
                     .allowEmptyShould(true))
         .selecting(
             "Interfaces in <module>.application.. of every module root that are assignable to"
-                + " InputPort, except those named exactly InputPort or UseCase.")
+                + " InputPort, except the types the inputPort and useCase roles name and those named"
+                + " exactly InputPort or UseCase.")
         .checking(
-            "The simple name ends with InputPort - no prefix is required, because Java interfaces"
+            "The simple name ends with the configured input-port suffix ("
+                + suffix
+                + " by default InputPort) - no prefix is required, because Java interfaces"
                 + " carry none; the .NET twin additionally requires the platform's I prefix."
                 + " Classes and records are not selected, and an"
                 + " interface extending InputPort outside an application package is not checked. An"
                 + " empty selection passes.",
-            "rename the interface to <UseCaseName>InputPort");
+            "rename the interface to <UseCaseName>" + suffix);
   }
 
   public static DcaRule repositoryInterfacesEndWithRepository(DcaLayout layout) {
@@ -501,10 +509,13 @@ public final class NamingRules implements DcaRuleSet {
     return operations;
   }
 
-  /** The simple name without the use-case suffix or {@code InputPort}. */
+  /** The simple name without the use-case suffix, the input-port suffix or {@code InputPort}. */
   private static String operationName(JavaClass type, DcaLayout layout) {
     String name = type.getSimpleName();
-    for (String suffix : List.of(layout.useCaseSuffix(), "InputPort")) {
+    for (String suffix :
+        List.of(layout.useCaseSuffix(), layout.inputPortSuffix(), "InputPort").stream()
+            .distinct()
+            .toList()) {
       if (name.endsWith(suffix) && name.length() > suffix.length()) {
         return name.substring(0, name.length() - suffix.length());
       }
