@@ -6,6 +6,11 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ### Changed
 
+**`DCA-ERR-006` stays quiet where it cannot see failures.** When no class of the scan is assignable to the
+`domainException` or `useCaseException` role — a project whose failures extend `RuntimeException` directly — it
+listed every driving adapter package. It now lists none and says once why, naming `withDomainException` /
+`withUseCaseException` to point the roles at the project's own base types.
+
 **A rule that selected nothing says so.** A rule built on a single ArchUnit rule is evaluated with an empty
 selection forbidden; when no class of the scan matched, it passes with the note `selected nothing` and its
 `selects()` text, shown as an `INFO` outcome. A selection that a layout or a framework role misses — as

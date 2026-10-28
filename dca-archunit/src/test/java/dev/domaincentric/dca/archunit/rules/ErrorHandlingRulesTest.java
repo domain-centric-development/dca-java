@@ -151,4 +151,24 @@ class ErrorHandlingRulesTest {
     assertEquals(
         java.util.List.of(), Fixtures.observed(FIXTURES + ".fieldtypes.good", "DCA-ERR-007"));
   }
+
+  /** DCA-ERR-006 says once that it cannot see failures of a project's own types. */
+  @Test
+  void withoutAnyFailureMarkerTypeTheDiagnosticListsNoPackage() {
+    var observed = Fixtures.observed(FIXTURES + ".ownfailures", "DCA-ERR-006");
+
+    assertEquals(1, observed.size(), observed.toString());
+    assertTrue(observed.get(0).contains("no class of the scan is assignable"), observed.toString());
+    assertFalse(observed.get(0).contains("adapter.incoming.rest:"), observed.toString());
+  }
+
+  /** Where failure types derive from the markers, DCA-ERR-006 lists packages as before. */
+  @Test
+  void withFailureMarkerTypesTheDiagnosticListsPackages() {
+    var observed = Fixtures.observed(FIXTURES + ".bad", "DCA-ERR-006");
+
+    assertTrue(
+        observed.stream().noneMatch(line -> line.contains("no class of the scan is assignable")),
+        observed.toString());
+  }
 }

@@ -266,6 +266,27 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                 + " everything escape to a generic handler or catches a generic type and answers"
                 + " every outcome the same way; whether it does is not visible in the import model",
             arch -> {
+              String domainException = arch.layout().markers().domainException();
+              String useCaseException = arch.layout().markers().useCaseException();
+              boolean anyFailureType =
+                  arch.classes().stream()
+                      .anyMatch(
+                          type ->
+                              !type.getName().equals(domainException)
+                                  && !type.getName().equals(useCaseException)
+                                  && (type.isAssignableTo(domainException)
+                                      || type.isAssignableTo(useCaseException)));
+              if (!anyFailureType) {
+                return List.of(
+                    "no class of the scan is assignable to "
+                        + domainException
+                        + " or "
+                        + useCaseException
+                        + ", so no package can be seen to name a failure - nothing is listed."
+                        + " Where the project has failure types of its own, point the"
+                        + " domainException and useCaseException roles at their base types"
+                        + " (DcaMarkers.withDomainException / withUseCaseException).");
+              }
               List<String> observed = new ArrayList<>();
               Map<String, List<JavaClass>> drivingByPackage = new TreeMap<>();
               Set<String> packagesThatName = new HashSet<>();
@@ -304,7 +325,10 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                 + " at least one non-interface class depending on a class assignable to InputPort -"
                 + " the packages that drive the application.")
         .checking(
-            "Informational diagnostic only: lists a package when no class in it - a central"
+            "Informational diagnostic only: when no class of the scan is assignable to"
+                + " DomainException or UseCaseException, it lists no package and says once that it"
+                + " cannot see the failures; otherwise it lists a package when no class in it - a"
+                + " central"
                 + " exception handler beside the adapters included - depends on a class assignable"
                 + " to DomainException or UseCaseException, and never fails. A handler in a"
                 + " different package of the same module is not seen, and a caught type is not"
