@@ -4,6 +4,8 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-29
+
 ### Added
 
 **`DCA-HEX-019` (experimental): output port implementations must reside in an outgoing adapter package.** Every
