@@ -48,8 +48,22 @@ public final class Fixtures {
   /** One dynamic test per rule of the set, each expecting the good fixture to pass. */
   public static Stream<DynamicTest> goodFixturePasses(
       Function<DcaLayout, DcaRuleSet> set, String goodPackage) {
+    return goodFixturePasses(set, goodPackage, new String[0]);
+  }
+
+  /**
+   * As {@link #goodFixturePasses(Function, String)}, except for the rules named in {@code
+   * withPositiveFixtureElsewhere} (with their reason at the call site) - an experimental rule
+   * stricter than the shared good fixture is written to.
+   */
+  public static Stream<DynamicTest> goodFixturePasses(
+      Function<DcaLayout, DcaRuleSet> set,
+      String goodPackage,
+      String... withPositiveFixtureElsewhere) {
     DcaArchitecture arch = arch(goodPackage);
+    java.util.Set<String> excluded = java.util.Set.of(withPositiveFixtureElsewhere);
     return set.apply(arch.layout()).rules().stream()
+        .filter(rule -> !excluded.contains(rule.id()))
         .map(rule -> DynamicTest.dynamicTest(rule.toString(), () -> rule.check(arch)));
   }
 

@@ -52,7 +52,8 @@ public final class HexagonalRules implements DcaRuleSet {
             getHandlersDriveNoCommand(),
             adaptersPublishNoEnumMemberName(),
             listenersThatDriveAnInputPortRunAfterTheCommit(),
-            controllersResideInIncomingAdapters());
+            controllersResideInIncomingAdapters(),
+            outputPortImplementationsResideInOutgoingAdapters());
   }
 
   @Override
@@ -689,6 +690,63 @@ public final class HexagonalRules implements DcaRuleSet {
             "Each resides in <module>.adapter.incoming.. of some module root. Where in the incoming"
                 + " adapters it sits - which protocol segment - is not checked.",
             "move the controller into the incoming adapter package of its module");
+  }
+
+  /**
+   * DCA-HEX-019. Every implementation of an output port is an outgoing adapter. The composition
+   * root wires an implementation to its port and holds none itself - except the bridge that hands a
+   * port a second use case: it implements an output port and drives an input port, so it is wiring,
+   * and in Java usually a lambda that is no class at all.
+   */
+  public DcaRule outputPortImplementationsResideInOutgoingAdapters() {
+    return DcaRule.check(
+            "DCA-HEX-019",
+            "Output port implementations must reside in an outgoing adapter package",
+            "An output port is what the application needs from outside; whatever implements it is an"
+                + " outgoing adapter. An implementation in the infrastructure package, the application"
+                + " or the domain is outside the selection of every rule written for outgoing"
+                + " adapters, and infrastructure then holds behaviour instead of wiring alone",
+            arch -> {
+              CollectedViolations violations =
+                  CollectedViolations.withHeader(
+                      "Output port implementations must reside in an outgoing adapter package\nbecause"
+                          + " whatever implements an output port is an outgoing adapter");
+              var outgoing =
+                  com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage(
+                      arch.allOutgoingAdapterPatterns());
+              var infrastructure =
+                  com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage(
+                      arch.allInfrastructurePatterns());
+              String outputPort = arch.layout().markers().outputPort();
+              String inputPort = arch.layout().markers().inputPort();
+              for (var type : arch.classes()) {
+                if (type.isInterface() || !type.isAssignableTo(outputPort) || outgoing.test(type)) {
+                  continue;
+                }
+                boolean bridge =
+                    infrastructure.test(type)
+                        && type.getDirectDependenciesFromSelf().stream()
+                            .anyMatch(d -> d.getTargetClass().isAssignableTo(inputPort));
+                if (!bridge) {
+                  violations.add(
+                      type.getName() + " implements an output port outside the outgoing adapters");
+                }
+              }
+              violations.throwIfAny();
+            })
+        .experimental()
+        .selecting(
+            "Non-interface classes anywhere under scan assignable to the output-port role -"
+                + " repositories, stores, event publishers and every other output port alike,"
+                + " abstract base classes and anonymous classes included. A lambda or a method"
+                + " reference is no class under scan and is not selected. Not selected: a class in"
+                + " an infrastructure package that depends on a type assignable to the input-port"
+                + " role - the bridge that hands an output port a second use case, which is wiring.")
+        .checking(
+            "Each resides in <module>.adapter.outgoing.. of some module root. DCA-TAC-015 and"
+                + " DCA-TAC-020 hold repositories and stores the same way in the tactical set.",
+            "move the implementation into the outgoing adapter package of its module; the"
+                + " configuration in infrastructure only wires it to its port");
   }
 
   public DcaRule adaptersPublishNoEnumMemberName() {

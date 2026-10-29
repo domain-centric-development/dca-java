@@ -6,6 +6,21 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ### Added
 
+**`DCA-HEX-019` (experimental): output port implementations must reside in an outgoing adapter package.** Every
+class assignable to the output-port role — not only repositories and stores, which `DCA-TAC-015`/`-020` already hold —
+lives in `<module>.adapter.outgoing..`. The configuration in infrastructure wires an implementation to its port and
+holds none itself. The one exception is the bridge that hands an output port a second use case: a class in an
+infrastructure package that depends on an input port is wiring and passes — in Java usually a lambda, no class at all.
+
+**`DCA-TAC-025` (experimental): domain types must not hold bare primitives, strings or time types.** Instance
+fields, return types and parameter types in `<module>.domain..` — generic arguments included — involve no `String`,
+primitive or box, and no point in time (`Instant`, `LocalDate`, `LocalDateTime`, `LocalTime`, `OffsetDateTime`,
+`ZonedDateTime`, `java.util.Date`). A value of several components holds values; only a wrapper — a value or id of
+exactly one instance field — holds the primitive it wraps. Exempt: `equals`/`hashCode`/`toString`/`compareTo`, an
+enum's `values()`/`valueOf(String)`, a method that implements a building block's (a domain event's `occurredOn()`)
+and the field behind it. A `boolean` return is a predicate — a question to the object — and passes; a `boolean` field or parameter
+does not.
+
 **`DCA-HEX-018` (experimental): controllers must reside in an incoming adapter package.** A class carrying
 the web-controller or REST-controller role outside `<module>.adapter.incoming..` was outside the selection of every
 rule written for incoming adapters and passed them all. Selected by role, never by name; an interface carrying

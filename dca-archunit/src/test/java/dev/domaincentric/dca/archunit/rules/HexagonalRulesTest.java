@@ -33,7 +33,9 @@ class HexagonalRulesTest {
         // negative fixture in .hexagonal.listeners
         "DCA-HEX-017",
         // negative fixture in .hexagonal.controllerplace
-        "DCA-HEX-018");
+        "DCA-HEX-018",
+        // negative fixture in .hexagonal.portplace
+        "DCA-HEX-019");
   }
 
   /**
@@ -217,6 +219,21 @@ class HexagonalRulesTest {
   @Test
   void aCdiObserverAfterASuccessfulCommitInItsOwnTransactionPasses() {
     checkUnderQuarkus(FIXTURES + ".listeners.good");
+  }
+
+  /** DCA-HEX-019: an output port implemented in infrastructure and in the application. */
+  @Test
+  void anOutputPortImplementedOutsideTheOutgoingAdaptersIsReported() {
+    String message = Fixtures.failure(FIXTURES + ".portplace.bad", "DCA-HEX-019").getMessage();
+
+    assertTrue(message.contains("infrastructure.SmtpMailer"), message);
+    assertTrue(message.contains("ConsoleMailer"), message);
+  }
+
+  /** An implementation in an outgoing adapter passes; a configuration wiring it, a lambda, too. */
+  @Test
+  void anOutputPortImplementedInAnOutgoingAdapterPasses() {
+    Fixtures.passes(FIXTURES + ".portplace.good", "DCA-HEX-019");
   }
 
   /** DCA-HEX-016 lists name() and toString() on an enum of the inner layers. */

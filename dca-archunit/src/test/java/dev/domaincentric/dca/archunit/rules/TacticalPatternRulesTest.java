@@ -1,6 +1,7 @@
 package dev.domaincentric.dca.archunit.rules;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tngtech.archunit.core.importer.ClassFileImporter;
@@ -26,13 +27,17 @@ class TacticalPatternRulesTest {
   void ruleSetHasStableShape() {
     TacticalPatternRules set = new TacticalPatternRules(DcaLayout.forBasePackage(GOOD));
     assertEquals("tactical", set.name());
-    assertEquals(23, set.rules().size());
+    assertEquals(24, set.rules().size());
     Fixtures.assertIdsAreSequential(set, "TAC");
   }
 
   @TestFactory
   Stream<DynamicTest> goodFixturePasses() {
-    return Fixtures.goodFixturePasses(TacticalPatternRules::new, GOOD);
+    return Fixtures.goodFixturePasses(
+        TacticalPatternRules::new,
+        GOOD,
+        // experimental and stricter than this fixture; its positive fixture is .tactical.primitives
+        "DCA-TAC-025");
   }
 
   /** Every tactical rule has a negative fixture. */
@@ -42,7 +47,9 @@ class TacticalPatternRulesTest {
         TacticalPatternRules::new,
         BAD,
         // negative fixture in .tactical.factories
-        "DCA-TAC-024");
+        "DCA-TAC-024",
+        // negative fixture in .tactical.primitives
+        "DCA-TAC-025");
   }
 
   @Test
@@ -234,5 +241,31 @@ class TacticalPatternRulesTest {
   @Test
   void oneFactoryPerOriginPasses() {
     Fixtures.passes(Fixtures.ROOT + ".tactical.factories.good", "DCA-TAC-024");
+  }
+
+  /** DCA-TAC-025: a flag, a count, a moment, a list of strings and a value's bare components. */
+  @Test
+  void barePrimitivesInTheDomainAreReported() {
+    String message =
+        Fixtures.violation(Fixtures.ROOT + ".tactical.primitives.bad", "DCA-TAC-025").getMessage();
+
+    assertTrue(message.contains("Account: field closed is boolean"), message);
+    assertTrue(message.contains("field overdraftCount is int"), message);
+    assertTrue(message.contains("field openedAt is Instant"), message);
+    assertTrue(message.contains("field tags is String"), message);
+    assertTrue(message.contains("rename(...) takes String"), message);
+    assertFalse(message.contains("isClosed()"), message);
+    assertTrue(message.contains("Address: field city is String; field street is String"), message);
+    assertTrue(message.contains("AccountOpened: field holder is String"), message);
+    assertFalse(message.contains("occurredOn"), message);
+    assertFalse(message.contains("PostalCode"), message);
+    assertFalse(message.contains("AccountId"), message);
+    assertFalse(message.contains("toString"), message);
+  }
+
+  /** Values of values, an enum for a flag and an event's occurredOn pass. */
+  @Test
+  void aDomainOfValueObjectsPasses() {
+    Fixtures.passes(Fixtures.ROOT + ".tactical.primitives.good", "DCA-TAC-025");
   }
 }

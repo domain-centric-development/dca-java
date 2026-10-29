@@ -69,7 +69,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
             storeImplementationsResideInOutgoingAdapters(layout),
             storeInterfacesHaveNoRepositorySemantics(),
             aggregateRootsHaveNoPublicConstructors(),
-            valueObjectsHaveOneFactoryPerOrigin());
+            valueObjectsHaveOneFactoryPerOrigin(),
+            domainHoldsNoBarePrimitives());
   }
 
   @Override
@@ -963,6 +964,213 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 + " factory's name says its origin is not checked. An empty selection passes.",
             "remove the neutral of(...) and keep one named factory for each origin - from input,"
                 + " from storage");
+  }
+
+  /** The types a domain wraps in a value object instead of holding them bare. */
+  private static final Set<String> BARE_TYPES =
+      Set.of(
+          "java.lang.String",
+          "boolean",
+          "java.lang.Boolean",
+          "byte",
+          "java.lang.Byte",
+          "short",
+          "java.lang.Short",
+          "int",
+          "java.lang.Integer",
+          "long",
+          "java.lang.Long",
+          "float",
+          "java.lang.Float",
+          "double",
+          "java.lang.Double",
+          "char",
+          "java.lang.Character",
+          "java.time.Instant",
+          "java.time.LocalDate",
+          "java.time.LocalDateTime",
+          "java.time.LocalTime",
+          "java.time.OffsetDateTime",
+          "java.time.ZonedDateTime",
+          "java.util.Date");
+
+  /** The methods every class has from the platform; their signatures are not the model's. */
+  private static final Set<String> PLATFORM_METHODS =
+      Set.of("equals", "hashCode", "toString", "compareTo");
+
+  /**
+   * DCA-TAC-025. A string, a number, a flag or a moment that means something in the domain carries
+   * its rules in a value object of its own - a postal code, a quantity, a status. Held bare, its
+   * rules are repeated wherever it is used, or nowhere.
+   */
+  public static DcaRule domainHoldsNoBarePrimitives() {
+    return DcaRule.check(
+            "DCA-TAC-025",
+            "Domain types must not hold bare primitives, strings or time types",
+            "A value with rules of its own - a postal code, a quantity, a status, a moment - is a"
+                + " value object; held as a bare String, int, boolean or Instant its validation is"
+                + " repeated at every use or missing. A value object with several components holds"
+                + " value objects too; only a wrapper - a value of exactly one component - holds the"
+                + " primitive it wraps",
+            arch -> {
+              DcaMarkers markers = arch.layout().markers();
+              Set<String> buildingBlocks = buildingBlockTypes(markers);
+              List<String> violations = new ArrayList<>();
+              for (JavaClass type :
+                  classesMatching(
+                      arch,
+                      c ->
+                          JavaClass.Predicates.resideInAnyPackage(arch.allDomainPatterns()).test(c)
+                              && !c.getModifiers().contains(JavaModifier.SYNTHETIC))) {
+                if (isWrapperValue(type, markers)) {
+                  continue;
+                }
+                List<String> bare = new ArrayList<>();
+                Set<String> exemptAccessors = new java.util.HashSet<>();
+                for (JavaMethod method : type.getMethods()) {
+                  if (implementsBuildingBlock(type, method, buildingBlocks)) {
+                    exemptAccessors.add(method.getName());
+                  }
+                }
+                Set<String> reportedFields = new java.util.HashSet<>();
+                for (JavaField field : type.getFields()) {
+                  if (field.getModifiers().contains(JavaModifier.STATIC)
+                      || field.getModifiers().contains(JavaModifier.SYNTHETIC)
+                      || exemptAccessors.contains(field.getName())) {
+                    continue;
+                  }
+                  String found = bareTypesIn(field.getType());
+                  if (!found.isEmpty()) {
+                    bare.add("field " + field.getName() + " is " + found);
+                    reportedFields.add(field.getName());
+                  }
+                }
+                for (JavaMethod method : type.getMethods()) {
+                  Set<JavaModifier> modifiers = method.getModifiers();
+                  if (modifiers.contains(JavaModifier.SYNTHETIC)
+                      || modifiers.contains(JavaModifier.BRIDGE)
+                      || PLATFORM_METHODS.contains(method.getName())
+                      || isEnumImplicit(type, method)
+                      || exemptAccessors.contains(method.getName())) {
+                    continue;
+                  }
+                  boolean accessorOfReportedField =
+                      method.getRawParameterTypes().isEmpty()
+                          && reportedFields.contains(method.getName());
+                  String returnType = method.getRawReturnType().getName();
+                  boolean predicate =
+                      returnType.equals("boolean") || returnType.equals("java.lang.Boolean");
+                  String returned = bareTypesIn(method.getReturnType());
+                  if (!returned.isEmpty() && !accessorOfReportedField && !predicate) {
+                    bare.add(method.getName() + "() returns " + returned);
+                  }
+                  List<JavaType> parameters = method.getParameterTypes();
+                  for (int i = 0; i < parameters.size(); i++) {
+                    String taken = bareTypesIn(parameters.get(i));
+                    if (!taken.isEmpty()) {
+                      bare.add(
+                          method.getName() + "(...) takes " + taken + " as parameter " + (i + 1));
+                    }
+                  }
+                }
+                if (!bare.isEmpty()) {
+                  violations.add(
+                      type.getName() + ": " + String.join("; ", bare.stream().sorted().toList()));
+                }
+              }
+              fail(
+                  "Domain types must not hold bare primitives, strings or time types. Fix: wrap each"
+                      + " in a value object that carries its rules - a value of one component"
+                      + " may hold the primitive it wraps.",
+                  violations);
+            })
+        .experimental()
+        .selecting(
+            "Classes, records, enums and interfaces in <module>.domain.. of every module root, the"
+                + " shared kernel's domain included - their instance fields and their methods,"
+                + " private ones included; constructors are not selected, the fields they fill are."
+                + " Not selected: a wrapper value - a type assignable to the value or the id role"
+                + " with exactly one instance field - with everything it declares; synthetic and"
+                + " bridge members; equals, hashCode, toString and compareTo; the values() and"
+                + " valueOf(String) the language declares on an enum; a method that implements a"
+                + " method of a building block, such as a domain event's occurredOn() or a"
+                + " specification's isSatisfiedBy, and the field of the same name behind it. A boolean"
+                + " return is a question to the object - a predicate - and passes; a boolean field or"
+                + " parameter does not.")
+        .checking(
+            "No selected field, return type or parameter type involves String, a primitive or its"
+                + " box, or a point in time (java.time.Instant, LocalDate, LocalDateTime, LocalTime,"
+                + " OffsetDateTime, ZonedDateTime, java.util.Date) - generic type arguments"
+                + " included, so List<String> counts. BigDecimal, BigInteger, Duration and the"
+                + " project's own types pass. A value object with several components is checked"
+                + " like any other type: each component is a value object itself. A record's"
+                + " accessor is not reported again beside its field. An empty selection passes.",
+            "wrap the primitive in a value object that carries its rules; a value of one"
+                + " component may hold it");
+  }
+
+  /** A value or an identifier of exactly one instance field: it wraps that field's primitive. */
+  private static boolean isWrapperValue(JavaClass type, DcaMarkers markers) {
+    if (!type.isAssignableTo(markers.value()) && !type.isAssignableTo(markers.id())) {
+      return false;
+    }
+    return type.getFields().stream()
+            .filter(
+                f ->
+                    !f.getModifiers().contains(JavaModifier.STATIC)
+                        && !f.getModifiers().contains(JavaModifier.SYNTHETIC))
+            .count()
+        == 1;
+  }
+
+  /** The type names of every building block the layout names. */
+  private static Set<String> buildingBlockTypes(DcaMarkers markers) {
+    return Set.of(
+        markers.aggregateRoot(),
+        markers.entity(),
+        markers.value(),
+        markers.id(),
+        markers.domainEvent(),
+        markers.integrationEvent(),
+        markers.domainService(),
+        markers.factory(),
+        markers.specification(),
+        markers.domainException(),
+        markers.outputPort(),
+        markers.repository(),
+        markers.store());
+  }
+
+  /** Whether a building block the type implements declares a method of this name and arity. */
+  private static boolean implementsBuildingBlock(
+      JavaClass type, JavaMethod method, Set<String> buildingBlocks) {
+    List<JavaClass> supertypes = new ArrayList<>(type.getAllRawInterfaces());
+    supertypes.addAll(type.getAllRawSuperclasses());
+    return supertypes.stream()
+        .filter(s -> buildingBlocks.contains(s.getName()))
+        .flatMap(s -> s.getMethods().stream())
+        .anyMatch(
+            m ->
+                m.getName().equals(method.getName())
+                    && m.getRawParameterTypes().size() == method.getRawParameterTypes().size());
+  }
+
+  /** The {@code values()} and {@code valueOf(String)} the language declares on every enum. */
+  private static boolean isEnumImplicit(JavaClass type, JavaMethod method) {
+    return type.isEnum()
+        && (isEnumValueOf(type, method)
+            || (method.getName().equals("values") && method.getRawParameterTypes().isEmpty()));
+  }
+
+  /** The bare types a declared type involves, generic arguments included; "" when none. */
+  private static String bareTypesIn(JavaType type) {
+    return type.getAllInvolvedRawTypes().stream()
+        .map(JavaClass::getName)
+        .filter(BARE_TYPES::contains)
+        .map(name -> name.substring(name.lastIndexOf('.') + 1))
+        .distinct()
+        .sorted()
+        .collect(Collectors.joining(", "));
   }
 
   // ---------------------------------------------------------------------------------------------
