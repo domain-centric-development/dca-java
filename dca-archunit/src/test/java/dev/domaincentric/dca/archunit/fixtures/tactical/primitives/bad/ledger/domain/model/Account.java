@@ -11,6 +11,7 @@ public class Account extends BaseAggregateRoot<Account, AccountId> {
   private int overdraftCount;
   private Instant openedAt;
   private List<String> tags;
+  private java.util.UUID ownerId;
 
   Account(AccountId id) {
     this.id = id;

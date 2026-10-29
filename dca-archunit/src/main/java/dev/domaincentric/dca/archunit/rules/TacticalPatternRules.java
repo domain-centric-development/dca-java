@@ -992,7 +992,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
           "java.time.LocalTime",
           "java.time.OffsetDateTime",
           "java.time.ZonedDateTime",
-          "java.util.Date");
+          "java.util.Date",
+          "java.util.UUID");
 
   /** The methods every class has from the platform; their signatures are not the model's. */
   private static final Set<String> PLATFORM_METHODS =
@@ -1007,8 +1008,9 @@ public final class TacticalPatternRules implements DcaRuleSet {
     return DcaRule.check(
             "DCA-TAC-025",
             "Domain types must not hold bare primitives, strings or time types",
-            "A value with rules of its own - a postal code, a quantity, a status, a moment - is a"
-                + " value object; held as a bare String, int, boolean or Instant its validation is"
+            "A value with rules of its own - a postal code, a quantity, a status, a moment, an"
+                + " identifier - is a value object; held as a bare String, int, boolean, Instant or UUID its"
+                + " validation is"
                 + " repeated at every use or missing. A value object with several components holds"
                 + " value objects too; only a wrapper - a value of exactly one component - holds the"
                 + " primitive it wraps",
@@ -1100,7 +1102,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
         .checking(
             "No selected field, return type or parameter type involves String, a primitive or its"
                 + " box, or a point in time (java.time.Instant, LocalDate, LocalDateTime, LocalTime,"
-                + " OffsetDateTime, ZonedDateTime, java.util.Date) - generic type arguments"
+                + " OffsetDateTime, ZonedDateTime, java.util.Date), nor a bare java.util.UUID - an"
+                + " identifier says whose it is through a typed id - generic type arguments"
                 + " included, so List<String> counts. BigDecimal, BigInteger, Duration and the"
                 + " project's own types pass. A value object with several components is checked"
                 + " like any other type: each component is a value object itself. A record's"

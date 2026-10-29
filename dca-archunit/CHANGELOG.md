@@ -15,7 +15,7 @@ infrastructure package that depends on an input port is wiring and passes — in
 **`DCA-TAC-025` (experimental): domain types must not hold bare primitives, strings or time types.** Instance
 fields, return types and parameter types in `<module>.domain..` — generic arguments included — involve no `String`,
 primitive or box, and no point in time (`Instant`, `LocalDate`, `LocalDateTime`, `LocalTime`, `OffsetDateTime`,
-`ZonedDateTime`, `java.util.Date`). A value of several components holds values; only a wrapper — a value or id of
+`ZonedDateTime`, `java.util.Date`), nor a bare `UUID` — an identifier says whose it is through a typed id. A value of several components holds values; only a wrapper — a value or id of
 exactly one instance field — holds the primitive it wraps. Exempt: `equals`/`hashCode`/`toString`/`compareTo`, an
 enum's `values()`/`valueOf(String)`, a method that implements a building block's (a domain event's `occurredOn()`)
 and the field behind it. A `boolean` return is a predicate — a question to the object — and passes; a `boolean` field or parameter

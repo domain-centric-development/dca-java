@@ -253,6 +253,7 @@ class TacticalPatternRulesTest {
     assertTrue(message.contains("field overdraftCount is int"), message);
     assertTrue(message.contains("field openedAt is Instant"), message);
     assertTrue(message.contains("field tags is String"), message);
+    assertTrue(message.contains("field ownerId is UUID"), message);
     assertTrue(message.contains("rename(...) takes String"), message);
     assertFalse(message.contains("isClosed()"), message);
     assertTrue(message.contains("Address: field city is String; field street is String"), message);
