@@ -3,11 +3,12 @@ package dev.domaincentric.dca.archunit.rules;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaClass;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaMarkers;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -47,11 +48,9 @@ public final class OnionRules implements DcaRuleSet {
                 + " services",
             arch ->
                 noClasses()
-                    .that()
-                    .resideInAnyPackage(arch.allDomainPatterns())
+                    .that(arch.inDomain())
                     .should()
-                    .dependOnClassesThat()
-                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .dependOnClassesThat(arch.inApplication())
                     .allowEmptyShould(true))
         .selecting("Classes in <module>.domain.. of every module root.")
         .checking(
@@ -74,18 +73,22 @@ public final class OnionRules implements DcaRuleSet {
               // markers is not reported as depending on a foreign library inside its own domain.
               // Strategic annotations, the application-layer roles and input ports are
               // deliberately not on the list.
-              List<String> domainPackageList = new ArrayList<>(List.of(arch.allDomainPatterns()));
-              domainPackageList.addAll(
-                  layout.markers().declaringPackagePatternsOf(DcaMarkers.DOMAIN_FACING_ROLES));
-              String[] domainPackages = domainPackageList.toArray(String[]::new);
-              List<String> allowed = new ArrayList<>(layout.thirdPartyPackagesAllowedInDomain());
-              allowed.addAll(List.of(domainPackages));
+              DescribedPredicate<JavaClass> domain =
+                  arch.inDomain()
+                      .or(
+                          JavaClass.Predicates.resideInAnyPackage(
+                              layout
+                                  .markers()
+                                  .declaringPackagePatternsOf(DcaMarkers.DOMAIN_FACING_ROLES)
+                                  .toArray(String[]::new)));
+              DescribedPredicate<JavaClass> allowed =
+                  domain.or(
+                      JavaClass.Predicates.resideInAnyPackage(
+                          layout.thirdPartyPackagesAllowedInDomain().toArray(String[]::new)));
               return classes()
-                  .that()
-                  .resideInAnyPackage(domainPackages)
+                  .that(domain)
                   .should()
-                  .onlyDependOnClassesThat()
-                  .resideInAnyPackage(allowed.toArray(String[]::new))
+                  .onlyDependOnClassesThat(allowed)
                   .allowEmptyShould(true);
             })
         .selecting(

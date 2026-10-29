@@ -237,6 +237,15 @@ public abstract class DcaArchitectureTest {
                         // neighbour of every other
                       }));
             });
+    for (String notice : arch.layerNotices()) {
+      System.out.println("DCA layout: " + notice);
+      notices.add(
+          DynamicTest.dynamicTest(
+              "layers: " + notice,
+              () -> {
+                // diagnostic only - the annotation holds; the notice names where it overrides
+              }));
+    }
     return DynamicContainer.dynamicContainer(
         "layout",
         Stream.concat(
@@ -246,6 +255,11 @@ public abstract class DcaArchitectureTest {
                     "framework annotations: " + layout.frameworkAnnotationsReport(),
                     () -> {
                       // diagnostic only - the preset in use, named in the report
+                    }),
+                DynamicTest.dynamicTest(
+                    "layers: " + layout.layersReport(),
+                    () -> {
+                      // diagnostic only - how each layer is recognised, named in the report
                     }),
                 DynamicTest.dynamicTest(
                     "building block markers: " + layout.markersReport(),

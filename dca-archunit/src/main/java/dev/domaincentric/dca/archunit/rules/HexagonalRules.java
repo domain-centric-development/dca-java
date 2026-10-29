@@ -11,6 +11,7 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import com.tngtech.archunit.lang.conditions.ArchConditions;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaMarkers;
 import dev.domaincentric.dca.archunit.DcaRule;
@@ -81,11 +82,9 @@ public final class HexagonalRules implements DcaRuleSet {
             "Domain should not depend on adapters (ports and adapters pattern)",
             arch ->
                 noClasses()
-                    .that()
-                    .resideInAnyPackage(arch.allDomainModelPatterns())
+                    .that(arch.inDomainModel())
                     .should()
-                    .dependOnClassesThat()
-                    .resideInAnyPackage(arch.allAdapterPatterns())
+                    .dependOnClassesThat(arch.inAdapter())
                     .allowEmptyShould(true))
         .selecting(
             "Classes in <module>.domain.model.. of every module root - the domain model"
@@ -103,11 +102,9 @@ public final class HexagonalRules implements DcaRuleSet {
             "Application services should only depend on domain and outbound ports, not adapters",
             arch ->
                 noClasses()
-                    .that()
-                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .that(arch.inApplication())
                     .should()
-                    .dependOnClassesThat()
-                    .resideInAnyPackage(arch.allAdapterPatterns())
+                    .dependOnClassesThat(arch.inAdapter())
                     .allowEmptyShould(true))
         .selecting(
             "Classes in <module>.application.. of every module root, application.shared"
@@ -155,8 +152,7 @@ public final class HexagonalRules implements DcaRuleSet {
                 + " infrastructure implementation details",
             arch ->
                 noClasses()
-                    .that()
-                    .resideInAnyPackage(arch.allIncomingAdapterPatterns())
+                    .that(arch.inIncomingAdapter())
                     .should()
                     .dependOnClassesThat(arch.infrastructureImplementation())
                     .allowEmptyShould(true))
@@ -180,10 +176,8 @@ public final class HexagonalRules implements DcaRuleSet {
                       "Outgoing adapters must not use another module's infrastructure\nbecause"
                           + " technical infrastructure reuse preserves module isolation");
               for (var adapter : arch.classes()) {
-                if (!com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage(
-                        arch.allOutgoingAdapterPatterns())
-                    .test(adapter)) continue;
-                String owner = arch.moduleRootOf(adapter.getPackageName());
+                if (!arch.inOutgoingAdapter().test(adapter)) continue;
+                String owner = arch.moduleRootOf(adapter);
                 for (var dependency : adapter.getDirectDependenciesFromSelf()) {
                   var target = dependency.getTargetClass();
                   String targetOwner =
@@ -218,13 +212,11 @@ public final class HexagonalRules implements DcaRuleSet {
                 + " consumers are the exception)",
             arch ->
                 noClasses()
-                    .that()
-                    .resideInAnyPackage(arch.allIncomingAdapterPatterns())
+                    .that(arch.inIncomingAdapter())
                     .and()
                     .resideOutsideOfPackage(eventConsumerPattern())
                     .should()
-                    .dependOnClassesThat()
-                    .resideInAnyPackage(arch.allOutgoingAdapterPatterns())
+                    .dependOnClassesThat(arch.inOutgoingAdapter())
                     .allowEmptyShould(true))
         .selecting(
             "Classes in <module>.adapter.incoming.. of every module root, excluding those"
@@ -257,8 +249,7 @@ public final class HexagonalRules implements DcaRuleSet {
                 }
                 perModule.add(
                     noClasses()
-                        .that()
-                        .resideInAPackage(layout.incomingAdapterPattern(module))
+                        .that(arch.inLayerOf(DcaLayout.Layer.INCOMING_ADAPTER, module))
                         .and()
                         .resideOutsideOfPackage(eventConsumerPattern())
                         .should()
@@ -300,8 +291,7 @@ public final class HexagonalRules implements DcaRuleSet {
                     .haveSimpleNameEndingWith("Repository")
                     .and()
                     .areNotInterfaces()
-                    .should()
-                    .resideInAnyPackage(arch.allOutgoingAdapterPatterns())
+                    .should(ArchConditions.be(arch.inOutgoingAdapter()))
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes anywhere on the classpath under scan whose simple name"
@@ -322,8 +312,7 @@ public final class HexagonalRules implements DcaRuleSet {
                 + " are part of their enclosing port's contract, not ports themselves",
             arch ->
                 classes()
-                    .that()
-                    .resideInAnyPackage(arch.allSharedOutputPortPatterns())
+                    .that(arch.inSharedOutputPorts())
                     .and()
                     .areInterfaces()
                     .and()
@@ -358,8 +347,7 @@ public final class HexagonalRules implements DcaRuleSet {
                 + " adapter untestable without the real use case and everything it depends on",
             arch ->
                 noClasses()
-                    .that()
-                    .resideInAnyPackage(arch.allIncomingAdapterPatterns())
+                    .that(arch.inIncomingAdapter())
                     .should()
                     .dependOnClassesThat(useCaseImplementations(arch.layout().markers()))
                     .allowEmptyShould(true))
@@ -395,8 +383,7 @@ public final class HexagonalRules implements DcaRuleSet {
                     .areAssignableTo(arch.layout().markers().outputPort())
                     .and()
                     .areInterfaces()
-                    .should()
-                    .resideInAnyPackage(arch.allDomainPatterns())
+                    .should(ArchConditions.be(arch.inDomain()))
                     .allowEmptyShould(true))
         .selecting(
             "Interfaces anywhere on the classpath under scan that are assignable to"
@@ -422,8 +409,7 @@ public final class HexagonalRules implements DcaRuleSet {
                 + " reconstitute domain objects while implementing output ports",
             arch ->
                 noClasses()
-                    .that()
-                    .resideInAnyPackage(arch.allIncomingAdapterPatterns())
+                    .that(arch.inIncomingAdapter())
                     .should()
                     .dependOnClassesThat()
                     .areAssignableTo(arch.layout().markers().domainService())
@@ -454,8 +440,7 @@ public final class HexagonalRules implements DcaRuleSet {
                 + " the first one's outgoing edge",
             arch ->
                 noClasses()
-                    .that()
-                    .resideInAnyPackage(arch.allOutgoingAdapterPatterns())
+                    .that(arch.inOutgoingAdapter())
                     .should()
                     .dependOnClassesThat()
                     .areAssignableTo(arch.layout().markers().inputPort())
@@ -487,8 +472,7 @@ public final class HexagonalRules implements DcaRuleSet {
                 + " handler that names no HTTP method answers GET as well",
             arch ->
                 classes()
-                    .that()
-                    .resideInAnyPackage(arch.allIncomingAdapterPatterns())
+                    .that(arch.inIncomingAdapter())
                     .and(AnnotationRoles.annotatedWithAny(webControllers, restControllers))
                     .should(driveNoCommandFromGet(getMapping, layout.markers()))
                     .allowEmptyShould(true))
@@ -676,8 +660,7 @@ public final class HexagonalRules implements DcaRuleSet {
                     .that()
                     .areNotInterfaces()
                     .and(AnnotationRoles.annotatedWithAny(webControllers, restControllers))
-                    .should()
-                    .resideInAnyPackage(arch.allIncomingAdapterPatterns())
+                    .should(ArchConditions.be(arch.inIncomingAdapter()))
                     .allowEmptyShould(true))
         .experimental()
         .selecting(
@@ -711,12 +694,8 @@ public final class HexagonalRules implements DcaRuleSet {
                   CollectedViolations.withHeader(
                       "Output port implementations must reside in an outgoing adapter package\nbecause"
                           + " whatever implements an output port is an outgoing adapter");
-              var outgoing =
-                  com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage(
-                      arch.allOutgoingAdapterPatterns());
-              var infrastructure =
-                  com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage(
-                      arch.allInfrastructurePatterns());
+              var outgoing = arch.inOutgoingAdapter();
+              var infrastructure = arch.inInfrastructure();
               String outputPort = arch.layout().markers().outputPort();
               String inputPort = arch.layout().markers().inputPort();
               for (var type : arch.classes()) {
@@ -758,15 +737,10 @@ public final class HexagonalRules implements DcaRuleSet {
                 + " Renaming a member is a refactoring inside the code and must not change what a"
                 + " client reads",
             arch -> {
-              String[] inner =
-                  java.util.stream.Stream.concat(
-                          java.util.Arrays.stream(arch.allDomainPatterns()),
-                          java.util.Arrays.stream(arch.allApplicationPatterns()))
-                      .toArray(String[]::new);
+              var inner = arch.inDomain().or(arch.inApplication());
               java.util.Set<String> observed = new java.util.TreeSet<>();
               for (JavaClass adapter : arch.classes()) {
-                if (!JavaClass.Predicates.resideInAnyPackage(arch.allAdapterPatterns())
-                    .test(adapter)) {
+                if (!arch.inAdapter().test(adapter)) {
                   continue;
                 }
                 for (JavaMethodCall call : adapter.getMethodCallsFromSelf()) {
@@ -778,7 +752,7 @@ public final class HexagonalRules implements DcaRuleSet {
                   if ((call.getName().equals("name") || call.getName().equals("toString"))
                       && call.getTarget().getRawParameterTypes().isEmpty()
                       && owner.isEnum()
-                      && JavaClass.Predicates.resideInAnyPackage(inner).test(owner)) {
+                      && inner.test(owner)) {
                     observed.add(
                         call.getOrigin().getFullName()
                             + " spells "

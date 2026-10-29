@@ -6,10 +6,10 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.lang.conditions.ArchConditions;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -72,12 +72,10 @@ public final class LayeredRules implements DcaRuleSet {
             "Domain should not depend on infrastructure concerns (Dependency Inversion Principle)",
             arch ->
                 noClasses()
-                    .that()
-                    .resideInAnyPackage(arch.allDomainPatterns())
+                    .that(arch.inDomain())
                     .should()
-                    .dependOnClassesThat()
                     // The global infrastructure package and every module's own one.
-                    .resideInAnyPackage(arch.allInfrastructurePatterns())
+                    .dependOnClassesThat(arch.inInfrastructure())
                     // A context may legitimately have no domain layer at all - a supporting or
                     // generic
                     // subdomain in transaction-script style. An absent domain is not a violation.
@@ -101,8 +99,7 @@ public final class LayeredRules implements DcaRuleSet {
                 + " infrastructure implementation details",
             arch ->
                 noClasses()
-                    .that()
-                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .that(arch.inApplication())
                     .should()
                     .dependOnClassesThat(arch.infrastructureImplementation())
                     .allowEmptyShould(true))
@@ -126,26 +123,29 @@ public final class LayeredRules implements DcaRuleSet {
               List<String> transactional = layout.frameworkAnnotations().transactional();
               List<String> transactionApi = layout.frameworkAnnotations().transactionApi();
               List<String> transactionManager = layout.frameworkAnnotations().transactionManager();
-              List<String> allowedPatterns =
-                  new ArrayList<>(List.of(arch.allApplicationPatterns()));
-              allowedPatterns.add(
-                  ".." + layout.adapterSubpackage() + "." + layout.outgoingSubpackage() + "..");
-              String[] allowed = allowedPatterns.toArray(String[]::new);
+              DescribedPredicate<JavaClass> allowed =
+                  arch.inApplication()
+                      .or(arch.inOutgoingAdapter())
+                      .or(
+                          JavaClass.Predicates.resideInAnyPackage(
+                              ".."
+                                  + layout.adapterSubpackage()
+                                  + "."
+                                  + layout.outgoingSubpackage()
+                                  + ".."));
               CollectedViolations violations = CollectedViolations.withoutHeader();
               violations.addAll(
                   methods()
                       .that(AnnotationRoles.annotatedWithAny(transactional))
                       .should()
-                      .beDeclaredInClassesThat()
-                      .resideInAnyPackage(allowed)
+                      .beDeclaredInClassesThat(allowed)
                       .allowEmptyShould(true),
                   arch.classes(),
                   rationale);
               violations.addAll(
                   classes()
                       .that(AnnotationRoles.annotatedWithAny(transactional))
-                      .should()
-                      .resideInAnyPackage(allowed)
+                      .should(ArchConditions.be(allowed))
                       .allowEmptyShould(true),
                   arch.classes(),
                   rationale);
@@ -160,8 +160,7 @@ public final class LayeredRules implements DcaRuleSet {
                       "a configured transaction API", c -> transactionApi.contains(c.getName()));
               violations.addAll(
                   noClasses()
-                      .that()
-                      .resideOutsideOfPackages(allowed)
+                      .that(DescribedPredicate.not(allowed))
                       .and()
                       .areNotAssignableTo(arch.layout().markers().transactionBoundary())
                       .should()
@@ -169,10 +168,16 @@ public final class LayeredRules implements DcaRuleSet {
                       .allowEmptyShould(true),
                   arch.classes(),
                   rationale);
-              List<String> wiringAllowed = new ArrayList<>(allowedPatterns);
-              wiringAllowed.add(layout.infrastructurePattern());
-              wiringAllowed.add(
-                  layout.sharedKernelPackage() + "." + layout.infrastructureSubpackage() + "..");
+              DescribedPredicate<JavaClass> wiringAllowed =
+                  allowed
+                      .or(arch.inInfrastructure())
+                      .or(
+                          JavaClass.Predicates.resideInAnyPackage(
+                              layout.infrastructurePattern(),
+                              layout.sharedKernelPackage()
+                                  + "."
+                                  + layout.infrastructureSubpackage()
+                                  + ".."));
               DescribedPredicate<JavaClass> managerOrBoundary =
                   DescribedPredicate.describe(
                       "a configured transaction manager or TransactionBoundary",
@@ -181,8 +186,7 @@ public final class LayeredRules implements DcaRuleSet {
                               || c.isAssignableTo(arch.layout().markers().transactionBoundary()));
               violations.addAll(
                   noClasses()
-                      .that()
-                      .resideOutsideOfPackages(wiringAllowed.toArray(String[]::new))
+                      .that(DescribedPredicate.not(wiringAllowed))
                       .and()
                       .areNotAssignableTo(arch.layout().markers().transactionBoundary())
                       .should()

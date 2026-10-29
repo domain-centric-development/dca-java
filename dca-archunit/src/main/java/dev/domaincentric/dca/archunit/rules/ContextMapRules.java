@@ -2,6 +2,7 @@ package dev.domaincentric.dca.archunit.rules;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaClass;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
@@ -619,14 +620,16 @@ public final class ContextMapRules implements DcaRuleSet {
                         channel == Upstream.Consumes.API
                             ? layout.outgoingAdapterPattern(pkg)
                             : layout.incomingAdapterPattern(pkg);
+                    DescribedPredicate<JavaClass> inAllowedAdapter =
+                        arch.inLayerOf(
+                            channel == Upstream.Consumes.API
+                                ? DcaLayout.Layer.OUTGOING_ADAPTER
+                                : DcaLayout.Layer.INCOMING_ADAPTER,
+                            pkg);
                     String contractPattern = targetPkg + "." + channelName(arch, channel) + "..";
                     boolean translationSite =
                         arch.classes().stream()
-                            .filter(
-                                c ->
-                                    com.tngtech.archunit.core.domain.JavaClass.Predicates
-                                        .resideInAPackage(allowedAdapter)
-                                        .test(c))
+                            .filter(c -> inAllowedAdapter.test(c))
                             .anyMatch(
                                 c ->
                                     c.getDirectDependenciesFromSelf().stream()
@@ -639,10 +642,10 @@ public final class ContextMapRules implements DcaRuleSet {
                                         && c.getDirectDependenciesFromSelf().stream()
                                             .anyMatch(
                                                 d ->
-                                                    com.tngtech.archunit.core.domain.JavaClass
-                                                        .Predicates.resideInAnyPackage(
-                                                            layout.domainPattern(pkg),
-                                                            layout.applicationPattern(pkg))
+                                                    arch.inLayerOf(DcaLayout.Layer.DOMAIN, pkg)
+                                                        .or(
+                                                            arch.inLayerOf(
+                                                                DcaLayout.Layer.APPLICATION, pkg))
                                                         .test(d.getTargetClass())));
                     violations.require(
                         translationSite || !demandsTranslationSite,
@@ -658,8 +661,7 @@ public final class ContextMapRules implements DcaRuleSet {
                         noClasses()
                             .that()
                             .resideInAPackage(pkg + "..")
-                            .and()
-                            .resideOutsideOfPackage(allowedAdapter)
+                            .and(DescribedPredicate.not(inAllowedAdapter))
                             .should()
                             .dependOnClassesThat()
                             .resideInAPackage(targetPkg + "." + channelName(arch, channel) + "..")
@@ -717,8 +719,7 @@ public final class ContextMapRules implements DcaRuleSet {
                   for (Upstream.Consumes channel : u.via()) {
                     violations.addAll(
                         noClasses()
-                            .that()
-                            .resideInAPackage(layout.domainPattern(pkg))
+                            .that(arch.inLayerOf(DcaLayout.Layer.DOMAIN, pkg))
                             .should()
                             .dependOnClassesThat()
                             .resideInAPackage(targetPkg + "." + channelName(arch, channel) + "..")
@@ -774,12 +775,17 @@ public final class ContextMapRules implements DcaRuleSet {
                         e.interaction() == ExternalUpstream.Interaction.OUTBOUND
                             ? layout.outgoingAdapterPattern(pkg)
                             : layout.incomingAdapterPattern(pkg);
+                    DescribedPredicate<JavaClass> inAllowedAdapter =
+                        arch.inLayerOf(
+                            e.interaction() == ExternalUpstream.Interaction.OUTBOUND
+                                ? DcaLayout.Layer.OUTGOING_ADAPTER
+                                : DcaLayout.Layer.INCOMING_ADAPTER,
+                            pkg);
                     violations.addAll(
                         noClasses()
                             .that()
                             .resideInAPackage(pkg + "..")
-                            .and()
-                            .resideOutsideOfPackage(allowedAdapter)
+                            .and(DescribedPredicate.not(inAllowedAdapter))
                             .should()
                             .dependOnClassesThat()
                             .resideInAnyPackage(e.contractPackages())
@@ -798,8 +804,7 @@ public final class ContextMapRules implements DcaRuleSet {
                   } else {
                     violations.addAll(
                         noClasses()
-                            .that()
-                            .resideInAPackage(layout.domainPattern(pkg))
+                            .that(arch.inLayerOf(DcaLayout.Layer.DOMAIN, pkg))
                             .should()
                             .dependOnClassesThat()
                             .resideInAnyPackage(e.contractPackages())

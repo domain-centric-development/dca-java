@@ -6,6 +6,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaModifier;
+import com.tngtech.archunit.lang.conditions.ArchConditions;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
@@ -61,8 +62,7 @@ public final class NamingRules implements DcaRuleSet {
                 + " (Hexagonal Architecture)",
             arch ->
                 classes()
-                    .that()
-                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .that(arch.inApplication())
                     .and()
                     .areNotInterfaces()
                     .and()
@@ -96,9 +96,7 @@ public final class NamingRules implements DcaRuleSet {
                 if (!type.isInterface()
                     && !type.isRecord()
                     && !type.isNestedClass()
-                    && com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage(
-                            arch.allApplicationPatterns())
-                        .test(type)
+                    && arch.inApplication().test(type)
                     && (type.isAssignableTo(arch.layout().markers().inputPort())
                         || type.getSimpleName().endsWith(layout.useCaseSuffix()))
                     && !AnnotationRoles.annotatedWithAny(injectable).test(type)
@@ -124,8 +122,7 @@ public final class NamingRules implements DcaRuleSet {
             "Input port interfaces should follow consistent naming conventions (Hexagonal Architecture)",
             arch ->
                 classes()
-                    .that()
-                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .that(arch.inApplication())
                     .and()
                     .areInterfaces()
                     .and()
@@ -163,8 +160,7 @@ public final class NamingRules implements DcaRuleSet {
             "Repository interfaces should follow consistent naming conventions (DDD pattern)",
             arch ->
                 classes()
-                    .that()
-                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .that(arch.inApplication())
                     .and()
                     .areInterfaces()
                     .and()
@@ -192,8 +188,7 @@ public final class NamingRules implements DcaRuleSet {
             "Classes carrying the web-controller stereotype should follow naming conventions",
             arch ->
                 classes()
-                    .that()
-                    .resideInAnyPackage(arch.allIncomingAdapterPatterns())
+                    .that(arch.inIncomingAdapter())
                     .and(
                         AnnotationRoles.annotatedWithAny(
                             layout.frameworkAnnotations().webController()))
@@ -222,8 +217,7 @@ public final class NamingRules implements DcaRuleSet {
                 + "' following RESTful naming conventions",
             arch ->
                 classes()
-                    .that()
-                    .resideInAnyPackage(arch.allIncomingAdapterPatterns())
+                    .that(arch.inIncomingAdapter())
                     .and(
                         AnnotationRoles.annotatedWithAny(
                             layout.frameworkAnnotations().restController()))
@@ -252,8 +246,7 @@ public final class NamingRules implements DcaRuleSet {
                     .haveSimpleNameEndingWith("Dto")
                     .and()
                     .resideInAnyPackage(layout.basePackage() + "..")
-                    .should()
-                    .resideInAnyPackage(arch.allAdapterPatterns())
+                    .should(ArchConditions.be(arch.inAdapter()))
                     .allowEmptyShould(true))
         .selecting("Classes under the base package whose simple name ends with Dto.")
         .checking(
@@ -273,8 +266,7 @@ public final class NamingRules implements DcaRuleSet {
                     .haveSimpleNameEndingWith("Converter")
                     .and()
                     .resideInAnyPackage(layout.basePackage() + "..")
-                    .should()
-                    .resideInAnyPackage(arch.allAdapterPatterns())
+                    .should(ArchConditions.be(arch.inAdapter()))
                     .allowEmptyShould(true))
         .selecting("Classes under the base package whose simple name ends with Converter.")
         .checking(
@@ -319,8 +311,7 @@ public final class NamingRules implements DcaRuleSet {
                 + " technical role",
             arch ->
                 noClasses()
-                    .that()
-                    .resideInAnyPackage(arch.allDomainPatterns())
+                    .that(arch.inDomain())
                     .should()
                     .haveSimpleNameEndingWith("Helper")
                     .orShould()
@@ -500,7 +491,7 @@ public final class NamingRules implements DcaRuleSet {
     for (JavaClass type : arch.classes()) {
       if (!type.isNestedClass()
           && !type.isAnonymousClass()
-          && JavaClass.Predicates.resideInAnyPackage(arch.allApplicationPatterns()).test(type)
+          && arch.inApplication().test(type)
           && (type.isAssignableTo(layout.markers().inputPort())
               || (!type.isInterface() && type.getSimpleName().endsWith(layout.useCaseSuffix())))) {
         operations.add(type);

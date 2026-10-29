@@ -2,6 +2,7 @@ package dev.domaincentric.dca.archunit.rules;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaMethod;
@@ -9,6 +10,7 @@ import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.domain.JavaParameterizedType;
 import com.tngtech.archunit.core.domain.JavaType;
 import com.tngtech.archunit.core.domain.JavaTypeVariable;
+import com.tngtech.archunit.lang.conditions.ArchConditions;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaMarkers;
@@ -99,8 +101,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
             "Classes named *AggregateRoot must implement AggregateRoot interface (DDD pattern)",
             arch ->
                 classes()
-                    .that()
-                    .resideInAnyPackage(arch.allDomainModelPatterns())
+                    .that(arch.inDomainModel())
                     .and()
                     .haveSimpleNameEndingWith(layout.aggregateRootSuffix())
                     .and()
@@ -381,8 +382,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
             "Value objects should be immutable (final classes) - Vernon's DDD recommendation",
             arch ->
                 classes()
-                    .that()
-                    .resideInAnyPackage(arch.allDomainModelPatterns())
+                    .that(arch.inDomainModel())
                     .and()
                     .areAssignableTo(arch.layout().markers().value())
                     .and()
@@ -515,8 +515,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
             "Repository interfaces should extend Repository marker interface",
             arch ->
                 classes()
-                    .that()
-                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .that(arch.inApplication())
                     .and()
                     .areInterfaces()
                     .and()
@@ -549,8 +548,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .areAssignableTo(arch.layout().markers().repository())
                     .and()
                     .doNotHaveSimpleName(arch.layout().repositorySuffix())
-                    .should()
-                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .should(ArchConditions.be(arch.inApplication()))
                     .allowEmptyShould(true))
         .selecting(
             "Interfaces anywhere under scan assignable to Repository, whatever their name, "
@@ -572,8 +570,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .areNotInterfaces()
                     .and()
                     .areAssignableTo(arch.layout().markers().repository())
-                    .should()
-                    .resideInAnyPackage(arch.allOutgoingAdapterPatterns())
+                    .should(ArchConditions.be(arch.inOutgoingAdapter()))
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes anywhere under scan assignable to Repository, abstract "
@@ -744,10 +741,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .doNotHaveSimpleName(arch.layout().storeSuffix())
                     .and()
                     .doNotHaveFullyQualifiedName(arch.layout().markers().store())
-                    .and()
-                    .resideOutsideOfPackages(arch.allAdapterPatterns())
-                    .and()
-                    .resideOutsideOfPackages(arch.allInfrastructurePatterns())
+                    .and(DescribedPredicate.not(arch.inAdapter()))
+                    .and(DescribedPredicate.not(arch.inInfrastructure()))
                     .should()
                     .beAssignableTo(arch.layout().markers().store())
                     .andShould()
@@ -777,8 +772,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .areAssignableTo(arch.layout().markers().store())
                     .and()
                     .doNotHaveSimpleName(arch.layout().storeSuffix())
-                    .should()
-                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .should(ArchConditions.be(arch.inApplication()))
                     .allowEmptyShould(true))
         .selecting(
             "Interfaces anywhere under scan assignable to Store, whatever their name, the "
@@ -800,8 +794,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .areNotInterfaces()
                     .and()
                     .areAssignableTo(arch.layout().markers().store())
-                    .should()
-                    .resideInAnyPackage(arch.allOutgoingAdapterPatterns())
+                    .should(ArchConditions.be(arch.inOutgoingAdapter()))
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes anywhere under scan assignable to Store, abstract base "
@@ -1022,7 +1015,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                   classesMatching(
                       arch,
                       c ->
-                          JavaClass.Predicates.resideInAnyPackage(arch.allDomainPatterns()).test(c)
+                          arch.inDomain().test(c)
                               && !c.getModifiers().contains(JavaModifier.SYNTHETIC))) {
                 if (isWrapperValue(type, markers)) {
                   continue;

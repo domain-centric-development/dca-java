@@ -15,7 +15,7 @@ final class OperationPolicy {
     return !type.isInterface()
         && !type.isNestedClass()
         && !type.getModifiers().contains(JavaModifier.ABSTRACT)
-        && JavaClass.Predicates.resideInAnyPackage(arch.allApplicationPatterns()).test(type)
+        && arch.inApplication().test(type)
         && (type.isAssignableTo(arch.layout().markers().inputPort())
             || type.getSimpleName().endsWith(arch.layout().useCaseSuffix()));
   }
@@ -52,7 +52,7 @@ final class OperationPolicy {
                 + target.getName()
                 + (via.isEmpty() ? "" : " [via " + String.join(" -> ", via) + "]"));
       } else if (!target.isInterface()
-          && JavaClass.Predicates.resideInAnyPackage(arch.allApplicationPatterns()).test(target)
+          && arch.inApplication().test(target)
           && Objects.equals(
               arch.moduleRootOf(caller.getPackageName()),
               arch.moduleRootOf(target.getPackageName()))) {

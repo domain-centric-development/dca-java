@@ -5,6 +5,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaModifier;
+import com.tngtech.archunit.lang.conditions.ArchConditions;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaMarkers;
@@ -69,8 +70,7 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                 + " either of them properly",
             arch ->
                 classes()
-                    .that()
-                    .resideInAnyPackage(arch.allDomainPatterns())
+                    .that(arch.inDomain())
                     .and()
                     .areAssignableTo(Throwable.class)
                     .should()
@@ -105,8 +105,7 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                       .and()
                       .resideOutsideOfPackages(
                           arch.layout().markers().declaringPackagePatterns().toArray(String[]::new))
-                      .should()
-                      .resideInAnyPackage(arch.allDomainPatterns())
+                      .should(ArchConditions.be(arch.inDomain()))
                       .allowEmptyShould(true),
                   arch.classes(),
                   "a domain exception belongs to the domain layer");
@@ -117,8 +116,7 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                       .and()
                       .resideOutsideOfPackages(
                           arch.layout().markers().declaringPackagePatterns().toArray(String[]::new))
-                      .should()
-                      .resideInAnyPackage(arch.allApplicationPatterns())
+                      .should(ArchConditions.be(arch.inApplication()))
                       .allowEmptyShould(true),
                   arch.classes(),
                   "a use-case exception belongs to the application layer");
@@ -145,8 +143,7 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                 + " map the same outcome onto a different one",
             arch ->
                 classes()
-                    .that()
-                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .that(arch.inApplication())
                     .and()
                     .areAssignableTo(Throwable.class)
                     .and()
@@ -291,8 +288,7 @@ public final class ErrorHandlingRules implements DcaRuleSet {
               Map<String, List<JavaClass>> drivingByPackage = new TreeMap<>();
               Set<String> packagesThatName = new HashSet<>();
               for (JavaClass type : arch.classes()) {
-                if (!JavaClass.Predicates.resideInAnyPackage(arch.allIncomingAdapterPatterns())
-                    .test(type)) {
+                if (!arch.inIncomingAdapter().test(type)) {
                   continue;
                 }
                 if (dependsOnAssignableTo(type, arch.layout().markers().domainException())

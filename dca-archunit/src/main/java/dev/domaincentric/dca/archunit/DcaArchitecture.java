@@ -48,6 +48,26 @@ public final class DcaArchitecture {
 
   private List<String> moduleRoots;
 
+  /** {@link #placement(JavaClass)} by class name — every rule asks it for every class. */
+  private final Map<String, Optional<Placement>> placementCache = new HashMap<>();
+
+  /**
+   * Where a class sits: its layer, the package that placed it there — the annotated package, the
+   * class's own package for a class annotation, {@code <root>.<segment>} for the path — and how.
+   */
+  public record Placement(DcaLayout.Layer layer, String layerPackage, Source source) {
+
+    /** How a placement was found, in precedence order. */
+    public enum Source {
+      /** A layer annotation on the class itself. */
+      CLASS,
+      /** A layer annotation on the {@code package-info} of its package or of one above it. */
+      PACKAGE,
+      /** The package path below a module root. */
+      PATH
+    }
+  }
+
   private DcaArchitecture(DcaLayout layout, JavaClasses classes) {
     this.layout = Objects.requireNonNull(layout);
     this.classes = withoutExcludedPackages(layout, Objects.requireNonNull(classes));
@@ -413,6 +433,14 @@ public final class DcaArchitecture {
           roots.add(root);
         }
       }
+      if (layout.hasLayerAnnotations()) {
+        for (JavaClass javaClass : classes) {
+          annotationPlacement(javaClass)
+              .filter(p -> p.layer() != DcaLayout.Layer.INFRASTRUCTURE)
+              .map(p -> annotatedModuleRoot(p))
+              .ifPresent(roots::add);
+        }
+      }
       moduleRoots = List.copyOf(roots);
     }
     return moduleRoots;
@@ -492,8 +520,18 @@ public final class DcaArchitecture {
    * adapter}.
    */
   public java.util.Set<String> layerSegments() {
-    return java.util.Set.of(
-        layout.domainSubpackage(), layout.applicationSubpackage(), layout.adapterSubpackage());
+    java.util.Set<String> segments = new java.util.HashSet<>();
+    if (layout.layerHasPath(DcaLayout.Layer.DOMAIN)) {
+      segments.add(layout.domainSubpackage());
+    }
+    if (layout.layerHasPath(DcaLayout.Layer.APPLICATION)) {
+      segments.add(layout.applicationSubpackage());
+    }
+    if (layout.layerHasPath(DcaLayout.Layer.INCOMING_ADAPTER)
+        || layout.layerHasPath(DcaLayout.Layer.OUTGOING_ADAPTER)) {
+      segments.add(layout.adapterSubpackage());
+    }
+    return java.util.Set.copyOf(segments);
   }
 
   /**
@@ -518,6 +556,277 @@ public final class DcaArchitecture {
       root.append('.').append(segment);
     }
     return null;
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Layer placement — annotation on the class, then on its package tree, then the path
+  // ---------------------------------------------------------------------------------------------
+
+  /**
+   * The layer a class sits in, or empty. A layer annotation the layout names on the class wins;
+   * then one on the {@code package-info} of its package or the nearest package above it (a
+   * declaration holds for its whole subtree); then the path below its module root. Without layer
+   * annotations in the layout this is the path alone, exactly the packages the {@code all…Patterns}
+   * name.
+   */
+  public Optional<Placement> placement(JavaClass javaClass) {
+    return placementCache.computeIfAbsent(javaClass.getName(), n -> computePlacement(javaClass));
+  }
+
+  private Optional<Placement> computePlacement(JavaClass javaClass) {
+    Optional<Placement> annotated = annotationPlacement(javaClass);
+    return annotated.isPresent() ? annotated : pathPlacement(javaClass.getPackageName());
+  }
+
+  /**
+   * The placement by annotation alone — on the class, then up its package tree. Needs no module
+   * root, so module discovery can ask it.
+   */
+  private Optional<Placement> annotationPlacement(JavaClass javaClass) {
+    if (!layout.hasLayerAnnotations()) {
+      return Optional.empty();
+    }
+    String pkg = javaClass.getPackageName();
+    for (JavaAnnotation<?> annotation : javaClass.getAnnotations()) {
+      Optional<DcaLayout.Layer> layer = layerAnnotatedBy(annotation.getRawType().getName());
+      if (layer.isPresent()) {
+        return Optional.of(new Placement(layer.get(), pkg, Placement.Source.CLASS));
+      }
+    }
+    return packageDeclaration(pkg);
+  }
+
+  /** The nearest package at or above {@code pkg} whose {@code package-info} declares a layer. */
+  private Optional<Placement> packageDeclaration(String pkg) {
+    String base = layout.basePackage();
+    if (!inPackageTree(pkg, base)) {
+      return Optional.empty();
+    }
+    for (String candidate = pkg; candidate != null; candidate = parentPackage(candidate, base)) {
+      Optional<DcaLayout.Layer> layer = declaredLayer(candidate);
+      if (layer.isPresent()) {
+        return Optional.of(new Placement(layer.get(), candidate, Placement.Source.PACKAGE));
+      }
+    }
+    return Optional.empty();
+  }
+
+  /** The layer a package's own {@code package-info} declares, if any. */
+  private Optional<DcaLayout.Layer> declaredLayer(String packageName) {
+    for (JavaAnnotation<?> annotation : packageInfoAnnotations(packageName)) {
+      Optional<DcaLayout.Layer> layer = layerAnnotatedBy(annotation.getRawType().getName());
+      if (layer.isPresent()) {
+        return layer;
+      }
+    }
+    return Optional.empty();
+  }
+
+  private Optional<DcaLayout.Layer> layerAnnotatedBy(String annotationName) {
+    for (DcaLayout.Layer layer : DcaLayout.Layer.values()) {
+      if (layout.layerAnnotations(layer).contains(annotationName)) {
+        return Optional.of(layer);
+      }
+    }
+    return Optional.empty();
+  }
+
+  /** The layer the path alone gives a package — what the {@code all…Patterns} have always meant. */
+  private Optional<Placement> pathPlacement(String pkg) {
+    for (String infrastructure : infrastructurePackages()) {
+      if (layout.layerHasPath(DcaLayout.Layer.INFRASTRUCTURE)
+          && inPackageTree(pkg, infrastructure)) {
+        return Optional.of(
+            new Placement(DcaLayout.Layer.INFRASTRUCTURE, infrastructure, Placement.Source.PATH));
+      }
+    }
+    String root = moduleRootOf(pkg, layout.basePackage(), layerSegments());
+    if (root == null) {
+      return Optional.empty();
+    }
+    for (DcaLayout.Layer layer :
+        List.of(
+            DcaLayout.Layer.DOMAIN,
+            DcaLayout.Layer.APPLICATION,
+            DcaLayout.Layer.INCOMING_ADAPTER,
+            DcaLayout.Layer.OUTGOING_ADAPTER)) {
+      String layerPackage = root + "." + layout.layerPackage(layer);
+      if (layout.layerHasPath(layer) && inPackageTree(pkg, layerPackage)) {
+        return Optional.of(new Placement(layer, layerPackage, Placement.Source.PATH));
+      }
+    }
+    return Optional.empty();
+  }
+
+  /**
+   * The module root an annotation placed a class under: the bounded context that contains its layer
+   * package, else the layer package's parent. A class placed by its own annotation counts only
+   * inside a declared context — a lone class is no module.
+   */
+  private String annotatedModuleRoot(Placement placement) {
+    String context = declaredContextOf(placement.layerPackage());
+    if (context != null) {
+      return context;
+    }
+    if (placement.source() == Placement.Source.CLASS) {
+      return null;
+    }
+    int dot = placement.layerPackage().lastIndexOf('.');
+    return dot < 0 ? null : placement.layerPackage().substring(0, dot);
+  }
+
+  /** The nearest package at or above {@code pkg} that declares a bounded context, or null. */
+  private String declaredContextOf(String pkg) {
+    String base = layout.basePackage();
+    if (!inPackageTree(pkg, base)) {
+      return null;
+    }
+    for (String candidate = pkg; candidate != null; candidate = parentPackage(candidate, base)) {
+      if (isContextRoot(candidate)) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  /** The module root a class belongs to — by its placement, else by its path; null for neither. */
+  public String moduleRootOf(JavaClass javaClass) {
+    Optional<Placement> placement = placement(javaClass);
+    if (placement.isPresent() && placement.get().source() != Placement.Source.PATH) {
+      String root = annotatedModuleRoot(placement.get());
+      if (root != null) {
+        return root;
+      }
+    }
+    return moduleRootOf(javaClass.getPackageName());
+  }
+
+  /** Classes the layout places in the given layer. */
+  public DescribedPredicate<JavaClass> inLayer(DcaLayout.Layer layer) {
+    return DescribedPredicate.describe(
+        "are in the " + layer.role() + " layer",
+        c -> placement(c).map(p -> p.layer() == layer).orElse(false));
+  }
+
+  /** Classes the layout places in the given layer of the given module root. */
+  public DescribedPredicate<JavaClass> inLayerOf(DcaLayout.Layer layer, String moduleRoot) {
+    return DescribedPredicate.describe(
+        "are in the " + layer.role() + " layer of " + moduleRoot,
+        c ->
+            placement(c).map(p -> p.layer() == layer).orElse(false)
+                && moduleRoot.equals(moduleRootOf(c)));
+  }
+
+  /** Classes in a sub-package of their layer's package — {@code <layer package>.<segment>..}. */
+  public DescribedPredicate<JavaClass> inLayerSegment(DcaLayout.Layer layer, String segment) {
+    return DescribedPredicate.describe(
+        "are in the " + layer.role() + " layer's " + segment + " package",
+        c ->
+            placement(c)
+                .filter(p -> p.layer() == layer)
+                .map(p -> inPackageTree(c.getPackageName(), p.layerPackage() + "." + segment))
+                .orElse(false));
+  }
+
+  public DescribedPredicate<JavaClass> inDomain() {
+    return inLayer(DcaLayout.Layer.DOMAIN);
+  }
+
+  /** The domain model: {@code <domain layer package>.<model>..}. */
+  public DescribedPredicate<JavaClass> inDomainModel() {
+    return inLayerSegment(DcaLayout.Layer.DOMAIN, layout.modelSubpackage());
+  }
+
+  public DescribedPredicate<JavaClass> inApplication() {
+    return inLayer(DcaLayout.Layer.APPLICATION);
+  }
+
+  /** The output ports shared by one context's use cases: {@code <application>.<shared>..}. */
+  public DescribedPredicate<JavaClass> inSharedOutputPorts() {
+    return inLayerSegment(DcaLayout.Layer.APPLICATION, layout.sharedSubpackage());
+  }
+
+  public DescribedPredicate<JavaClass> inIncomingAdapter() {
+    return inLayer(DcaLayout.Layer.INCOMING_ADAPTER);
+  }
+
+  public DescribedPredicate<JavaClass> inOutgoingAdapter() {
+    return inLayer(DcaLayout.Layer.OUTGOING_ADAPTER);
+  }
+
+  /**
+   * Classes in either adapter layer, or below a module root's adapter package outside both — the
+   * {@code <root>.adapter..} the path rules have always meant.
+   */
+  public DescribedPredicate<JavaClass> inAdapter() {
+    return DescribedPredicate.describe(
+        "are in an adapter",
+        c -> {
+          Optional<Placement> placement = placement(c);
+          if (placement.isPresent()) {
+            DcaLayout.Layer layer = placement.get().layer();
+            return layer == DcaLayout.Layer.INCOMING_ADAPTER
+                || layer == DcaLayout.Layer.OUTGOING_ADAPTER;
+          }
+          String root = moduleRootOf(c.getPackageName());
+          return root != null
+              && layerSegments().contains(layout.adapterSubpackage())
+              && inPackageTree(c.getPackageName(), root + "." + layout.adapterSubpackage());
+        });
+  }
+
+  public DescribedPredicate<JavaClass> inInfrastructure() {
+    return inLayer(DcaLayout.Layer.INFRASTRUCTURE);
+  }
+
+  /**
+   * Findings about the layout's layer declarations: a package whose annotation names another layer
+   * than its path, and a package that declares another layer than a package above it. Notices in
+   * the report, not failures — a migration keeps path and annotation side by side.
+   */
+  public List<String> layerNotices() {
+    if (!layout.hasLayerAnnotations()) {
+      return List.of();
+    }
+    java.util.Set<String> notices = new java.util.LinkedHashSet<>();
+    String base = layout.basePackage();
+    for (String pkg : packagesBelowBase()) {
+      Optional<DcaLayout.Layer> declared = declaredLayer(pkg);
+      if (declared.isEmpty()) {
+        continue;
+      }
+      pathPlacement(pkg)
+          .filter(p -> p.layer() != declared.get())
+          .ifPresent(
+              p ->
+                  notices.add(
+                      "package "
+                          + pkg
+                          + ": path says "
+                          + p.layer().role()
+                          + ", annotation says "
+                          + declared.get().role()
+                          + ", "
+                          + declared.get().role()
+                          + " holds"));
+      String parent = parentPackage(pkg, base);
+      Optional<Placement> above = parent == null ? Optional.empty() : packageDeclaration(parent);
+      above
+          .filter(a -> a.layer() != declared.get())
+          .ifPresent(
+              a ->
+                  notices.add(
+                      "package "
+                          + pkg
+                          + " declares "
+                          + declared.get().role()
+                          + " inside "
+                          + a.layerPackage()
+                          + ", which declares "
+                          + a.layer().role()
+                          + " - one layer per subtree"));
+    }
+    return List.copyOf(notices);
   }
 
   // ---------------------------------------------------------------------------------------------

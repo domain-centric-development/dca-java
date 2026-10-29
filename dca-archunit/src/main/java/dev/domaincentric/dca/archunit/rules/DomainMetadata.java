@@ -27,11 +27,8 @@ final class DomainMetadata {
     for (JavaClass type : arch.classes()) {
       if (type.isInterface()
           || !owner(type, arch.layout().markers(), arch.layout().specificationSuffix()).equals(id)
-          || !JavaClass.Predicates.resideInAnyPackage(arch.allDomainPatterns()).test(type))
-        continue;
-      if (id.equals("DCA-ONI-003")
-          && !JavaClass.Predicates.resideInAnyPackage(arch.allDomainModelPatterns()).test(type))
-        continue;
+          || !arch.inDomain().test(type)) continue;
+      if (id.equals("DCA-ONI-003") && !arch.inDomainModel().test(type)) continue;
       inspect(
           type,
           type.getName(),

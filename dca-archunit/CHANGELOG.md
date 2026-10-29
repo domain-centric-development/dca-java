@@ -4,6 +4,21 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Added
+
+**Layers recognised by the project's own annotations (WP-160).** `DcaMarker` names how a layer or a role is
+recognised — `ofPackage`, `ofAnnotation`, `ofType`, `ofSuffix`, or `anyOf` several. `DcaLayout.withDomain`,
+`withApplication`, `withIncomingAdapter`, `withOutgoingAdapter` and `withInfrastructure` take `ofPackage`,
+`ofAnnotation` or both; the default stays the package path, unchanged. A layer annotation the layout names places a
+class: on the class itself first, then on the `package-info` of its package or the nearest package above it (a
+declaration holds for its whole subtree), then the path. The library ships no annotations of its own — the layout
+names the project's (or jMolecules'). The rules select through `DcaArchitecture.inDomain()`, `inApplication()`,
+`inIncomingAdapter()`, `inOutgoingAdapter()`, `inInfrastructure()` and `inLayerOf(layer, moduleRoot)` instead of path
+patterns; with the default layout they select exactly what the patterns did. The report names the layers recognised
+otherwise (`layers: …`) and lists, as notices, a package whose annotation overrides its path and a package that
+declares another layer than one above it. The sub-packages of a layer (`shared`, `model`, `api`, `events`, `web`,
+`event`) stay segments below the layer's package.
+
 ## [0.10.0] - 2026-10-29
 
 ### Added

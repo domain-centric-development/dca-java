@@ -10,6 +10,7 @@ import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import com.tngtech.archunit.lang.conditions.ArchConditions;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaMarkers;
@@ -111,8 +112,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                     .areAssignableTo(arch.layout().markers().domainEvent())
                     .and()
                     .areNotInterfaces()
-                    .should()
-                    .resideInAnyPackage(arch.allDomainPatterns())
+                    .should(ArchConditions.be(arch.inDomain()))
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes anywhere on the classpath under scan that are assignable to DomainEvent.")
@@ -268,8 +268,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                     .areAssignableTo(arch.layout().markers().domainService())
                     .and()
                     .areNotInterfaces()
-                    .should()
-                    .resideInAnyPackage(arch.allDomainPatterns())
+                    .should(ArchConditions.be(arch.inDomain()))
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes anywhere on the classpath under scan that are assignable to"
@@ -387,8 +386,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                     .areAssignableTo(arch.layout().markers().domainService())
                     .and()
                     .areNotInterfaces()
-                    .and()
-                    .resideInAnyPackage(arch.allDomainPatterns())
+                    .and(arch.inDomain())
                     .should(haveOnlyFinalFieldsIncludingInherited())
                     .allowEmptyShould(true))
         .selecting(
@@ -437,8 +435,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                     .areAssignableTo(arch.layout().markers().factory())
                     .and()
                     .areNotInterfaces()
-                    .should()
-                    .resideInAnyPackage(arch.allDomainPatterns())
+                    .should(ArchConditions.be(arch.inDomain()))
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes anywhere on the classpath under scan that are assignable to Factory.")
@@ -470,8 +467,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                     .areAssignableTo(arch.layout().markers().factory())
                     .and()
                     .areNotInterfaces()
-                    .and()
-                    .resideInAnyPackage(arch.allDomainPatterns())
+                    .and(arch.inDomain())
                     .should(haveOnlyFinalFieldsIncludingInherited())
                     .allowEmptyShould(true))
         .selecting(
@@ -497,8 +493,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                     .that(
                         specifications(
                             arch.layout().markers(), arch.layout().specificationSuffix()))
-                    .should()
-                    .resideInAnyPackage(arch.allDomainPatterns())
+                    .should(ArchConditions.be(arch.inDomain()))
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes anywhere on the classpath under scan that are assignable to the"

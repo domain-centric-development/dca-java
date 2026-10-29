@@ -154,8 +154,7 @@ public final class StrategicPatternRules implements DcaRuleSet {
                 // it.
                 perModule.add(
                     noClasses()
-                        .that()
-                        .resideInAPackage(layout.applicationPattern(source))
+                        .that(arch.inLayerOf(DcaLayout.Layer.APPLICATION, source))
                         .should()
                         .dependOnClassesThat()
                         .resideInAnyPackage(forbidden)
@@ -199,8 +198,7 @@ public final class StrategicPatternRules implements DcaRuleSet {
                 }
                 perModule.add(
                     noClasses()
-                        .that()
-                        .resideInAPackage(layout.domainPattern(source))
+                        .that(arch.inLayerOf(DcaLayout.Layer.DOMAIN, source))
                         .should()
                         .dependOnClassesThat()
                         .resideInAnyPackage(forbidden)
@@ -290,8 +288,7 @@ public final class StrategicPatternRules implements DcaRuleSet {
                 String[] published = arch.publishedPackagePatternsExcluding(source);
                 perModule.add(
                     noClasses()
-                        .that()
-                        .resideInAPackage(layout.outgoingAdapterPattern(source))
+                        .that(arch.inLayerOf(DcaLayout.Layer.OUTGOING_ADAPTER, source))
                         .should()
                         .dependOnClassesThat(
                             resideInAnyPackage(foreign).and(not(resideInAnyPackage(published))))

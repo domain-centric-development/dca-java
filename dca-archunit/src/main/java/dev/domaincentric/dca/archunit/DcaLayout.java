@@ -1,9 +1,12 @@
 package dev.domaincentric.dca.archunit;
 
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.relationships.Upstream;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -95,6 +98,33 @@ public final class DcaLayout {
   private final FrameworkAnnotationsOrigin frameworkAnnotationsOrigin;
   private final List<String> frameworkCandidates;
 
+  /**
+   * The five layers a class can be placed in. Each is recognised by its package below a module root
+   * (the default), by a layer annotation of the project's — on the class, or on the {@code
+   * package-info} of its package or of one above it — or by either ({@link DcaMarker#anyOf}).
+   */
+  public enum Layer {
+    DOMAIN("domain"),
+    APPLICATION("application"),
+    INCOMING_ADAPTER("incomingAdapter"),
+    OUTGOING_ADAPTER("outgoingAdapter"),
+    INFRASTRUCTURE("infrastructure");
+
+    private final String role;
+
+    Layer(String role) {
+      this.role = role;
+    }
+
+    /** The name the layout and the report use for this layer, e.g. {@code outgoingAdapter}. */
+    public String role() {
+      return role;
+    }
+  }
+
+  private final Map<Layer, List<String>> layerAnnotations;
+  private final Set<Layer> pathlessLayers;
+
   /** How the layout came by its {@link FrameworkAnnotations} — shown in the report. */
   public enum FrameworkAnnotationsOrigin {
     /** A provider recognised its framework on the test class path. */
@@ -172,6 +202,13 @@ public final class DcaLayout {
     this.frameworkAnnotationsOrigin =
         Objects.requireNonNull(settings.frameworkAnnotationsOrigin, "frameworkAnnotationsOrigin");
     this.frameworkCandidates = List.copyOf(settings.frameworkCandidates);
+    EnumMap<Layer, List<String>> annotations = new EnumMap<>(Layer.class);
+    settings.layerAnnotations.forEach((layer, names) -> annotations.put(layer, List.copyOf(names)));
+    this.layerAnnotations = java.util.Collections.unmodifiableMap(annotations);
+    this.pathlessLayers =
+        settings.pathlessLayers.isEmpty()
+            ? Set.of()
+            : java.util.Collections.unmodifiableSet(EnumSet.copyOf(settings.pathlessLayers));
   }
 
   /**
@@ -282,6 +319,103 @@ public final class DcaLayout {
   // ---------------------------------------------------------------------------------------------
   // Fluent overrides
   // ---------------------------------------------------------------------------------------------
+
+  /**
+   * How the domain layer is recognised: {@code DcaMarker.ofPackage("domain")} (the default), a
+   * project's layer annotation ({@link DcaMarker#ofAnnotation(String)}), or both ({@link
+   * DcaMarker#anyOf(DcaMarker...)}). The package names one segment below a module root.
+   */
+  public DcaLayout withDomain(DcaMarker marker) {
+    return withLayer(Layer.DOMAIN, marker);
+  }
+
+  /** How the application layer is recognised — see {@link #withDomain(DcaMarker)}. */
+  public DcaLayout withApplication(DcaMarker marker) {
+    return withLayer(Layer.APPLICATION, marker);
+  }
+
+  /**
+   * How the incoming adapters are recognised — see {@link #withDomain(DcaMarker)}. The package is
+   * {@code <adapter>.<incoming>} below a module root, e.g. {@code "adapter.in"}; the adapter
+   * segment itself is {@link #withAdapterSubpackage(String)}'s.
+   */
+  public DcaLayout withIncomingAdapter(DcaMarker marker) {
+    return withLayer(Layer.INCOMING_ADAPTER, marker);
+  }
+
+  /** How the outgoing adapters are recognised — see {@link #withIncomingAdapter(DcaMarker)}. */
+  public DcaLayout withOutgoingAdapter(DcaMarker marker) {
+    return withLayer(Layer.OUTGOING_ADAPTER, marker);
+  }
+
+  /**
+   * How the infrastructure is recognised — see {@link #withDomain(DcaMarker)}. The package is one
+   * segment, below the base package and below each module root.
+   */
+  public DcaLayout withInfrastructure(DcaMarker marker) {
+    return withLayer(Layer.INFRASTRUCTURE, marker);
+  }
+
+  private DcaLayout withLayer(Layer layer, DcaMarker marker) {
+    Objects.requireNonNull(marker, layer.role());
+    marker.requireKinds(
+        "The " + layer.role() + " layer", DcaMarker.Kind.PACKAGE, DcaMarker.Kind.ANNOTATION);
+    List<String> packages = marker.valuesOf(DcaMarker.Kind.PACKAGE);
+    if (packages.size() > 1) {
+      throw new IllegalArgumentException(
+          "The " + layer.role() + " layer takes one package, was " + packages);
+    }
+    List<String> annotations = marker.valuesOf(DcaMarker.Kind.ANNOTATION);
+    return copy(
+        settings -> {
+          if (!packages.isEmpty()) {
+            applyLayerPackage(settings, layer, packages.get(0));
+          }
+          EnumMap<Layer, List<String>> annotationsByLayer = new EnumMap<>(Layer.class);
+          annotationsByLayer.putAll(settings.layerAnnotations);
+          settings.layerAnnotations = annotationsByLayer;
+          if (annotations.isEmpty()) {
+            settings.layerAnnotations.remove(layer);
+          } else {
+            settings.layerAnnotations.put(layer, annotations);
+          }
+          settings.pathlessLayers = EnumSet.noneOf(Layer.class);
+          settings.pathlessLayers.addAll(this.pathlessLayers);
+          if (packages.isEmpty()) {
+            settings.pathlessLayers.add(layer);
+          } else {
+            settings.pathlessLayers.remove(layer);
+          }
+        });
+  }
+
+  private static void applyLayerPackage(Settings settings, Layer layer, String value) {
+    switch (layer) {
+      case DOMAIN -> settings.domainSubpackage = value;
+      case APPLICATION -> settings.applicationSubpackage = value;
+      case INFRASTRUCTURE -> settings.infrastructureSubpackage = value;
+      case INCOMING_ADAPTER, OUTGOING_ADAPTER -> {
+        String prefix = settings.adapterSubpackage + ".";
+        if (!value.startsWith(prefix) || value.substring(prefix.length()).contains(".")) {
+          throw new IllegalArgumentException(
+              "The "
+                  + layer.role()
+                  + " layer's package is <adapter>.<segment> below a module root, e.g. '"
+                  + prefix
+                  + (layer == Layer.INCOMING_ADAPTER ? "in" : "out")
+                  + "', was '"
+                  + value
+                  + "' - withAdapterSubpackage(..) renames the adapter segment");
+        }
+        String segment = value.substring(prefix.length());
+        if (layer == Layer.INCOMING_ADAPTER) {
+          settings.incomingSubpackage = segment;
+        } else {
+          settings.outgoingSubpackage = segment;
+        }
+      }
+    }
+  }
 
   public DcaLayout withSharedKernelSubpackage(String value) {
     return copy(settings -> settings.sharedKernelSubpackage = value);
@@ -599,6 +733,8 @@ public final class DcaLayout {
     settings.frameworkAnnotations = frameworkAnnotations;
     settings.frameworkAnnotationsOrigin = frameworkAnnotationsOrigin;
     settings.frameworkCandidates = frameworkCandidates;
+    settings.layerAnnotations = layerAnnotations;
+    settings.pathlessLayers = pathlessLayers;
     change.accept(settings);
     return new DcaLayout(settings);
   }
@@ -637,11 +773,66 @@ public final class DcaLayout {
     FrameworkAnnotations frameworkAnnotations;
     FrameworkAnnotationsOrigin frameworkAnnotationsOrigin;
     List<String> frameworkCandidates = List.of();
+    Map<Layer, List<String>> layerAnnotations = Map.of();
+    Set<Layer> pathlessLayers = Set.of();
   }
 
   // ---------------------------------------------------------------------------------------------
   // Plain values
   // ---------------------------------------------------------------------------------------------
+
+  /** The layer annotations the layout names for a layer — empty while the path alone decides. */
+  public List<String> layerAnnotations(Layer layer) {
+    return layerAnnotations.getOrDefault(layer, List.of());
+  }
+
+  /** Whether a layer is recognised by its package path — true unless only annotations name it. */
+  public boolean layerHasPath(Layer layer) {
+    return !pathlessLayers.contains(layer);
+  }
+
+  /** True when any layer is recognised by an annotation, so the rules must look beyond the path. */
+  public boolean hasLayerAnnotations() {
+    return !layerAnnotations.isEmpty();
+  }
+
+  /** The marker a layer is recognised by, e.g. {@code ofPackage(adapter.outgoing)}. */
+  public DcaMarker layerMarker(Layer layer) {
+    List<DcaMarker> alternatives = new java.util.ArrayList<>();
+    if (layerHasPath(layer)) {
+      alternatives.add(DcaMarker.ofPackage(layerPackage(layer)));
+    }
+    layerAnnotations(layer).forEach(a -> alternatives.add(DcaMarker.ofAnnotation(a)));
+    return DcaMarker.anyOf(alternatives.toArray(DcaMarker[]::new));
+  }
+
+  /** The package of a layer below a module root, e.g. {@code adapter.outgoing}. */
+  public String layerPackage(Layer layer) {
+    return switch (layer) {
+      case DOMAIN -> domainSubpackage;
+      case APPLICATION -> applicationSubpackage;
+      case INCOMING_ADAPTER -> adapterSubpackage + "." + incomingSubpackage;
+      case OUTGOING_ADAPTER -> adapterSubpackage + "." + outgoingSubpackage;
+      case INFRASTRUCTURE -> infrastructureSubpackage;
+    };
+  }
+
+  /**
+   * One line for the report: {@code path (library default)} while every layer is its package, or
+   * the layers recognised otherwise — {@code outgoingAdapter=anyOf(ofPackage(adapter.out),
+   * ofAnnotation(com.acme.SecondaryAdapterLayer))}.
+   */
+  public String layersReport() {
+    if (layerAnnotations.isEmpty() && pathlessLayers.isEmpty()) {
+      return "path (library default)";
+    }
+    return String.join(
+        ", ",
+        java.util.Arrays.stream(Layer.values())
+            .filter(l -> layerAnnotations.containsKey(l) || pathlessLayers.contains(l))
+            .map(l -> l.role() + "=" + layerMarker(l))
+            .toList());
+  }
 
   public String basePackage() {
     return basePackage;

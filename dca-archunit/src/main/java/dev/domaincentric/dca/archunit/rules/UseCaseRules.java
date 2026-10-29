@@ -11,6 +11,7 @@ import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import com.tngtech.archunit.lang.conditions.ArchConditions;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaMarkers;
@@ -147,8 +148,7 @@ public final class UseCaseRules implements DcaRuleSet {
                     .haveSimpleNameEndingWith("Command")
                     .and()
                     .resideInAnyPackage(layout.basePackage() + "..")
-                    .should()
-                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .should(ArchConditions.be(arch.inApplication()))
                     .allowEmptyShould(true))
         .selecting("Classes under the base package whose simple name ends with Command.")
         .checking(
@@ -166,8 +166,7 @@ public final class UseCaseRules implements DcaRuleSet {
                     .haveSimpleNameEndingWith("Query")
                     .and()
                     .resideInAnyPackage(layout.basePackage() + "..")
-                    .should()
-                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .should(ArchConditions.be(arch.inApplication()))
                     .allowEmptyShould(true))
         .selecting("Classes under the base package whose simple name ends with Query.")
         .checking(
@@ -213,8 +212,7 @@ public final class UseCaseRules implements DcaRuleSet {
                     .and()
                     .areNotAssignableTo(arch.layout().markers().value())
                     .and(DescribedPredicate.not(sealedDomainOutcome(arch)))
-                    .should()
-                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .should(ArchConditions.be(arch.inApplication()))
                     .allowEmptyShould(true))
         .selecting(
             "Classes under the base package whose simple name ends with Result, that do not"
@@ -252,8 +250,7 @@ public final class UseCaseRules implements DcaRuleSet {
                     .haveSimpleNameEndingWith("Response")
                     .and()
                     .resideInAnyPackage(layout.basePackage() + "..")
-                    .should()
-                    .resideInAnyPackage(arch.allAdapterPatterns())
+                    .should(ArchConditions.be(arch.inAdapter()))
                     .allowEmptyShould(true))
         .selecting("Classes under the base package whose simple name ends with Response.")
         .checking(
@@ -299,8 +296,7 @@ public final class UseCaseRules implements DcaRuleSet {
                 + " Principle",
             arch ->
                 noClasses()
-                    .that()
-                    .resideInAnyPackage(arch.allDomainPatterns())
+                    .that(arch.inDomain())
                     .should()
                     .dependOnClassesThat()
                     .haveSimpleNameEndingWith("Dto")
@@ -317,8 +313,7 @@ public final class UseCaseRules implements DcaRuleSet {
                 + " Architecture)",
             arch ->
                 noClasses()
-                    .that()
-                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .that(arch.inApplication())
                     .should()
                     .dependOnClassesThat()
                     .haveSimpleNameEndingWith("Dto")
@@ -339,8 +334,7 @@ public final class UseCaseRules implements DcaRuleSet {
    * the rule texts say nor what the .NET twin does.
    */
   private static DescribedPredicate<JavaClass> useCases(DcaArchitecture arch, DcaLayout layout) {
-    DescribedPredicate<JavaClass> inApplication =
-        JavaClass.Predicates.resideInAnyPackage(arch.allApplicationPatterns());
+    DescribedPredicate<JavaClass> inApplication = arch.inApplication();
     DescribedPredicate<JavaClass> named =
         JavaClass.Predicates.simpleNameEndingWith(layout.useCaseSuffix());
     DescribedPredicate<JavaClass> port =
@@ -359,8 +353,7 @@ public final class UseCaseRules implements DcaRuleSet {
    * whatever it is named.
    */
   private static DescribedPredicate<JavaClass> sealedDomainOutcome(DcaArchitecture arch) {
-    DescribedPredicate<JavaClass> inDomain =
-        JavaClass.Predicates.resideInAnyPackage(arch.allDomainPatterns());
+    DescribedPredicate<JavaClass> inDomain = arch.inDomain();
     return DescribedPredicate.describe(
         "a sealed domain outcome",
         type ->
@@ -377,8 +370,7 @@ public final class UseCaseRules implements DcaRuleSet {
     return classes()
         .that()
         .haveSimpleNameEndingWith(suffix)
-        .and()
-        .resideInAnyPackage(arch.allApplicationPatterns())
+        .and(arch.inApplication())
         .and()
         .areNotInterfaces()
         .and()
@@ -607,11 +599,11 @@ public final class UseCaseRules implements DcaRuleSet {
           || result.isNestedClass()
           || !result.getSimpleName().endsWith("Result")
           || result.isAssignableTo(arch.layout().markers().value())
-          || !residesInAny(result, arch.allApplicationPatterns())) {
+          || !arch.inApplication().test(result)) {
         continue;
       }
       walkResult(
-          arch.allApplicationPatterns(),
+          arch.inApplication(),
           result,
           result.getSimpleName(),
           new ArrayDeque<>(),
@@ -624,15 +616,6 @@ public final class UseCaseRules implements DcaRuleSet {
     }
   }
 
-  private static boolean residesInAny(JavaClass javaClass, String[] packagePatterns) {
-    for (String pattern : packagePatterns) {
-      if (JavaClass.Predicates.resideInAPackage(pattern).test(javaClass)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   /**
    * Walks the instance fields of a result or part record — inherited ones included, a base class
    * need not carry the suffix, and a generic base's type parameters are read as the result binds
@@ -641,7 +624,7 @@ public final class UseCaseRules implements DcaRuleSet {
    * reached through two fields is reported on both paths.
    */
   private static void walkResult(
-      String[] applicationPatterns,
+      DescribedPredicate<JavaClass> application,
       JavaClass current,
       String path,
       Deque<String> recordsOnPath,
@@ -657,9 +640,9 @@ public final class UseCaseRules implements DcaRuleSet {
         String identity = identityKind(involved, markers);
         if (identity != null) {
           violations.add(fieldPath + " : " + involved.getSimpleName() + " (" + identity + ")");
-        } else if (isPartRecord(involved, applicationPatterns)) {
+        } else if (isPartRecord(involved, application)) {
           walkResult(
-              applicationPatterns,
+              application,
               involved,
               fieldPath + " -> " + involved.getSimpleName(),
               recordsOnPath,
@@ -692,8 +675,9 @@ public final class UseCaseRules implements DcaRuleSet {
    * next to it, or shared in {@code application.shared}. Records from other layers (value objects,
    * read models) are values by contract and are not walked.
    */
-  private static boolean isPartRecord(JavaClass candidate, String[] applicationPatterns) {
-    return candidate.isRecord() && residesInAny(candidate, applicationPatterns);
+  private static boolean isPartRecord(
+      JavaClass candidate, DescribedPredicate<JavaClass> application) {
+    return candidate.isRecord() && application.test(candidate);
   }
 
   private static boolean callsBoundary(JavaCodeUnit unit, DcaMarkers markers) {
@@ -1132,8 +1116,7 @@ public final class UseCaseRules implements DcaRuleSet {
                 + " adapter answers itself; the use case never sees it",
             arch ->
                 noClasses()
-                    .that()
-                    .resideInAnyPackage(arch.allApplicationPatterns())
+                    .that(arch.inApplication())
                     .should()
                     .callMethod(java.util.UUID.class, "fromString", String.class)
                     .allowEmptyShould(true))
