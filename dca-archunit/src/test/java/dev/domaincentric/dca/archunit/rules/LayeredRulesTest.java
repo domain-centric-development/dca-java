@@ -46,6 +46,8 @@ class LayeredRulesTest {
         FIXTURES + ".bad",
         // documentation-only rule, never fails
         "DCA-LAY-001",
+        // a diagnostic, lists and never fails
+        "DCA-LAY-007",
         // the building-blocks markers are library code, not part of the fixture import
         "DCA-LAY-005");
   }

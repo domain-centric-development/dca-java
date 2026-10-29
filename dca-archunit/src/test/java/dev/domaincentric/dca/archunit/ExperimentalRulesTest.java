@@ -49,6 +49,7 @@ class ExperimentalRulesTest {
 
     assertEquals(
         List.of(
+            "DCA-LAY-007",
             "DCA-HEX-014",
             "DCA-HEX-016",
             "DCA-HEX-017",

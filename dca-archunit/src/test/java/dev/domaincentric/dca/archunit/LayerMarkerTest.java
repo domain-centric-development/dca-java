@@ -55,13 +55,40 @@ class LayerMarkerTest {
   }
 
   @Test
-  void withoutTheAnnotationsTheDeclaredPackageIsInNoLayer() {
-    DcaArchitecture arch = arch(DcaLayout.forBasePackage(APP));
+  void withoutTheAnnotationsTheDeclaredPackageIsInNoLayerAndTheDiagnosticNamesIt() {
+    DcaLayout layout = DcaLayout.forBasePackage(APP);
+    DcaArchitecture arch = arch(layout);
 
     assertEquals(
         Optional.empty(), placementOf(arch, BILLING + ".out.persistence.JdbcInvoiceStore"));
-    DcaLayout layout = DcaLayout.forBasePackage(APP);
-    assertThrows(AssertionError.class, () -> rule(layout, "DCA-HEX-019").check(arch(layout)));
+    rule(layout, "DCA-HEX-019").check(arch);
+    List<String> unplaced = rule(layout, "DCA-LAY-007").observe(arch);
+    assertTrue(
+        unplaced.contains(BILLING + ".out.persistence.JdbcInvoiceStore (module " + BILLING + ")"),
+        unplaced.toString());
+  }
+
+  @Test
+  void anOutputPortImplementationPlacedInAnotherLayerIsReported() {
+    DcaLayout layout =
+        DcaLayout.forBasePackage(APP)
+            .withIncomingAdapter(
+                DcaMarker.anyOf(
+                    DcaMarker.ofPackage("adapter.incoming"),
+                    DcaMarker.ofAnnotation(VOCABULARY + "OutgoingLayer")));
+    AssertionError error =
+        assertThrows(AssertionError.class, () -> rule(layout, "DCA-HEX-019").check(arch(layout)));
+
+    assertTrue(
+        error
+            .getMessage()
+            .contains(
+                BILLING
+                    + ".lone.MailGateway implements an output port but is placed in the"
+                    + " incomingAdapter layer (class "
+                    + BILLING
+                    + ".lone)"),
+        error.getMessage());
   }
 
   @Test

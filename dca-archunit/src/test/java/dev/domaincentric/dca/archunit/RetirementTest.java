@@ -60,6 +60,7 @@ class RetirementTest {
     assertEquals(
         java.util.Set.of(
             "DCA-LAY-001",
+            "DCA-LAY-007",
             "DCA-STR-001",
             "DCA-STR-010",
             "DCA-MAP-013",

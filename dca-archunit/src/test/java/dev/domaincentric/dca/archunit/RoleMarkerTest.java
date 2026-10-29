@@ -136,4 +136,31 @@ class RoleMarkerTest {
     assertTrue(DcaMarkers.dca().isDefault());
     assertFalse(DcaMarkers.dca().withQuery(DcaMarker.ofSuffix("Read")).isDefault());
   }
+
+  @Test
+  void theBarePrimitiveRulePassesOverFailuresAndAValuesOwnErrorShapesAndExplainsAOneFieldType() {
+    String app = Fixtures.ROOT + ".barevalues.app";
+    String model = app + ".orders.domain.model.";
+    DcaLayout layout = DcaLayout.forBasePackage(app);
+    AssertionError error =
+        assertThrows(
+            AssertionError.class,
+            () ->
+                rule(layout, "DCA-TAC-025")
+                    .check(
+                        DcaArchitecture.of(layout, new ClassFileImporter().importPackages(app))));
+    String message = error.getMessage();
+
+    assertFalse(message.contains("OrderRefused"), message);
+    assertFalse(message.contains("EmptyError"), message);
+    assertFalse(message.contains("TooLongError"), message);
+    assertFalse(message.contains(model + "PostalCode:"), message);
+    assertTrue(
+        message.contains(
+            model
+                + "Street: field name is String - it has one field: mark it as a value or"
+                + " an id (ofType(dev.domaincentric.dca.buildingblocks.ddd.tactical.Value)) to count"
+                + " as a wrapper"),
+        message);
+  }
 }

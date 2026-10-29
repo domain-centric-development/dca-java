@@ -1010,7 +1010,9 @@ public final class TacticalPatternRules implements DcaRuleSet {
                       c ->
                           arch.inDomain().test(c)
                               && !c.getModifiers().contains(JavaModifier.SYNTHETIC))) {
-                if (isWrapperValue(type, markers)) {
+                if (isWrapperValue(type, markers)
+                    || isFailure(type, markers)
+                    || nestedInWrapperOrValue(type, markers)) {
                   continue;
                 }
                 List<String> bare = new ArrayList<>();
@@ -1063,7 +1065,14 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 }
                 if (!bare.isEmpty()) {
                   violations.add(
-                      type.getName() + ": " + String.join("; ", bare.stream().sorted().toList()));
+                      type.getName()
+                          + ": "
+                          + String.join("; ", bare.stream().sorted().toList())
+                          + (instanceFieldCount(type) == 1
+                              ? " - it has one field: mark it as a value or an id ("
+                                  + markers.marker("value")
+                                  + ") to count as a wrapper"
+                              : ""));
                 }
               }
               fail(
@@ -1078,7 +1087,10 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 + " shared kernel's domain included - their instance fields and their methods,"
                 + " private ones included; constructors are not selected, the fields they fill are."
                 + " Not selected: a wrapper value - a type assignable to the value or the id role"
-                + " with exactly one instance field - with everything it declares; synthetic and"
+                + " with exactly one instance field - with everything it declares; a type declared"
+                + " inside a value or an id, such as the value's own error shapes, which carry the"
+                + " input it refused; a failure - a type of the domain-exception or use-case-exception"
+                + " role; synthetic and"
                 + " bridge members; equals, hashCode, toString and compareTo; the values() and"
                 + " valueOf(String) the language declares on an enum; a method that implements a"
                 + " method of a building block, such as a domain event's occurredOn() or a"
@@ -1093,7 +1105,9 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 + " included, so List<String> counts. BigDecimal, BigInteger, Duration and the"
                 + " project's own types pass. A value object with several components is checked"
                 + " like any other type: each component is a value object itself. A record's"
-                + " accessor is not reported again beside its field. An empty selection passes.",
+                + " accessor is not reported again beside its field. A reported type with exactly one"
+                + " instance field that is no value or id is told to carry the value or id role to"
+                + " count as a wrapper. An empty selection passes.",
             "wrap the primitive in a value object that carries its rules; a value of one"
                 + " component may hold it");
   }
@@ -1103,13 +1117,36 @@ public final class TacticalPatternRules implements DcaRuleSet {
     if (!markers.is("value").test(type) && !markers.is("id").test(type)) {
       return false;
     }
+    return instanceFieldCount(type) == 1;
+  }
+
+  private static long instanceFieldCount(JavaClass type) {
     return type.getFields().stream()
-            .filter(
-                f ->
-                    !f.getModifiers().contains(JavaModifier.STATIC)
-                        && !f.getModifiers().contains(JavaModifier.SYNTHETIC))
-            .count()
-        == 1;
+        .filter(
+            f ->
+                !f.getModifiers().contains(JavaModifier.STATIC)
+                    && !f.getModifiers().contains(JavaModifier.SYNTHETIC))
+        .count();
+  }
+
+  /** A failure reports what was refused - the raw input included - and is no value itself. */
+  private static boolean isFailure(JavaClass type, DcaMarkers markers) {
+    return markers.is("domainException").test(type) || markers.is("useCaseException").test(type);
+  }
+
+  /**
+   * A type declared inside a value or an id - the value's own error shapes, which carry the input
+   * it refused. "With everything it declares" holds for its nested types too.
+   */
+  private static boolean nestedInWrapperOrValue(JavaClass type, DcaMarkers markers) {
+    for (java.util.Optional<JavaClass> enclosing = type.getEnclosingClass();
+        enclosing.isPresent();
+        enclosing = enclosing.get().getEnclosingClass()) {
+      if (markers.is("value").test(enclosing.get()) || markers.is("id").test(enclosing.get())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /** The type names of every building block the layout names. */

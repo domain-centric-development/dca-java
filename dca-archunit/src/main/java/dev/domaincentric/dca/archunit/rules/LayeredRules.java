@@ -7,6 +7,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.lang.conditions.ArchConditions;
+import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
@@ -29,7 +30,8 @@ public final class LayeredRules implements DcaRuleSet {
             domainMustNotDependOnInfrastructure(),
             applicationMustNotUseInfrastructureImplementations(),
             transactionBoundariesBelongToApplicationLayer(),
-            outputPortMarkersMustBeInterfaces());
+            outputPortMarkersMustBeInterfaces(),
+            classesSitInALayer());
   }
 
   @Override
@@ -63,6 +65,59 @@ public final class LayeredRules implements DcaRuleSet {
         .checking(
             "Informational - selects nothing and never fails; it carries doctrine only. The"
                 + " dependency direction is enforced by the hexagonal rules.");
+  }
+
+  /**
+   * DCA-LAY-007 (experimental, informational). A class of a module in no layer escapes every rule
+   * written for a layer - typically a helper of an adapter (a mapper, a persistence entity) lying
+   * beside the layer packages, or a class whose layer is declared only on a neighbour.
+   */
+  public DcaRule classesSitInALayer() {
+    return DcaRule.informational(
+            "DCA-LAY-007",
+            "Diagnostic: classes of a module that sit in no layer",
+            "Every rule written for a layer selects by the layer a class is placed in. A class of a"
+                + " module that sits in none - a mapper or a persistence entity beside the adapter"
+                + " packages, a class whose layer is declared only on its neighbour - is seen by"
+                + " none of them",
+            arch -> {
+              java.util.Set<String> published =
+                  new java.util.HashSet<>(arch.layout().publishedSubpackages());
+              List<String> observed = new java.util.ArrayList<>();
+              for (JavaClass type : arch.classes()) {
+                String pkg = type.getPackageName();
+                String root =
+                    arch.moduleRoots().stream()
+                        .filter(r -> DcaArchitecture.inPackageTree(pkg, r))
+                        .max(java.util.Comparator.comparingInt(String::length))
+                        .orElse(null);
+                if (root == null
+                    || pkg.equals(root)
+                    || type.getSimpleName().equals("package-info")
+                    || type.getModifiers()
+                        .contains(com.tngtech.archunit.core.domain.JavaModifier.SYNTHETIC)
+                    || arch.placement(type).isPresent()) {
+                  continue;
+                }
+                String below = pkg.substring(root.length() + 1).split("\\.")[0];
+                if (published.contains(below)
+                    || below.equals(arch.layout().infrastructureSubpackage())) {
+                  continue;
+                }
+                observed.add(type.getName() + " (module " + root + ")");
+              }
+              return observed.stream().sorted().toList();
+            })
+        .experimental()
+        .selecting(
+            "Classes under a module root, below its own package, that the layout places in no layer"
+                + " - neither by a layer annotation on the class or a package above it nor by the"
+                + " package path. Not selected: classes directly in the module root's package, the"
+                + " published packages (api, events) of a module and its own infrastructure package"
+                + " - the shared kernel's included, which is shared support rather than a layer.")
+        .checking(
+            "Informational - lists every selected class and never fails. Place each in a layer:"
+                + " move it into the layer package it belongs to, or declare its package's layer.");
   }
 
   public DcaRule domainMustNotDependOnInfrastructure() {
