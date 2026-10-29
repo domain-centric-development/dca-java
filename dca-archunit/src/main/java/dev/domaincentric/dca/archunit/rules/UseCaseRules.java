@@ -1010,7 +1010,7 @@ public final class UseCaseRules implements DcaRuleSet {
 
   /**
    * DCA-USE-019. The query is recognised by its input, as DCA-USE-003 and DCA-USE-005 recognise it:
-   * the operation takes a type whose simple name ends with {@code Query}.
+   * the operation takes a type the configured query role recognises.
    */
   public static DcaRule queriesHaveNoSideEffect(DcaLayout layout) {
     return DcaRule.of(
@@ -1029,9 +1029,10 @@ public final class UseCaseRules implements DcaRuleSet {
         .experimental()
         .selecting(
             "Non-interface classes in <module>.application.. that implement InputPort or whose"
-                + " simple name ends with the configured use-case suffix, and whose input ends"
-                + " with Query - a parameter of a public method, or a type argument of the input"
-                + " port they implement.")
+                + " simple name ends with the configured use-case suffix, and whose input the"
+                + " configured query role recognises (by default a simple name ending with Query)"
+                + " - a parameter of a public method, or a type argument of the input port they"
+                + " implement.")
         .checking(
             "No code unit of the class calls a write on the repository or store role - a method"
                 + " whose name is a write verb alone or followed by a capital (save, delete, remove,"

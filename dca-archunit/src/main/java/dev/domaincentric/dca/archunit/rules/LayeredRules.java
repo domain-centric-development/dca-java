@@ -224,15 +224,13 @@ public final class LayeredRules implements DcaRuleSet {
                   arch.classes(),
                   rationale);
               DescribedPredicate<JavaClass> wiringAllowed =
-                  allowed
-                      .or(arch.inInfrastructure())
-                      .or(
-                          JavaClass.Predicates.resideInAnyPackage(
-                              layout.infrastructurePattern(),
-                              layout.sharedKernelPackage()
-                                  + "."
-                                  + layout.infrastructureSubpackage()
-                                  + ".."));
+                  allowed.or(
+                      JavaClass.Predicates.resideInAnyPackage(
+                          layout.infrastructurePattern(),
+                          layout.sharedKernelPackage()
+                              + "."
+                              + layout.infrastructureSubpackage()
+                              + ".."));
               DescribedPredicate<JavaClass> managerOrBoundary =
                   DescribedPredicate.describe(
                       "a configured transaction manager or TransactionBoundary",
