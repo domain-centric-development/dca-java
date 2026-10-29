@@ -323,8 +323,7 @@ public final class StrategicPatternRules implements DcaRuleSet {
             "Integration contracts are published separately from translators and transport adapters",
             arch ->
                 classes()
-                    .that()
-                    .areAssignableTo(arch.layout().markers().integrationEvent())
+                    .that(arch.layout().markers().is("integrationEvent"))
                     .and()
                     .areNotInterfaces()
                     .should()
@@ -349,8 +348,7 @@ public final class StrategicPatternRules implements DcaRuleSet {
                 + " read",
             arch ->
                 classes()
-                    .that()
-                    .areAssignableTo(arch.layout().markers().integrationEvent())
+                    .that(arch.layout().markers().is("integrationEvent"))
                     .and()
                     .areNotInterfaces()
                     .should(TypeInspection.haveImmutableShape())
@@ -484,7 +482,7 @@ public final class StrategicPatternRules implements DcaRuleSet {
                 + " through that interface, not only the payload",
             arch -> {
               List<String> violations = new ArrayList<>();
-              String marker = arch.layout().markers().integrationEvent();
+              var marker = arch.layout().markers().is("integrationEvent");
               for (String root : arch.moduleRoots()) {
                 String events = root + "." + layout.eventsSubpackage();
                 for (JavaClass type : arch.classes()) {
@@ -496,7 +494,7 @@ public final class StrategicPatternRules implements DcaRuleSet {
                       && !type.isAnnotation()
                       && type.isTopLevelClass()
                       && !type.getSimpleName().equals("package-info")
-                      && !type.isAssignableTo(marker)) {
+                      && !marker.test(type)) {
                     violations.add(
                         type.getName()
                             + " is an event contract without the integration event identity");

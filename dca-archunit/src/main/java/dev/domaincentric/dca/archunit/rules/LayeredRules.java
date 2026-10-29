@@ -161,8 +161,8 @@ public final class LayeredRules implements DcaRuleSet {
               violations.addAll(
                   noClasses()
                       .that(DescribedPredicate.not(allowed))
-                      .and()
-                      .areNotAssignableTo(arch.layout().markers().transactionBoundary())
+                      .and(
+                          DescribedPredicate.not(arch.layout().markers().is("transactionBoundary")))
                       .should()
                       .dependOnClassesThat(usesTransactionApi)
                       .allowEmptyShould(true),
@@ -183,12 +183,12 @@ public final class LayeredRules implements DcaRuleSet {
                       "a configured transaction manager or TransactionBoundary",
                       c ->
                           transactionManager.contains(c.getName())
-                              || c.isAssignableTo(arch.layout().markers().transactionBoundary()));
+                              || arch.layout().markers().is("transactionBoundary").test(c));
               violations.addAll(
                   noClasses()
                       .that(DescribedPredicate.not(wiringAllowed))
-                      .and()
-                      .areNotAssignableTo(arch.layout().markers().transactionBoundary())
+                      .and(
+                          DescribedPredicate.not(arch.layout().markers().is("transactionBoundary")))
                       .should()
                       .dependOnClassesThat(managerOrBoundary)
                       .allowEmptyShould(true),

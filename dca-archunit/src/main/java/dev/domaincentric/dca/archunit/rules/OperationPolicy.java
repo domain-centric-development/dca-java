@@ -16,7 +16,7 @@ final class OperationPolicy {
         && !type.isNestedClass()
         && !type.getModifiers().contains(JavaModifier.ABSTRACT)
         && arch.inApplication().test(type)
-        && (type.isAssignableTo(arch.layout().markers().inputPort())
+        && (arch.layout().markers().is("inputPort").test(type)
             || type.getSimpleName().endsWith(arch.layout().useCaseSuffix()));
   }
 
@@ -45,7 +45,7 @@ final class OperationPolicy {
     for (var dep : current.getDirectDependenciesFromSelf()) {
       var target = dep.getTargetClass();
       if (own.contains(target)) continue;
-      if (target.isAssignableTo(arch.layout().markers().inputPort()) || operation(target, arch)) {
+      if (arch.layout().markers().is("inputPort").test(target) || operation(target, arch)) {
         violations.add(
             caller.getName()
                 + " -> "

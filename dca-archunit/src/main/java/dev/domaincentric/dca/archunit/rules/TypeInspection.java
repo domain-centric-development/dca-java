@@ -1,5 +1,6 @@
 package dev.domaincentric.dca.archunit.rules;
 
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaGenericArrayType;
@@ -209,21 +210,29 @@ final class TypeInspection {
    * PlaceOrderResult>} yields both). Called on an input port or on a class implementing one. Bridge
    * and synthetic methods are left out; an erased {@code Object} parameter is left out too.
    */
-  static Set<JavaClass> inputTypes(JavaClass type, String inputPortRole) {
+  static Set<JavaClass> inputTypes(JavaClass type, DescribedPredicate<JavaClass> inputPortRole) {
     Set<JavaClass> inputs = new LinkedHashSet<>();
     collectInputs(type, inputPortRole, inputs, new HashSet<>());
     inputs.removeIf(input -> input.getName().equals(OBJECT));
     return inputs;
   }
 
-  /** Whether one of the operation's input types has a simple name ending with the suffix. */
-  static boolean takesInputEndingWith(JavaClass type, String inputPortRole, String suffix) {
-    return inputTypes(type, inputPortRole).stream()
-        .anyMatch(input -> input.getSimpleName().endsWith(suffix));
+  /**
+   * Whether one of the operation's input types is of the given role — a command or a query, as the
+   * layout's markers recognise them.
+   */
+  static boolean takesInput(
+      JavaClass type,
+      DescribedPredicate<JavaClass> inputPortRole,
+      DescribedPredicate<JavaClass> input) {
+    return inputTypes(type, inputPortRole).stream().anyMatch(input);
   }
 
   private static void collectInputs(
-      JavaClass type, String inputPortRole, Set<JavaClass> inputs, Set<JavaClass> visited) {
+      JavaClass type,
+      DescribedPredicate<JavaClass> inputPortRole,
+      Set<JavaClass> inputs,
+      Set<JavaClass> visited) {
     if (!visited.add(type)) {
       return;
     }
@@ -238,7 +247,7 @@ final class TypeInspection {
     }
     for (JavaType candidate : type.getInterfaces()) {
       JavaClass erasure = candidate.toErasure();
-      if (!erasure.isAssignableTo(inputPortRole)) {
+      if (!inputPortRole.test(erasure)) {
         continue;
       }
       if (candidate instanceof JavaParameterizedType parameterized) {
@@ -249,7 +258,7 @@ final class TypeInspection {
       collectInputs(erasure, inputPortRole, inputs, visited);
     }
     type.getRawSuperclass()
-        .filter(superclass -> superclass.isAssignableTo(inputPortRole))
+        .filter(inputPortRole)
         .ifPresent(superclass -> collectInputs(superclass, inputPortRole, inputs, visited));
   }
 }

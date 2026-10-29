@@ -1,5 +1,7 @@
 package dev.domaincentric.dca.archunit;
 
+import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaClass;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,11 +29,17 @@ import java.util.Objects;
  *             .withRepository("org.jmolecules.ddd.types.Repository"));
  * }</pre>
  *
- * <p>Every role holds exactly one type name, matched by assignability: a class or interface the
- * project's own type extends or implements, directly or through an intermediate type. Two
- * vocabularies at once — the library's own marker on one aggregate and another's on the next — are
- * outside this: a role names one type, so a migration points the role at one of them and the rules
- * select what carries it.
+ * <p>Every role holds one type name, matched by assignability: a class or interface the project's
+ * own type extends or implements, directly or through an intermediate type. Where a project marks
+ * its building blocks with annotations instead, the role takes a {@link DcaMarker} — {@code
+ * withValue(DcaMarker.ofAnnotation("com.acme.ValueObject"))}, or {@code anyOf} a type and an
+ * annotation while a migration has both; the annotation counts on the class and on its supertypes,
+ * directly or as a meta-annotation. A package never names a role. Two roles are recognised by name
+ * by default: {@code command} and {@code query}, the input of a use case, {@code
+ * ofSuffix("Command")} and {@code ofSuffix("Query")} — {@link #withCommand(DcaMarker)} and {@link
+ * #withQuery(DcaMarker)} point them at a supertype or an annotation instead. A rule that reads a
+ * role's generic arguments or method names (a repository's aggregate, {@code save}) reads them from
+ * the role's type.
  *
  * <p><b>The port roles need a common root.</b> {@code withOutputPort} must be set whenever any
  * other port role is: {@code DCA-HEX-009} measures every output port of the project against it, so
@@ -95,6 +103,11 @@ import java.util.Objects;
  * @param sharedKernel the annotation that declares the shared kernel on a {@code package-info}
  * @param integrationEventType the annotation that gives an integration event its contract identity
  *     - {@code DCA-ADV-005} reads its presence
+ * @param recognisedBy how a role is recognised where that is more than assignability to its type
+ *     (WP-160): a building-block role by {@code ofType} and/or {@code ofAnnotation}, the {@code
+ *     command} and {@code query} roles also by {@code ofSuffix} — their default — and the three
+ *     declaration roles by {@code ofAnnotation}. A role absent from the map is its type, by
+ *     assignability
  */
 public record DcaMarkers(
     String name,
@@ -119,7 +132,71 @@ public record DcaMarkers(
     String integrationEventPublisher,
     String boundedContext,
     String sharedKernel,
-    String integrationEventType) {
+    String integrationEventType,
+    Map<String, DcaMarker> recognisedBy) {
+
+  /** The two roles that are recognised by name by default: a use case's input. */
+  public static final List<String> NAMED_ROLES = List.of("command", "query");
+
+  private static final Map<String, DcaMarker> DEFAULT_RECOGNITION =
+      Map.of(
+          "command", DcaMarker.ofSuffix("Command"),
+          "query", DcaMarker.ofSuffix("Query"));
+
+  private static final List<String> DECLARATION_ROLES =
+      List.of("boundedContext", "sharedKernel", "integrationEventType");
+
+  /** The vocabulary as before WP-160: every role its type, command and query by suffix. */
+  public DcaMarkers(
+      String name,
+      String aggregateRoot,
+      String entity,
+      String value,
+      String id,
+      String domainEvent,
+      String integrationEvent,
+      String domainService,
+      String factory,
+      String specification,
+      String domainException,
+      String useCaseException,
+      String transactionBoundary,
+      String inputPort,
+      String useCase,
+      String outputPort,
+      String repository,
+      String store,
+      String domainEventPublisher,
+      String integrationEventPublisher,
+      String boundedContext,
+      String sharedKernel,
+      String integrationEventType) {
+    this(
+        name,
+        aggregateRoot,
+        entity,
+        value,
+        id,
+        domainEvent,
+        integrationEvent,
+        domainService,
+        factory,
+        specification,
+        domainException,
+        useCaseException,
+        transactionBoundary,
+        inputPort,
+        useCase,
+        outputPort,
+        repository,
+        store,
+        domainEventPublisher,
+        integrationEventPublisher,
+        boundedContext,
+        sharedKernel,
+        integrationEventType,
+        DEFAULT_RECOGNITION);
+  }
 
   /** The package the default vocabulary lives in. */
   public static final String DCA_BUILDING_BLOCKS = "dev.domaincentric.dca.buildingblocks";
@@ -150,6 +227,11 @@ public record DcaMarkers(
     boundedContext = type(boundedContext, "boundedContext");
     sharedKernel = type(sharedKernel, "sharedKernel");
     integrationEventType = type(integrationEventType, "integrationEventType");
+    Map<String, DcaMarker> recognition = new LinkedHashMap<>(DEFAULT_RECOGNITION);
+    if (recognisedBy != null) {
+      recognition.putAll(recognisedBy);
+    }
+    recognisedBy = java.util.Collections.unmodifiableMap(recognition);
   }
 
   private static String type(String fqn, String role) {
@@ -193,7 +275,7 @@ public record DcaMarkers(
 
   /** The same vocabulary under a different name, which the test report shows. */
   public DcaMarkers named(String vocabulary) {
-    return from(vocabulary, roles());
+    return from(vocabulary, roles(), recognisedBy);
   }
 
   /**
@@ -208,10 +290,142 @@ public record DcaMarkers(
           "No marker role named '" + role + "' - known: " + next.keySet());
     }
     next.put(role, type(fqn, role));
-    return from(name, next);
+    Map<String, DcaMarker> recognition = new LinkedHashMap<>(recognisedBy);
+    recognition.remove(role);
+    return from(name, next, recognition);
   }
 
-  private static DcaMarkers from(String name, Map<String, String> roles) {
+  /**
+   * The same vocabulary with one role recognised by the given marker (WP-160). A building-block
+   * role takes {@link DcaMarker#ofType(String)}, {@link DcaMarker#ofAnnotation(String)} on the
+   * type, or both; {@code command} and {@code query} also {@link DcaMarker#ofSuffix(String)}; the
+   * three declaration roles {@code ofAnnotation} only. A package never names a role — it says where
+   * a type sits, not what it is. At most one {@code ofType}: it is the type the role names, and the
+   * rules that read a role's generic arguments or methods read them from it. A role given without
+   * {@code ofType} keeps its type name for those readings but is not recognised by assignability to
+   * it.
+   */
+  public DcaMarkers withRole(String role, DcaMarker marker) {
+    Objects.requireNonNull(marker, role);
+    boolean named = NAMED_ROLES.contains(role);
+    if (!named && !roles().containsKey(role)) {
+      throw new IllegalArgumentException(
+          "No marker role named '" + role + "' - known: " + roles().keySet() + ", " + NAMED_ROLES);
+    }
+    if (DECLARATION_ROLES.contains(role)) {
+      marker.requireKinds("The " + role + " role", DcaMarker.Kind.ANNOTATION);
+    } else if (named) {
+      marker.requireKinds(
+          "The " + role + " role",
+          DcaMarker.Kind.TYPE,
+          DcaMarker.Kind.ANNOTATION,
+          DcaMarker.Kind.SUFFIX);
+    } else {
+      marker.requireKinds("The " + role + " role", DcaMarker.Kind.TYPE, DcaMarker.Kind.ANNOTATION);
+    }
+    List<String> types = marker.valuesOf(DcaMarker.Kind.TYPE);
+    if (types.size() > 1) {
+      throw new IllegalArgumentException(
+          "The " + role + " role names one type, was " + types + " - name their common supertype");
+    }
+    Map<String, String> next = new LinkedHashMap<>(roles());
+    if (!named && !types.isEmpty()) {
+      next.put(role, types.get(0));
+    }
+    if (DECLARATION_ROLES.contains(role)) {
+      next.put(role, marker.valuesOf(DcaMarker.Kind.ANNOTATION).get(0));
+    }
+    Map<String, DcaMarker> recognition = new LinkedHashMap<>(recognisedBy);
+    boolean plainType =
+        !named && marker.kind() == DcaMarker.Kind.TYPE || DECLARATION_ROLES.contains(role);
+    if (plainType) {
+      recognition.remove(role);
+    } else {
+      recognition.put(role, marker);
+    }
+    return from(name, next, recognition);
+  }
+
+  /** How a role is recognised: its marker, or {@code ofType} of the type it names. */
+  public DcaMarker marker(String role) {
+    DcaMarker marker = recognisedBy.get(role);
+    if (marker != null) {
+      return marker;
+    }
+    String type = roles().get(role);
+    if (type == null) {
+      throw new IllegalArgumentException("No marker role named '" + role + "'");
+    }
+    return DECLARATION_ROLES.contains(role) ? DcaMarker.ofAnnotation(type) : DcaMarker.ofType(type);
+  }
+
+  /**
+   * The classes a role recognises: assignable to its type, carrying its annotation — on the class
+   * or on one of its supertypes, directly or as a meta-annotation — or named with its suffix, as
+   * its marker says.
+   */
+  public DescribedPredicate<JavaClass> is(String role) {
+    DcaMarker marker = marker(role);
+    return DescribedPredicate.describe(
+        "are " + role + " (" + marker + ")", c -> matches(marker, c));
+  }
+
+  /** Whether the class is one the marker recognises — {@link #is(String)} for a single class. */
+  public static boolean matches(DcaMarker marker, JavaClass javaClass) {
+    for (DcaMarker alternative : marker.alternatives()) {
+      boolean hit =
+          switch (alternative.kind()) {
+            case TYPE -> javaClass.isAssignableTo(alternative.value());
+            case ANNOTATION -> annotatedInHierarchy(javaClass, alternative.value());
+            case SUFFIX -> javaClass.getSimpleName().endsWith(alternative.value());
+            case PACKAGE, ANY_OF -> false;
+          };
+      if (hit) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean annotatedInHierarchy(JavaClass javaClass, String annotation) {
+    if (javaClass.isAnnotatedWith(annotation) || javaClass.isMetaAnnotatedWith(annotation)) {
+      return true;
+    }
+    for (JavaClass type : javaClass.getAllRawSuperclasses()) {
+      if (type.isAnnotatedWith(annotation) || type.isMetaAnnotatedWith(annotation)) {
+        return true;
+      }
+    }
+    for (JavaClass type : javaClass.getAllRawInterfaces()) {
+      if (type.isAnnotatedWith(annotation) || type.isMetaAnnotatedWith(annotation)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** The roles recognised otherwise than by plain assignability, for the report. */
+  public Map<String, DcaMarker> recognisedOtherwise() {
+    Map<String, DcaMarker> changed = new LinkedHashMap<>();
+    recognisedBy.forEach(
+        (role, marker) -> {
+          if (!marker.equals(DEFAULT_RECOGNITION.get(role))) {
+            changed.put(role, marker);
+          }
+        });
+    return changed;
+  }
+
+  public DcaMarkers withCommand(DcaMarker marker) {
+    return withRole("command", marker);
+  }
+
+  public DcaMarkers withQuery(DcaMarker marker) {
+    return withRole("query", marker);
+  }
+
+  private static DcaMarkers from(
+      String name, Map<String, String> roles, Map<String, DcaMarker> recognisedBy) {
     return new DcaMarkers(
         name,
         roles.get("aggregateRoot"),
@@ -235,7 +449,8 @@ public record DcaMarkers(
         roles.get("integrationEventPublisher"),
         roles.get("boundedContext"),
         roles.get("sharedKernel"),
-        roles.get("integrationEventType"));
+        roles.get("integrationEventType"),
+        recognisedBy);
   }
 
   public DcaMarkers withAggregateRoot(String fqn) {
@@ -339,6 +554,94 @@ public record DcaMarkers(
     return withRole("integrationEventType", fqn);
   }
 
+  public DcaMarkers withAggregateRoot(DcaMarker marker) {
+    return withRole("aggregateRoot", marker);
+  }
+
+  public DcaMarkers withEntity(DcaMarker marker) {
+    return withRole("entity", marker);
+  }
+
+  public DcaMarkers withValue(DcaMarker marker) {
+    return withRole("value", marker);
+  }
+
+  public DcaMarkers withId(DcaMarker marker) {
+    return withRole("id", marker);
+  }
+
+  public DcaMarkers withDomainEvent(DcaMarker marker) {
+    return withRole("domainEvent", marker);
+  }
+
+  public DcaMarkers withIntegrationEvent(DcaMarker marker) {
+    return withRole("integrationEvent", marker);
+  }
+
+  public DcaMarkers withDomainService(DcaMarker marker) {
+    return withRole("domainService", marker);
+  }
+
+  public DcaMarkers withFactory(DcaMarker marker) {
+    return withRole("factory", marker);
+  }
+
+  public DcaMarkers withSpecification(DcaMarker marker) {
+    return withRole("specification", marker);
+  }
+
+  public DcaMarkers withDomainException(DcaMarker marker) {
+    return withRole("domainException", marker);
+  }
+
+  public DcaMarkers withUseCaseException(DcaMarker marker) {
+    return withRole("useCaseException", marker);
+  }
+
+  public DcaMarkers withTransactionBoundary(DcaMarker marker) {
+    return withRole("transactionBoundary", marker);
+  }
+
+  public DcaMarkers withInputPort(DcaMarker marker) {
+    return withRole("inputPort", marker);
+  }
+
+  public DcaMarkers withUseCase(DcaMarker marker) {
+    return withRole("useCase", marker);
+  }
+
+  public DcaMarkers withOutputPort(DcaMarker marker) {
+    return withRole("outputPort", marker);
+  }
+
+  public DcaMarkers withRepository(DcaMarker marker) {
+    return withRole("repository", marker);
+  }
+
+  public DcaMarkers withStore(DcaMarker marker) {
+    return withRole("store", marker);
+  }
+
+  public DcaMarkers withDomainEventPublisher(DcaMarker marker) {
+    return withRole("domainEventPublisher", marker);
+  }
+
+  public DcaMarkers withIntegrationEventPublisher(DcaMarker marker) {
+    return withRole("integrationEventPublisher", marker);
+  }
+
+  public DcaMarkers withBoundedContext(DcaMarker marker) {
+    return withRole("boundedContext", marker);
+  }
+
+  public DcaMarkers withSharedKernel(DcaMarker marker) {
+    return withRole("sharedKernel", marker);
+  }
+
+  public DcaMarkers withIntegrationEventType(DcaMarker marker) {
+    return withRole("integrationEventType", marker);
+  }
+
   /**
    * The packages the role types themselves live in, as ArchUnit patterns ({@code pkg..}) — the
    * vocabulary's own code, which is never the project's. Rules that ask "is this the project's own
@@ -413,7 +716,7 @@ public record DcaMarkers(
 
   /** Whether every role still names the type of {@link #dca()}. */
   public boolean isDefault() {
-    return roles().equals(dca().roles());
+    return roles().equals(dca().roles()) && recognisedOtherwise().isEmpty();
   }
 
   /** The roles by name, in declaration order — what the report prints when they are not default. */

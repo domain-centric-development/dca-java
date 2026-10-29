@@ -2,6 +2,7 @@ package dev.domaincentric.dca.archunit.rules;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaModifier;
@@ -73,8 +74,7 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                     .that(arch.inDomain())
                     .and()
                     .areAssignableTo(Throwable.class)
-                    .should()
-                    .beAssignableTo(arch.layout().markers().domainException())
+                    .should(ArchConditions.be(arch.layout().markers().is("domainException")))
                     .allowEmptyShould(true))
         .selecting(
             "Classes in <module>.domain.. of every module root that are assignable to Throwable -"
@@ -100,8 +100,7 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                       "An exception resides outside the layer its base type names");
               collected.addAll(
                   classes()
-                      .that()
-                      .areAssignableTo(arch.layout().markers().domainException())
+                      .that(arch.layout().markers().is("domainException"))
                       .and()
                       .resideOutsideOfPackages(
                           arch.layout().markers().declaringPackagePatterns().toArray(String[]::new))
@@ -111,8 +110,7 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                   "a domain exception belongs to the domain layer");
               collected.addAll(
                   classes()
-                      .that()
-                      .areAssignableTo(arch.layout().markers().useCaseException())
+                      .that(arch.layout().markers().is("useCaseException"))
                       .and()
                       .resideOutsideOfPackages(
                           arch.layout().markers().declaringPackagePatterns().toArray(String[]::new))
@@ -146,10 +144,8 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                     .that(arch.inApplication())
                     .and()
                     .areAssignableTo(Throwable.class)
-                    .and()
-                    .areNotAssignableTo(arch.layout().markers().domainException())
-                    .should()
-                    .beAssignableTo(arch.layout().markers().useCaseException())
+                    .and(DescribedPredicate.not(arch.layout().markers().is("domainException")))
+                    .should(ArchConditions.be(arch.layout().markers().is("useCaseException")))
                     .allowEmptyShould(true))
         .selecting(
             "Classes in <module>.application.. of every module root that are assignable to Throwable"
@@ -271,8 +267,11 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                           type ->
                               !type.getName().equals(domainException)
                                   && !type.getName().equals(useCaseException)
-                                  && (type.isAssignableTo(domainException)
-                                      || type.isAssignableTo(useCaseException)));
+                                  && (arch.layout().markers().is("domainException").test(type)
+                                      || arch.layout()
+                                          .markers()
+                                          .is("useCaseException")
+                                          .test(type)));
               if (!anyFailureType) {
                 return List.of(
                     "no class of the scan is assignable to "
@@ -291,12 +290,13 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                 if (!arch.inIncomingAdapter().test(type)) {
                   continue;
                 }
-                if (dependsOnAssignableTo(type, arch.layout().markers().domainException())
-                    || dependsOnAssignableTo(type, arch.layout().markers().useCaseException())) {
+                if (dependsOnAssignableTo(type, arch.layout().markers().is("domainException"))
+                    || dependsOnAssignableTo(
+                        type, arch.layout().markers().is("useCaseException"))) {
                   packagesThatName.add(type.getPackageName());
                 }
                 if (!type.isInterface()
-                    && dependsOnAssignableTo(type, arch.layout().markers().inputPort())) {
+                    && dependsOnAssignableTo(type, arch.layout().markers().is("inputPort"))) {
                   drivingByPackage
                       .computeIfAbsent(type.getPackageName(), pkg -> new ArrayList<>())
                       .add(type);
@@ -394,7 +394,7 @@ public final class ErrorHandlingRules implements DcaRuleSet {
   private static String fieldFinding(JavaClass type, DcaArchitecture arch) {
     DcaMarkers markers = arch.layout().markers();
     String name = type.getName();
-    if (type.isAssignableTo(markers.aggregateRoot()) || type.isAssignableTo(markers.entity())) {
+    if (markers.is("aggregateRoot").test(type) || markers.is("entity").test(type)) {
       return "an aggregate or entity";
     }
     if (type.isAssignableTo(CharSequence.class)) {
@@ -403,8 +403,8 @@ public final class ErrorHandlingRules implements DcaRuleSet {
     if (type.isPrimitive()
         || type.isEnum()
         || type.isAssignableTo(Number.class)
-        || type.isAssignableTo(markers.id())
-        || type.isAssignableTo(markers.value())
+        || markers.is("id").test(type)
+        || markers.is("value").test(type)
         || name.equals("java.lang.Boolean")
         || name.equals("java.lang.Character")
         || type.getPackageName().equals("java.time")
@@ -423,13 +423,13 @@ public final class ErrorHandlingRules implements DcaRuleSet {
 
   /** A project's own exception type: assignable to a base type, outside the building blocks. */
   private static boolean isProjectException(JavaClass type, DcaMarkers markers) {
-    return (type.isAssignableTo(markers.domainException())
-            || type.isAssignableTo(markers.useCaseException()))
+    return (markers.is("domainException").test(type) || markers.is("useCaseException").test(type))
         && !markers.declaresTypesIn(type.getPackageName());
   }
 
-  private static boolean dependsOnAssignableTo(JavaClass type, String target) {
+  private static boolean dependsOnAssignableTo(
+      JavaClass type, DescribedPredicate<JavaClass> target) {
     return type.getDirectDependenciesFromSelf().stream()
-        .anyMatch(dependency -> dependency.getTargetClass().isAssignableTo(target));
+        .anyMatch(dependency -> target.test(dependency.getTargetClass()));
   }
 }

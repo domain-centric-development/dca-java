@@ -13,10 +13,10 @@ final class DomainMetadata {
   private DomainMetadata() {}
 
   static String owner(JavaClass type, DcaMarkers markers, String specificationSuffix) {
-    if (type.isAssignableTo(markers.domainEvent())) return "DCA-ADV-004";
-    if (type.isAssignableTo(markers.domainService())) return "DCA-ADV-011";
-    if (type.isAssignableTo(markers.factory())) return "DCA-ADV-015";
-    if (type.isAssignableTo(markers.specification())
+    if (markers.is("domainEvent").test(type)) return "DCA-ADV-004";
+    if (markers.is("domainService").test(type)) return "DCA-ADV-011";
+    if (markers.is("factory").test(type)) return "DCA-ADV-015";
+    if (markers.is("specification").test(type)
         || type.getSimpleName().endsWith(specificationSuffix)) return "DCA-ADV-018";
     return "DCA-ONI-003";
   }

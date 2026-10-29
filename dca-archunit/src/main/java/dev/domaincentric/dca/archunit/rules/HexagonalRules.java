@@ -130,8 +130,7 @@ public final class HexagonalRules implements DcaRuleSet {
                             layout.frameworkAnnotations().webController(),
                             layout.frameworkAnnotations().restController()))
                     .should()
-                    .dependOnClassesThat()
-                    .areAssignableTo(arch.layout().markers().repository())
+                    .dependOnClassesThat(arch.layout().markers().is("repository"))
                     .allowEmptyShould(true))
         .selecting(
             "Classes anywhere on the classpath under scan whose simple name ends with the"
@@ -319,8 +318,7 @@ public final class HexagonalRules implements DcaRuleSet {
                     .areTopLevelClasses()
                     .and()
                     .haveSimpleNameNotEndingWith("package-info")
-                    .should()
-                    .beAssignableTo(arch.layout().markers().outputPort())
+                    .should(ArchConditions.be(arch.layout().markers().is("outputPort")))
                     .allowEmptyShould(true))
         .selecting(
             "Top-level interfaces in <module>.application.<shared>.. of every module root,"
@@ -366,7 +364,7 @@ public final class HexagonalRules implements DcaRuleSet {
     return new DescribedPredicate<>("are use case implementations rather than input ports") {
       @Override
       public boolean test(JavaClass javaClass) {
-        return !javaClass.isInterface() && javaClass.isAssignableTo(markers.inputPort());
+        return !javaClass.isInterface() && markers.is("inputPort").test(javaClass);
       }
     };
   }
@@ -379,8 +377,7 @@ public final class HexagonalRules implements DcaRuleSet {
                 + " in application/shared/, not domain/",
             arch ->
                 noClasses()
-                    .that()
-                    .areAssignableTo(arch.layout().markers().outputPort())
+                    .that(arch.layout().markers().is("outputPort"))
                     .and()
                     .areInterfaces()
                     .should(ArchConditions.be(arch.inDomain()))
@@ -411,8 +408,7 @@ public final class HexagonalRules implements DcaRuleSet {
                 noClasses()
                     .that(arch.inIncomingAdapter())
                     .should()
-                    .dependOnClassesThat()
-                    .areAssignableTo(arch.layout().markers().domainService())
+                    .dependOnClassesThat(arch.layout().markers().is("domainService"))
                     .allowEmptyShould(true))
         .selecting(
             "Classes in <module>.adapter.incoming.. of every module root, event consumers"
@@ -442,8 +438,7 @@ public final class HexagonalRules implements DcaRuleSet {
                 noClasses()
                     .that(arch.inOutgoingAdapter())
                     .should()
-                    .dependOnClassesThat()
-                    .areAssignableTo(arch.layout().markers().inputPort())
+                    .dependOnClassesThat(arch.layout().markers().is("inputPort"))
                     .allowEmptyShould(true))
         .selecting("Classes in <module>.adapter.outgoing.. of every module root.")
         .checking(
@@ -492,9 +487,10 @@ public final class HexagonalRules implements DcaRuleSet {
                 + " as a GET handler.")
         .checking(
             "No such method - or a method of the same class it reaches through calls within the"
-                + " class - calls a type assignable to the configured input-port role whose input"
-                + " ends with Command: a parameter of the called method, of a public method of the"
-                + " port, or a type argument of the input port it extends. A mapping that names no"
+                + " class - calls a type assignable to the configured input-port role whose input is"
+                + " a command (the configured command role, by default a simple name ending with"
+                + " Command): a parameter of the called method, of a public method of the port, or a"
+                + " type argument of the input port it extends. A mapping that names no"
                 + " HTTP method is checked like a GET handler. With empty web-controller and"
                 + " REST-controller roles, or an empty GET-mapping role, nothing is selected and the"
                 + " rule passes.",
@@ -516,7 +512,7 @@ public final class HexagonalRules implements DcaRuleSet {
           for (JavaCodeUnit unit : calls.reachableFrom(handler)) {
             for (JavaMethodCall call : unit.getMethodCallsFromSelf()) {
               JavaClass owner = call.getTargetOwner();
-              if (owner.isAssignableTo(markers.inputPort()) && takesCommand(call, markers)) {
+              if (markers.is("inputPort").test(owner) && takesCommand(call, markers)) {
                 commands.add(owner.getSimpleName() + "." + call.getName());
               }
             }
@@ -539,10 +535,9 @@ public final class HexagonalRules implements DcaRuleSet {
   }
 
   private static boolean takesCommand(JavaMethodCall call, DcaMarkers markers) {
-    return call.getTarget().getRawParameterTypes().stream()
-            .anyMatch(parameter -> parameter.getSimpleName().endsWith("Command"))
-        || TypeInspection.takesInputEndingWith(
-            call.getTargetOwner(), markers.inputPort(), "Command");
+    return call.getTarget().getRawParameterTypes().stream().anyMatch(markers.is("command"))
+        || TypeInspection.takesInput(
+            call.getTargetOwner(), markers.is("inputPort"), markers.is("command"));
   }
 
   /**
@@ -609,7 +604,7 @@ public final class HexagonalRules implements DcaRuleSet {
           for (JavaCodeUnit unit : calls.reachableFrom(listener)) {
             for (JavaMethodCall call : unit.getMethodCallsFromSelf()) {
               JavaClass owner = call.getTargetOwner();
-              if (owner.isAssignableTo(markers.inputPort())) {
+              if (markers.is("inputPort").test(owner)) {
                 ports.add(owner.getSimpleName() + "." + call.getName());
               }
             }
@@ -696,16 +691,16 @@ public final class HexagonalRules implements DcaRuleSet {
                           + " whatever implements an output port is an outgoing adapter");
               var outgoing = arch.inOutgoingAdapter();
               var infrastructure = arch.inInfrastructure();
-              String outputPort = arch.layout().markers().outputPort();
-              String inputPort = arch.layout().markers().inputPort();
+              var outputPort = arch.layout().markers().is("outputPort");
+              var inputPort = arch.layout().markers().is("inputPort");
               for (var type : arch.classes()) {
-                if (type.isInterface() || !type.isAssignableTo(outputPort) || outgoing.test(type)) {
+                if (type.isInterface() || !outputPort.test(type) || outgoing.test(type)) {
                   continue;
                 }
                 boolean bridge =
                     infrastructure.test(type)
                         && type.getDirectDependenciesFromSelf().stream()
-                            .anyMatch(d -> d.getTargetClass().isAssignableTo(inputPort));
+                            .anyMatch(d -> inputPort.test(d.getTargetClass()));
                 if (!bridge) {
                   violations.add(
                       type.getName() + " implements an output port outside the outgoing adapters");

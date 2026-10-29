@@ -1141,10 +1141,14 @@ public final class DcaLayout {
       return markers.name() + " (library default)";
     }
     Map<String, String> defaults = DcaMarkers.dca().roles();
+    Map<String, DcaMarker> recognised = markers.recognisedOtherwise();
     List<String> changed =
-        markers.roles().entrySet().stream()
-            .filter(role -> !role.getValue().equals(defaults.get(role.getKey())))
-            .map(role -> role.getKey() + "=" + role.getValue())
+        java.util.stream.Stream.concat(
+                markers.roles().entrySet().stream()
+                    .filter(role -> !recognised.containsKey(role.getKey()))
+                    .filter(role -> !role.getValue().equals(defaults.get(role.getKey())))
+                    .map(role -> role.getKey() + "=" + role.getValue()),
+                recognised.entrySet().stream().map(role -> role.getKey() + "=" + role.getValue()))
             .toList();
     return changed.isEmpty()
         ? markers.name()

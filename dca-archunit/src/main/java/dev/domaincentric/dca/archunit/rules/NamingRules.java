@@ -67,8 +67,7 @@ public final class NamingRules implements DcaRuleSet {
                     .areNotInterfaces()
                     .and()
                     .areNotRecords()
-                    .and()
-                    .areAssignableTo(arch.layout().markers().useCase())
+                    .and(arch.layout().markers().is("useCase"))
                     .should()
                     .haveSimpleNameEndingWith(layout.useCaseSuffix())
                     .allowEmptyShould(true))
@@ -97,7 +96,7 @@ public final class NamingRules implements DcaRuleSet {
                     && !type.isRecord()
                     && !type.isNestedClass()
                     && arch.inApplication().test(type)
-                    && (type.isAssignableTo(arch.layout().markers().inputPort())
+                    && (arch.layout().markers().is("inputPort").test(type)
                         || type.getSimpleName().endsWith(layout.useCaseSuffix()))
                     && !AnnotationRoles.annotatedWithAny(injectable).test(type)
                     && !AnnotationRoles.isMetaAnnotatedWithAny(type, injectable)) {
@@ -125,8 +124,7 @@ public final class NamingRules implements DcaRuleSet {
                     .that(arch.inApplication())
                     .and()
                     .areInterfaces()
-                    .and()
-                    .areAssignableTo(arch.layout().markers().inputPort())
+                    .and(arch.layout().markers().is("inputPort"))
                     .and()
                     .doNotHaveFullyQualifiedName(arch.layout().markers().inputPort())
                     .and()
@@ -492,7 +490,7 @@ public final class NamingRules implements DcaRuleSet {
       if (!type.isNestedClass()
           && !type.isAnonymousClass()
           && arch.inApplication().test(type)
-          && (type.isAssignableTo(layout.markers().inputPort())
+          && (layout.markers().is("inputPort").test(type)
               || (!type.isInterface() && type.getSimpleName().endsWith(layout.useCaseSuffix())))) {
         operations.add(type);
       }

@@ -87,8 +87,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                 + " e.g., ProductCreated, CartCleared)",
             arch ->
                 classes()
-                    .that()
-                    .areAssignableTo(arch.layout().markers().domainEvent())
+                    .that(arch.layout().markers().is("domainEvent"))
                     .and()
                     .areNotInterfaces()
                     .should(TypeInspection.haveImmutableShape())
@@ -108,8 +107,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             "Domain events are part of the domain layer (named in past tense)",
             arch ->
                 classes()
-                    .that()
-                    .areAssignableTo(arch.layout().markers().domainEvent())
+                    .that(arch.layout().markers().is("domainEvent"))
                     .and()
                     .areNotInterfaces()
                     .should(ArchConditions.be(arch.inDomain()))
@@ -142,8 +140,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                 + " envelope",
             arch ->
                 classes()
-                    .that()
-                    .areAssignableTo(arch.layout().markers().integrationEvent())
+                    .that(arch.layout().markers().is("integrationEvent"))
                     .and()
                     .areNotInterfaces()
                     .should()
@@ -169,7 +166,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                   violations(
                       arch,
                       c ->
-                          c.isAssignableTo(arch.layout().markers().integrationEvent())
+                          arch.layout().markers().is("integrationEvent").test(c)
                               && !c.isInterface(),
                       AdvancedPatternRules::hasVersionField,
                       c ->
@@ -199,8 +196,8 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                   violations(
                       arch,
                       c ->
-                          c.isAssignableTo(arch.layout().markers().domainEvent())
-                              && !c.isAssignableTo(arch.layout().markers().integrationEvent())
+                          arch.layout().markers().is("domainEvent").test(c)
+                              && !arch.layout().markers().is("integrationEvent").test(c)
                               && !c.isInterface(),
                       AdvancedPatternRules::hasVersionField,
                       c ->
@@ -229,9 +226,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
               List<String> violations =
                   violations(
                       arch,
-                      c ->
-                          c.isAssignableTo(arch.layout().markers().domainEvent())
-                              && !c.isInterface(),
+                      c -> arch.layout().markers().is("domainEvent").test(c) && !c.isInterface(),
                       c -> !hasTimestampField(c, arch.layout().timestampTypes()),
                       c -> c.getName() + " does not have a timestamp field");
               failIfAny(
@@ -264,8 +259,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             "Domain services are part of the domain layer, not application layer",
             arch ->
                 classes()
-                    .that()
-                    .areAssignableTo(arch.layout().markers().domainService())
+                    .that(arch.layout().markers().is("domainService"))
                     .and()
                     .areNotInterfaces()
                     .should(ArchConditions.be(arch.inDomain()))
@@ -287,15 +281,11 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                 + " inside its own",
             arch ->
                 noClasses()
-                    .that()
-                    .areAssignableTo(arch.layout().markers().aggregateRoot())
-                    .or()
-                    .areAssignableTo(arch.layout().markers().entity())
-                    .or()
-                    .areAssignableTo(arch.layout().markers().value())
+                    .that(arch.layout().markers().is("aggregateRoot"))
+                    .or(arch.layout().markers().is("entity"))
+                    .or(arch.layout().markers().is("value"))
                     .should()
-                    .accessClassesThat()
-                    .areAssignableTo(arch.layout().markers().domainService())
+                    .accessClassesThat(arch.layout().markers().is("domainService"))
                     .allowEmptyShould(true))
         .selecting(
             "Classes anywhere on the classpath under scan that carry the aggregate-root, entity or"
@@ -318,15 +308,15 @@ public final class AdvancedPatternRules implements DcaRuleSet {
               CollectedViolations collected =
                   CollectedViolations.withHeader(
                       "A domain service operation takes at least one aggregate or entity");
-              String aggregateRoot = arch.layout().markers().aggregateRoot();
-              String entity = arch.layout().markers().entity();
+              var aggregateRoot = arch.layout().markers().is("aggregateRoot");
+              var entity = arch.layout().markers().is("entity");
               for (JavaClass type :
                   arch.classes()
                       .that(
                           DescribedPredicate.describe(
                               "domain services",
                               candidate ->
-                                  candidate.isAssignableTo(arch.layout().markers().domainService())
+                                  arch.layout().markers().is("domainService").test(candidate)
                                       && !candidate.isInterface()))) {
                 for (JavaMethod method : type.getMethods()) {
                   if (!method.getModifiers().contains(JavaModifier.PUBLIC)
@@ -338,9 +328,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                   boolean takesModelObject =
                       method.getRawParameterTypes().stream()
                           .anyMatch(
-                              parameter ->
-                                  parameter.isAssignableTo(aggregateRoot)
-                                      || parameter.isAssignableTo(entity));
+                              parameter -> aggregateRoot.test(parameter) || entity.test(parameter));
                   collected.require(
                       takesModelObject,
                       type.getName()
@@ -382,8 +370,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             "Domain services should be stateless (only final fields for dependencies)",
             arch ->
                 classes()
-                    .that()
-                    .areAssignableTo(arch.layout().markers().domainService())
+                    .that(arch.layout().markers().is("domainService"))
                     .and()
                     .areNotInterfaces()
                     .and(arch.inDomain())
@@ -411,8 +398,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                 + " search",
             arch ->
                 classes()
-                    .that()
-                    .areAssignableTo(arch.layout().markers().factory())
+                    .that(arch.layout().markers().is("factory"))
                     .and()
                     .areNotInterfaces()
                     .should()
@@ -431,8 +417,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             "Factories are part of the domain layer (complex aggregate creation logic)",
             arch ->
                 classes()
-                    .that()
-                    .areAssignableTo(arch.layout().markers().factory())
+                    .that(arch.layout().markers().is("factory"))
                     .and()
                     .areNotInterfaces()
                     .should(ArchConditions.be(arch.inDomain()))
@@ -463,8 +448,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             "Factories should be stateless (only final fields for dependencies)",
             arch ->
                 classes()
-                    .that()
-                    .areAssignableTo(arch.layout().markers().factory())
+                    .that(arch.layout().markers().is("factory"))
                     .and()
                     .areNotInterfaces()
                     .and(arch.inDomain())
@@ -529,8 +513,7 @@ public final class AdvancedPatternRules implements DcaRuleSet {
    * the suffix without the marker.
    */
   private static DescribedPredicate<JavaClass> specifications(DcaMarkers markers, String suffix) {
-    DescribedPredicate<JavaClass> byRole =
-        JavaClass.Predicates.assignableTo(markers.specification());
+    DescribedPredicate<JavaClass> byRole = markers.is("specification");
     DescribedPredicate<JavaClass> byName = JavaClass.Predicates.simpleNameEndingWith(suffix);
     return byRole
         .or(byName)

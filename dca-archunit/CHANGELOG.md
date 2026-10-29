@@ -19,6 +19,16 @@ otherwise (`layers: …`) and lists, as notices, a package whose annotation over
 declares another layer than one above it. The sub-packages of a layer (`shared`, `model`, `api`, `events`, `web`,
 `event`) stay segments below the layer's package.
 
+**Building-block roles recognised by the project's own annotations; command and query are roles (WP-160, WP-161).**
+Every `DcaMarkers` role takes a `DcaMarker` beside its type name: `ofType` (assignability, as before),
+`ofAnnotation` (on the class or one of its supertypes, directly or as a meta-annotation) or `anyOf` both; a package
+or a suffix is refused for a building block. `command` and `query` are new roles, `ofSuffix("Command")` and
+`ofSuffix("Query")` by default — what the rules hard-wired until now — and take a type or an annotation instead
+(`DcaMarkers.withCommand`, `withQuery`), so a project that names its read-only inputs `…Command` can say which are
+commands. `DCA-USE-002`…`-005`, `DCA-HEX-014` and the feature rules read the roles; `DCA-USE-002`/`-003` are now
+titled "Commands/Queries reside in the application layer". The report names every role recognised otherwise. A rule
+that reads a role's generic arguments or method names still reads them from the role's type.
+
 ## [0.10.0] - 2026-10-29
 
 ### Added
