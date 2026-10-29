@@ -11,7 +11,6 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
-import com.tngtech.archunit.lang.conditions.ArchConditions;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaMarkers;
 import dev.domaincentric.dca.archunit.DcaRule;
@@ -290,7 +289,7 @@ public final class HexagonalRules implements DcaRuleSet {
                     .haveSimpleNameEndingWith("Repository")
                     .and()
                     .areNotInterfaces()
-                    .should(ArchConditions.be(arch.inOutgoingAdapter()))
+                    .should(LayerConditions.be(arch.inOutgoingAdapter()))
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes anywhere on the classpath under scan whose simple name"
@@ -318,7 +317,7 @@ public final class HexagonalRules implements DcaRuleSet {
                     .areTopLevelClasses()
                     .and()
                     .haveSimpleNameNotEndingWith("package-info")
-                    .should(ArchConditions.be(arch.layout().markers().is("outputPort")))
+                    .should(LayerConditions.be(arch.layout().markers().is("outputPort")))
                     .allowEmptyShould(true))
         .selecting(
             "Top-level interfaces in <module>.application.<shared>.. of every module root,"
@@ -380,7 +379,7 @@ public final class HexagonalRules implements DcaRuleSet {
                     .that(arch.layout().markers().is("outputPort"))
                     .and()
                     .areInterfaces()
-                    .should(ArchConditions.be(arch.inDomain()))
+                    .should(LayerConditions.be(arch.inDomain()))
                     .allowEmptyShould(true))
         .selecting(
             "Interfaces anywhere on the classpath under scan that are assignable to"
@@ -655,7 +654,7 @@ public final class HexagonalRules implements DcaRuleSet {
                     .that()
                     .areNotInterfaces()
                     .and(AnnotationRoles.annotatedWithAny(webControllers, restControllers))
-                    .should(ArchConditions.be(arch.inIncomingAdapter()))
+                    .should(LayerConditions.be(arch.inIncomingAdapter()))
                     .allowEmptyShould(true))
         .experimental()
         .selecting(

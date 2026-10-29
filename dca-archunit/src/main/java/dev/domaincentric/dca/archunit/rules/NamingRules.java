@@ -6,7 +6,6 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaModifier;
-import com.tngtech.archunit.lang.conditions.ArchConditions;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
@@ -244,7 +243,7 @@ public final class NamingRules implements DcaRuleSet {
                     .haveSimpleNameEndingWith("Dto")
                     .and()
                     .resideInAnyPackage(layout.basePackage() + "..")
-                    .should(ArchConditions.be(arch.inAdapter()))
+                    .should(LayerConditions.be(arch.inAdapter()))
                     .allowEmptyShould(true))
         .selecting("Classes under the base package whose simple name ends with Dto.")
         .checking(
@@ -264,7 +263,7 @@ public final class NamingRules implements DcaRuleSet {
                     .haveSimpleNameEndingWith("Converter")
                     .and()
                     .resideInAnyPackage(layout.basePackage() + "..")
-                    .should(ArchConditions.be(arch.inAdapter()))
+                    .should(LayerConditions.be(arch.inAdapter()))
                     .allowEmptyShould(true))
         .selecting("Classes under the base package whose simple name ends with Converter.")
         .checking(

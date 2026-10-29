@@ -6,7 +6,6 @@ import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaModifier;
-import com.tngtech.archunit.lang.conditions.ArchConditions;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaMarkers;
@@ -74,7 +73,7 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                     .that(arch.inDomain())
                     .and()
                     .areAssignableTo(Throwable.class)
-                    .should(ArchConditions.be(arch.layout().markers().is("domainException")))
+                    .should(LayerConditions.be(arch.layout().markers().is("domainException")))
                     .allowEmptyShould(true))
         .selecting(
             "Classes in <module>.domain.. of every module root that are assignable to Throwable -"
@@ -104,7 +103,7 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                       .and()
                       .resideOutsideOfPackages(
                           arch.layout().markers().declaringPackagePatterns().toArray(String[]::new))
-                      .should(ArchConditions.be(arch.inDomain()))
+                      .should(LayerConditions.be(arch.inDomain()))
                       .allowEmptyShould(true),
                   arch.classes(),
                   "a domain exception belongs to the domain layer");
@@ -114,7 +113,7 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                       .and()
                       .resideOutsideOfPackages(
                           arch.layout().markers().declaringPackagePatterns().toArray(String[]::new))
-                      .should(ArchConditions.be(arch.inApplication()))
+                      .should(LayerConditions.be(arch.inApplication()))
                       .allowEmptyShould(true),
                   arch.classes(),
                   "a use-case exception belongs to the application layer");
@@ -145,7 +144,7 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                     .and()
                     .areAssignableTo(Throwable.class)
                     .and(DescribedPredicate.not(arch.layout().markers().is("domainException")))
-                    .should(ArchConditions.be(arch.layout().markers().is("useCaseException")))
+                    .should(LayerConditions.be(arch.layout().markers().is("useCaseException")))
                     .allowEmptyShould(true))
         .selecting(
             "Classes in <module>.application.. of every module root that are assignable to Throwable"

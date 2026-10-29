@@ -11,7 +11,6 @@ import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
-import com.tngtech.archunit.lang.conditions.ArchConditions;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaMarkers;
@@ -147,7 +146,7 @@ public final class UseCaseRules implements DcaRuleSet {
                     .that(arch.layout().markers().is("command"))
                     .and()
                     .resideInAnyPackage(layout.basePackage() + "..")
-                    .should(ArchConditions.be(arch.inApplication()))
+                    .should(LayerConditions.be(arch.inApplication()))
                     .allowEmptyShould(true))
         .selecting(
             "Classes under the base package the configured command role recognises - by default a"
@@ -166,7 +165,7 @@ public final class UseCaseRules implements DcaRuleSet {
                     .that(arch.layout().markers().is("query"))
                     .and()
                     .resideInAnyPackage(layout.basePackage() + "..")
-                    .should(ArchConditions.be(arch.inApplication()))
+                    .should(LayerConditions.be(arch.inApplication()))
                     .allowEmptyShould(true))
         .selecting(
             "Classes under the base package the configured query role recognises - by default a"
@@ -213,7 +212,7 @@ public final class UseCaseRules implements DcaRuleSet {
                     .resideInAnyPackage(layout.basePackage() + "..")
                     .and(DescribedPredicate.not(arch.layout().markers().is("value")))
                     .and(DescribedPredicate.not(sealedDomainOutcome(arch)))
-                    .should(ArchConditions.be(arch.inApplication()))
+                    .should(LayerConditions.be(arch.inApplication()))
                     .allowEmptyShould(true))
         .selecting(
             "Classes under the base package whose simple name ends with Result, that do not"
@@ -253,7 +252,7 @@ public final class UseCaseRules implements DcaRuleSet {
                     .haveSimpleNameEndingWith("Response")
                     .and()
                     .resideInAnyPackage(layout.basePackage() + "..")
-                    .should(ArchConditions.be(arch.inAdapter()))
+                    .should(LayerConditions.be(arch.inAdapter()))
                     .allowEmptyShould(true))
         .selecting("Classes under the base package whose simple name ends with Response.")
         .checking(

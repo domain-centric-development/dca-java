@@ -36,6 +36,11 @@ published packages (`api`, `events`) and its own `infrastructure` package. The i
 
 ### Changed
 
+**Violation lines of the rules that place a class name the layer or the role.** Where a rule asks that a class be in
+a layer or carry a role, a violation reads `… is not in the domain layer` or `… is not an outputPort (ofType(…))`
+instead of `… does not reside in any package [...]` / `… is not assignable to …`; the same classes are reported. An
+ignore pattern (`dca.rule.<id>.ignore`) written against the old wording needs the new one.
+
 **`DCA-HEX-019` (experimental): output port implementations are placed in the outgoing adapters.** An
 implementation is an outgoing adapter by the port it implements; the rule reports one the layout places in another
 layer — domain, application, incoming adapter, infrastructure (the bridge to a second use case still passes) — by

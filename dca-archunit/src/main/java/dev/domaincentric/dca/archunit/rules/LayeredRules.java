@@ -6,7 +6,6 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
-import com.tngtech.archunit.lang.conditions.ArchConditions;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRule;
@@ -200,7 +199,7 @@ public final class LayeredRules implements DcaRuleSet {
               violations.addAll(
                   classes()
                       .that(AnnotationRoles.annotatedWithAny(transactional))
-                      .should(ArchConditions.be(allowed))
+                      .should(LayerConditions.be(allowed))
                       .allowEmptyShould(true),
                   arch.classes(),
                   rationale);

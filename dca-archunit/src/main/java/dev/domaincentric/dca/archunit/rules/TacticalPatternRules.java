@@ -10,7 +10,6 @@ import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.domain.JavaParameterizedType;
 import com.tngtech.archunit.core.domain.JavaType;
 import com.tngtech.archunit.core.domain.JavaTypeVariable;
-import com.tngtech.archunit.lang.conditions.ArchConditions;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaMarkers;
@@ -108,7 +107,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .areNotInterfaces()
                     .and()
                     .doNotHaveSimpleName(layout.aggregateRootSuffix())
-                    .should(ArchConditions.be(arch.layout().markers().is("aggregateRoot")))
+                    .should(LayerConditions.be(arch.layout().markers().is("aggregateRoot")))
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes in <module>.domain.model.. of every module root whose "
@@ -520,7 +519,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .haveSimpleNameEndingWith(arch.layout().repositorySuffix())
                     .and()
                     .doNotHaveSimpleName(arch.layout().repositorySuffix())
-                    .should(ArchConditions.be(arch.layout().markers().is("repository")))
+                    .should(LayerConditions.be(arch.layout().markers().is("repository")))
                     .allowEmptyShould(true))
         .selecting(
             "Interfaces in <module>.application.. of every module root whose simple name "
@@ -544,7 +543,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .and(arch.layout().markers().is("repository"))
                     .and()
                     .doNotHaveSimpleName(arch.layout().repositorySuffix())
-                    .should(ArchConditions.be(arch.inApplication()))
+                    .should(LayerConditions.be(arch.inApplication()))
                     .allowEmptyShould(true))
         .selecting(
             "Interfaces anywhere under scan assignable to Repository, whatever their name, "
@@ -565,7 +564,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .that()
                     .areNotInterfaces()
                     .and(arch.layout().markers().is("repository"))
-                    .should(ArchConditions.be(arch.inOutgoingAdapter()))
+                    .should(LayerConditions.be(arch.inOutgoingAdapter()))
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes anywhere under scan assignable to Repository, abstract "
@@ -738,10 +737,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .doNotHaveFullyQualifiedName(arch.layout().markers().store())
                     .and(DescribedPredicate.not(arch.inAdapter()))
                     .and(DescribedPredicate.not(arch.inInfrastructure()))
-                    .should(ArchConditions.be(arch.layout().markers().is("store")))
-                    .andShould(
-                        ArchConditions.be(
-                            DescribedPredicate.not(arch.layout().markers().is("repository"))))
+                    .should(LayerConditions.be(arch.layout().markers().is("store")))
+                    .andShould(LayerConditions.notBe(arch.layout().markers().is("repository")))
                     .allowEmptyShould(true))
         .selecting(
             "Interfaces under scan whose simple name ends with Store, the marker Store itself"
@@ -766,7 +763,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .and(arch.layout().markers().is("store"))
                     .and()
                     .doNotHaveSimpleName(arch.layout().storeSuffix())
-                    .should(ArchConditions.be(arch.inApplication()))
+                    .should(LayerConditions.be(arch.inApplication()))
                     .allowEmptyShould(true))
         .selecting(
             "Interfaces anywhere under scan assignable to Store, whatever their name, the "
@@ -787,7 +784,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                     .that()
                     .areNotInterfaces()
                     .and(arch.layout().markers().is("store"))
-                    .should(ArchConditions.be(arch.inOutgoingAdapter()))
+                    .should(LayerConditions.be(arch.inOutgoingAdapter()))
                     .allowEmptyShould(true))
         .selecting(
             "Non-interface classes anywhere under scan assignable to Store, abstract base "
@@ -1068,7 +1065,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                       type.getName()
                           + ": "
                           + String.join("; ", bare.stream().sorted().toList())
-                          + (instanceFieldCount(type) == 1
+                          + (instanceFieldCount(type) == 1 && !reportedFields.isEmpty()
                               ? " - it has one field: mark it as a value or an id ("
                                   + markers.marker("value")
                                   + ") to count as a wrapper"

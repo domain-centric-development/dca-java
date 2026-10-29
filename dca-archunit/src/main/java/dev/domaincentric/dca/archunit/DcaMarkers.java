@@ -367,7 +367,8 @@ public record DcaMarkers(
   public DescribedPredicate<JavaClass> is(String role) {
     DcaMarker marker = marker(role);
     return DescribedPredicate.describe(
-        "are " + role + " (" + marker + ")", c -> matches(marker, c));
+        "are " + ("aeio".indexOf(role.charAt(0)) >= 0 ? "an " : "a ") + role + " (" + marker + ")",
+        c -> matches(marker, c));
   }
 
   /** Whether the class is one the marker recognises — {@link #is(String)} for a single class. */
