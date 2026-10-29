@@ -55,13 +55,22 @@ class LayerMarkerTest {
   }
 
   @Test
-  void withoutTheAnnotationsTheDeclaredPackageIsInNoLayerAndTheDiagnosticNamesIt() {
+  void withoutTheAnnotationsTheDeclaredPackageIsInNoLayerAndBothRulesNameIt() {
     DcaLayout layout = DcaLayout.forBasePackage(APP);
     DcaArchitecture arch = arch(layout);
 
     assertEquals(
         Optional.empty(), placementOf(arch, BILLING + ".out.persistence.JdbcInvoiceStore"));
-    rule(layout, "DCA-HEX-019").check(arch);
+    AssertionError error =
+        assertThrows(AssertionError.class, () -> rule(layout, "DCA-HEX-019").check(arch));
+    assertTrue(
+        error
+            .getMessage()
+            .contains(
+                BILLING
+                    + ".out.persistence.JdbcInvoiceStore implements an output port but sits in no"
+                    + " layer"),
+        error.getMessage());
     List<String> unplaced = rule(layout, "DCA-LAY-007").observe(arch);
     assertTrue(
         unplaced.contains(BILLING + ".out.persistence.JdbcInvoiceStore (module " + BILLING + ")"),

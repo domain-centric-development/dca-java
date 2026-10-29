@@ -679,18 +679,17 @@ public final class HexagonalRules implements DcaRuleSet {
   public DcaRule outputPortImplementationsResideInOutgoingAdapters() {
     return DcaRule.check(
             "DCA-HEX-019",
-            "Output port implementations are placed in no layer but the outgoing adapters",
+            "Output port implementations are placed in the outgoing adapters",
             "An output port is what the application needs from outside; whatever implements it is an"
                 + " outgoing adapter - the implemented port says so. An implementation placed in the"
-                + " infrastructure package, the application or the domain is outside the selection of"
-                + " every rule written for outgoing adapters, and infrastructure then holds behaviour"
-                + " instead of wiring alone",
+                + " infrastructure package, the application, the domain or in no layer at all is"
+                + " outside the selection of every rule written for outgoing adapters, and"
+                + " infrastructure then holds behaviour instead of wiring alone",
             arch -> {
               CollectedViolations violations =
                   CollectedViolations.withHeader(
-                      "Output port implementations are placed in no layer but the outgoing"
-                          + " adapters\nbecause whatever implements an output port is an outgoing"
-                          + " adapter");
+                      "Output port implementations are placed in the outgoing adapters\nbecause"
+                          + " whatever implements an output port is an outgoing adapter");
               var outputPort = arch.layout().markers().is("outputPort");
               var inputPort = arch.layout().markers().is("inputPort");
               for (var type : arch.classes()) {
@@ -698,8 +697,15 @@ public final class HexagonalRules implements DcaRuleSet {
                   continue;
                 }
                 var placement = arch.placement(type);
-                if (placement.isEmpty()
-                    || placement.get().layer() == DcaLayout.Layer.OUTGOING_ADAPTER) {
+                if (placement.isEmpty()) {
+                  violations.add(
+                      type.getName()
+                          + " implements an output port but sits in no layer - declare the layer"
+                          + " of its package (DCA-LAY-007 lists such classes), or switch the"
+                          + " hexagonal set off while the project has no layers");
+                  continue;
+                }
+                if (placement.get().layer() == DcaLayout.Layer.OUTGOING_ADAPTER) {
                   continue;
                 }
                 boolean bridge =
@@ -724,15 +730,14 @@ public final class HexagonalRules implements DcaRuleSet {
         .selecting(
             "Non-interface classes anywhere under scan assignable to the output-port role -"
                 + " repositories, stores, event publishers and every other output port alike,"
-                + " abstract base classes and anonymous classes included - that the layout places in"
-                + " a layer: by a layer annotation on the class or a package above it, or by the"
-                + " package path. A lambda or a method reference is no class under scan and is not"
-                + " selected; a class in no layer is not selected either. Not selected: a class in"
+                + " abstract base classes and anonymous classes included. A lambda or a method"
+                + " reference is no class under scan and is not selected. Not selected: a class in"
                 + " an infrastructure package that depends on a type assignable to the input-port"
                 + " role - the bridge that hands an output port a second use case, which is wiring.")
         .checking(
             "Each is placed in the outgoing adapter layer - by default <module>.adapter.outgoing..,"
-                + " or wherever the layout's outgoing-adapter marker places it. DCA-TAC-015 and"
+                + " or wherever the layout's outgoing-adapter marker places it; a class the layout"
+                + " places in no layer is reported as well. DCA-TAC-015 and"
                 + " DCA-TAC-020 hold repositories and stores the same way in the tactical set.",
             "move the implementation into the outgoing adapter layer of its module; the"
                 + " configuration in infrastructure only wires it to its port");
