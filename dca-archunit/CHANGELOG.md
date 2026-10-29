@@ -4,6 +4,8 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-29
+
 ### Added
 
 **Layers recognised by the project's own annotations (WP-160).** `DcaMarker` names how a layer or a role is
