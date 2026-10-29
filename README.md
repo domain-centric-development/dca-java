@@ -343,9 +343,22 @@ the segments of the package layout, and the types a domain event may store its o
 (`withTimestampTypes`) — `DcaLayout` has a `with…` for it. Configure the name; do not switch the
 rule off.
 
+**Your own layers and annotations.** A layer is its package by default. A project that keeps a layer under
+another package name, or already marks its layers with annotations — its own or a library's — names that per
+layer: `withOutgoingAdapter(DcaMarker.ofPackage("adapter.out"))`, or during a migration
+`DcaMarker.anyOf(DcaMarker.ofPackage("adapter.outgoing"), DcaMarker.ofAnnotation("com.acme.arch.OutgoingAdapter"))`.
+On a `package-info` the annotation holds for the package tree below it, on a class it places that class; the
+class's annotation wins over the package's, the package's over the path, and the report lists every package
+where an annotation overrides the path. A building block takes an annotation too —
+`withValue(DcaMarker.ofAnnotation("com.acme.ddd.ValueObject"))` — never a package: a layer is a place, a building
+block is what a type is. Commands and queries are recognised by their name by default (`…Command`, `…Query`);
+`withCommand(DcaMarker.ofType(..))` / `withQuery(..)` point them at a supertype or an annotation instead. The
+library ships no annotations for any of this; it reads the ones a project has. `DCA-LAY-007` (experimental)
+lists the classes of a module that sit in no layer.
+
 ## Rule catalog
 
-**134 rule ids in 11 sets: 125 enforced, 9 informational; 10 of them experimental.** Six further ids are retired and keep their meaning in the retirement list. The exact, current list is
+**139 rule ids in 11 sets: 129 enforced, 10 informational; 15 of them experimental.** Six further ids are retired and keep their meaning in the retirement list. The exact, current list is
 [RULES.md](RULES.md) and [rules.json](rules.json), both generated from the code by
 `./gradlew :dca-archunit:rulesCatalog` and verified in CI; every number in this README is taken from
 there. `rules.json` names the library version its texts belong to.
