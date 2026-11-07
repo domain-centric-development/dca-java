@@ -46,7 +46,8 @@ class ErrorHandlingRulesTest {
         FIXTURES + ".bad",
         // informational diagnostics, never fail; DCA-ERR-007 observed in .errors.fieldtypes
         "DCA-ERR-006",
-        "DCA-ERR-007");
+        "DCA-ERR-007",
+        "DCA-ERR-008");
   }
 
   @Test
@@ -285,25 +286,42 @@ class ErrorHandlingRulesTest {
   }
 
   @Test
-  @DisplayName("DCA-ERR-008 reports a closed result whose refusing case is not marked")
-  void aClosedResultWithoutARefusalCaseIsReported() {
-    String message = Fixtures.violation(FIXTURES + ".bad", "DCA-ERR-008").getMessage();
+  @DisplayName("DCA-ERR-008 lists a closed result whose refusing case is not marked")
+  void aClosedResultWithoutARefusalCaseIsListed() {
+    var observed = Fixtures.observed(FIXTURES + ".bad", "DCA-ERR-008");
 
-    assertTrue(message.contains("CancelReservationResult is answered by"), message);
-    assertTrue(message.contains("[Cancelled, NotFound]"), message);
-    assertFalse(message.contains("ConfirmReservationResult"), "a plain record is no closed result");
+    assertEquals(1, observed.size(), observed.toString());
+    assertTrue(observed.get(0).contains("CancelReservationResult is answered by"), observed.get(0));
+    assertTrue(observed.get(0).contains("[Cancelled, NotFound]"), observed.get(0));
+    assertTrue(observed.get(0).contains("is none of these outcomes a refusal"), observed.get(0));
+  }
+
+  @Test
+  @DisplayName("DCA-ERR-008 lists a closed result of two successes and does not fail")
+  void aClosedResultOfSuccessesIsListedButDoesNotFail() {
+    Fixtures.passes(FIXTURES + ".results", "DCA-ERR-008");
+    var observed = Fixtures.observed(FIXTURES + ".results", "DCA-ERR-008");
+
+    assertEquals(1, observed.size(), observed.toString());
+    assertTrue(observed.get(0).contains("SendReminderResult"), observed.toString());
+    assertTrue(observed.get(0).contains("[AlreadySent, Sent]"), observed.toString());
+  }
+
+  @Test
+  @DisplayName("DCA-ERR-008 does not list a closed result with a marked refusal case")
+  void aClosedResultWithARefusalCaseIsNotListed() {
+    var observed = Fixtures.observed(FIXTURES + ".results", "DCA-ERR-008");
+
+    assertTrue(
+        observed.stream()
+            .noneMatch(line -> line.contains("LendCopyResult") || line.contains("RenewLoanResult")),
+        observed.toString());
   }
 
   @Test
   @DisplayName("DCA-ERR-008 counts refusals grouped below a sealed case")
   void aRefusalBelowASealedCaseCounts() {
-    Fixtures.passes(FIXTURES + ".good", "DCA-ERR-008");
-  }
-
-  @Test
-  @DisplayName("DCA-ERR-008 holds for a sealed interface and a sealed class with a marked case")
-  void theResultFixtureMarksItsRefusals() {
-    Fixtures.passes(FIXTURES + ".results", "DCA-ERR-008");
+    assertEquals(java.util.List.of(), Fixtures.observed(FIXTURES + ".good", "DCA-ERR-008"));
   }
 
   @Test

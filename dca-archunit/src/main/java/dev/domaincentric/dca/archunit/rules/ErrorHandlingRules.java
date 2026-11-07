@@ -451,20 +451,23 @@ public final class ErrorHandlingRules implements DcaRuleSet {
   }
 
   public DcaRule closedResultsRefuse() {
-    return DcaRule.check(
+    return DcaRule.informational(
             "DCA-ERR-008",
-            "A closed use-case result must have at least one case marked as a refusal",
-            "A use case answers with a closed result to return its expected refusals as cases the"
-                + " caller must handle; the refusal marker on those cases is what lets the"
-                + " transaction boundary roll a refusal back like a thrown failure. A closed result"
-                + " whose refusing cases are unmarked commits the writes made before the refusal,"
-                + " and one that refuses nothing is no closed result - the use case answers with a"
-                + " plain result",
+            "Diagnostic: closed use-case results without a case marked as a refusal",
+            "A closed result describes the outcomes a use case can answer with; some of them are"
+                + " refusals, some are not. A result may hold several outcomes of which none"
+                + " refuses - found or nothing found, sent or already sent - and that alone is"
+                + " reason enough to close it. The refusal marker on a case says the request was"
+                + " refused, a meaning the caller answers with or without a transaction, and it is"
+                + " what lets the transaction boundary roll a refusal back like a thrown failure."
+                + " Whether a case refuses is domain knowledge the type does not show, so a closed"
+                + " result without any marked case is listed for a look, not failed: if one of its"
+                + " outcomes is a refusal and stays unmarked, the transaction commits the writes"
+                + " made before it",
             arch -> {
               DcaMarkers markers = arch.layout().markers();
               DescribedPredicate<JavaClass> refusal = markers.is("refusal");
-              CollectedViolations collected =
-                  CollectedViolations.withHeader("A closed use-case result without a refusal case");
+              List<String> observed = new ArrayList<>();
               for (Map.Entry<JavaClass, Set<JavaClass>> result : closedResultsOf(arch).entrySet()) {
                 JavaClass type = result.getKey();
                 if (!arch.inApplication().test(type)) {
@@ -472,18 +475,21 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                 }
                 Set<JavaClass> cases = new LinkedHashSet<>();
                 collectCaseClasses(type, cases);
-                collected.require(
-                    cases.stream().anyMatch(refusal::test),
+                if (cases.stream().anyMatch(refusal::test)) {
+                  continue;
+                }
+                observed.add(
                     type.getName()
                         + " is answered by "
                         + result.getValue().stream().map(JavaClass::getSimpleName).sorted().toList()
                         + " and none of its cases "
                         + cases.stream().map(JavaClass::getSimpleName).sorted().toList()
-                        + " is a refusal ("
+                        + " is marked as a refusal ("
                         + markers.marker("refusal")
-                        + ") - mark the refusing cases, or answer with a plain result");
+                        + ") - check: is none of these outcomes a refusal? If one is, mark it,"
+                        + " or the transaction commits when it is returned");
               }
-              collected.throwIfAny();
+              return observed;
             })
         .experimental()
         .selecting(
@@ -492,14 +498,14 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                 + " port's use-case interface binds as a type argument - commands and queries"
                 + " excluded.")
         .checking(
-            "At least one of its cases is assignable to the configured refusal role (by default"
-                + " the Refusal marker of the building blocks). Its cases are its permitted"
-                + " subclasses, recursively through sealed cases, so refusals grouped below a"
-                + " sealed case of their own count. The result type itself carrying the marker"
-                + " does not count. A context that throws its refusals has no closed results and"
-                + " passes, and an empty selection passes.",
-            "implement the refusal marker on every case that refuses the request; a result with"
-                + " no refusing case becomes a plain record");
+            "Informational diagnostic only: lists every closed result none of whose cases is"
+                + " assignable to the configured refusal role (by default the Refusal marker of"
+                + " the building blocks), and never fails. Its cases are its permitted subclasses,"
+                + " recursively through sealed cases, so refusals grouped below a sealed case of"
+                + " their own count. The result type itself carrying the marker does not count. A"
+                + " listed result is not a finding by itself: a closed result whose outcomes are"
+                + " all successes - found or nothing found - is correct as it is. A context that"
+                + " throws its refusals has no closed results and lists nothing.");
   }
 
   public DcaRule domainExceptionsConstructedInTheDomain() {

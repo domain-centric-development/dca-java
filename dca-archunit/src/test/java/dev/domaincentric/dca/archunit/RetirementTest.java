@@ -68,7 +68,8 @@ class RetirementTest {
             "DCA-HEX-016",
             "DCA-NAM-012",
             "DCA-ERR-006",
-            "DCA-ERR-007"),
+            "DCA-ERR-007",
+            "DCA-ERR-008"),
         DcaRules.all(layout).stream()
             .filter(r -> r.kind() == DcaRule.Kind.INFORMATIONAL)
             .map(DcaRule::id)

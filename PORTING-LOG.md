@@ -408,12 +408,14 @@ The decision behind the set, the naming and the limits is `docs/adr/adr-002-exce
   the `checkcast` nor the type-switch bootstrap arguments of a pattern `switch`, so `ClassFileReferences` reads
   the class file's constant pool beside it. One reference to one case counts; exhaustiveness is the compiler's.
   The fixture compiles for Java 17, so its pattern switch is compiled by the test on a Java 21+ runtime.
-- **ERR-008 — a closed result has a refusal case (WP-171, 2026-11-07), experimental, enforced.** New rule, same id
-  in `dca-dotnet` and `dca-rust`. Selects the closed results ERR-006 knows (a sealed type an input port's public
-  method returns or its `UseCase<…>` interface binds), restricted to the application layer and with commands and
-  queries excluded; asks one of its permitted subclasses, recursively, to be assignable to the new `refusal` role
-  of `DcaMarkers` (default `application.Refusal`). The marker is what the transaction boundaries and the
-  `@Transactional` net of `dca-spring` roll back on.
+- **ERR-008 — closed results without a refusal case (WP-171, 2026-11-07), experimental, informational.** New
+  rule, same id in `dca-dotnet` and `dca-rust`. Selects the closed results ERR-006 knows (a sealed type an input
+  port's public method returns or its `UseCase<…>` interface binds), restricted to the application layer and with
+  commands and queries excluded; lists each one none of whose permitted subclasses, recursively, is assignable
+  to the new `refusal` role of `DcaMarkers` (default `application.Refusal`). The marker is what the transaction
+  boundaries and the `@Transactional` net of `dca-spring` roll back on. First written as an enforced rule
+  demanding a refusal case; turned into a diagnostic the same day (decision "A"): a closed result may hold only
+  successes (`Found | NoResult`, `Sent | AlreadySent`), and whether a case refuses is not visible in the type.
 - **Port failures (WP-171, decision 8, 2026-11-07).** `PortException` → `InputPortException` → `UseCaseException`,
   and `PortException` → `OutputPortException`, abstract, in the building blocks' application package. Three new
   `DcaMarkers` roles. ERR-002 places every `portException` subtype in the application layer; ERR-003 accepts

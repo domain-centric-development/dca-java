@@ -14,13 +14,15 @@ outside the domain layer and fails for each one whose target is assignable to th
 subclass constructor chaining to its parent is no construction; the role's own package is library code and not
 selected. Reflection and generic factories are not seen. Enforced once experimental rules are switched on.
 
-**`DCA-ERR-008` — a closed use-case result has at least one case marked as a refusal (WP-171), experimental.** A
-use case that returns its expected refusals as cases of a closed result marks each refusing case with
-`Refusal` from the building blocks, so the transaction boundary rolls a returned refusal back like a thrown
-failure. The rule selects the closed results `DCA-ERR-006` knows — a sealed type an input port's public method
-returns or its use-case interface binds as a type argument, in the application layer, commands and queries
-excluded — and fails for each one none of whose permitted subclasses (recursively) is a refusal. A context that
-throws its refusals has no closed result and passes. Enforced once experimental rules are switched on.
+**`DCA-ERR-008` — diagnostic: closed use-case results without a case marked as a refusal (WP-171),
+experimental, informational.** A use case that returns its expected refusals as cases of a closed result marks
+each refusing case with `Refusal` from the building blocks, so the transaction boundary rolls a returned refusal
+back like a thrown failure. A closed result may also hold only outcomes that are not refusals — found or nothing
+found, sent or already sent — and is correct that way; whether a case refuses is domain knowledge the type does
+not show. So the diagnostic selects the closed results `DCA-ERR-006` knows — a sealed type an input port's public
+method returns or its use-case interface binds as a type argument, in the application layer, commands and
+queries excluded — and lists each one none of whose permitted subclasses (recursively) is a refusal, asking
+whether none of its outcomes is one. It never fails the build.
 
 **`DcaMarkers` role `refusal`** (default `dev.domaincentric.dca.buildingblocks.application.Refusal`;
 `withRefusal(String)` / `withRefusal(DcaMarker)`). The record gained a component; the previous canonical

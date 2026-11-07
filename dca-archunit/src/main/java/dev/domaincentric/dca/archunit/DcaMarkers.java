@@ -93,8 +93,8 @@ import java.util.Objects;
  *     adapter and caught by the use case - read by {@code DCA-ERR-003}
  * @param transactionBoundary the explicit transaction boundary of the application layer
  * @param refusal the marker on a case of a closed use-case result that refuses the request - read
- *     by {@code DCA-ERR-008}, which asks every closed result an input port answers with for at
- *     least one such case
+ *     by {@code DCA-ERR-008}, which lists every closed result an input port answers with that has
+ *     no such case
  * @param inputPort the base type of every incoming (driving) port
  * @param useCase the input port that takes a command or query and answers with a result - read only
  *     by {@code DCA-NAM-001}; every other use-case rule selects through {@code inputPort} or the

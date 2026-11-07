@@ -360,7 +360,7 @@ lists the classes of a module that sit in no layer.
 
 ## Rule catalog
 
-**139 rule ids in 11 sets: 129 enforced, 10 informational; 15 of them experimental.** Six further ids are retired and keep their meaning in the retirement list. The exact, current list is
+**141 rule ids in 11 sets: 130 enforced, 11 informational; 17 of them experimental.** Six further ids are retired and keep their meaning in the retirement list. The exact, current list is
 [RULES.md](RULES.md) and [rules.json](rules.json), both generated from the code by
 `./gradlew :dca-archunit:rulesCatalog` and verified in CI; every number in this README is taken from
 there. `rules.json` names the library version its texts belong to.
