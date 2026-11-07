@@ -4,6 +4,8 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-07
+
 ### Added
 
 - **A returned refusal rolls back (WP-171).** `SpringTransactionBoundary` marks the status rollback-only when the
