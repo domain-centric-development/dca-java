@@ -84,7 +84,17 @@ import java.util.Objects;
  *     by {@code DCA-ADV-017} and {@code DCA-ADV-018} alongside the name suffix
  * @param domainException the base type of a domain failure
  * @param useCaseException the base type of a use-case failure
+ * @param portException the base type of every failure a port's contract declares - read by {@code
+ *     DCA-ERR-002}, which places every subtype in the application layer, and by the rules that tell
+ *     a project's failures from other exceptions
+ * @param inputPortException the base type of a failure an input port declares - read by {@code
+ *     DCA-ERR-006}, which lists an incoming adapter that names it
+ * @param outputPortException the base type of a failure an output port declares, raised by its
+ *     adapter and caught by the use case - read by {@code DCA-ERR-003}
  * @param transactionBoundary the explicit transaction boundary of the application layer
+ * @param refusal the marker on a case of a closed use-case result that refuses the request - read
+ *     by {@code DCA-ERR-008}, which asks every closed result an input port answers with for at
+ *     least one such case
  * @param inputPort the base type of every incoming (driving) port
  * @param useCase the input port that takes a command or query and answers with a result - read only
  *     by {@code DCA-NAM-001}; every other use-case rule selects through {@code inputPort} or the
@@ -122,7 +132,11 @@ public record DcaMarkers(
     String specification,
     String domainException,
     String useCaseException,
+    String portException,
+    String inputPortException,
+    String outputPortException,
     String transactionBoundary,
+    String refusal,
     String inputPort,
     String useCase,
     String outputPort,
@@ -145,6 +159,121 @@ public record DcaMarkers(
 
   private static final List<String> DECLARATION_ROLES =
       List.of("boundedContext", "sharedKernel", "integrationEventType");
+
+  /** The vocabulary before the roles refusal existed: it keeps the library's own type. */
+  public DcaMarkers(
+      String name,
+      String aggregateRoot,
+      String entity,
+      String value,
+      String id,
+      String domainEvent,
+      String integrationEvent,
+      String domainService,
+      String factory,
+      String specification,
+      String domainException,
+      String useCaseException,
+      String transactionBoundary,
+      String inputPort,
+      String useCase,
+      String outputPort,
+      String repository,
+      String store,
+      String domainEventPublisher,
+      String integrationEventPublisher,
+      String boundedContext,
+      String sharedKernel,
+      String integrationEventType,
+      Map<String, DcaMarker> recognisedBy) {
+    this(
+        name,
+        aggregateRoot,
+        entity,
+        value,
+        id,
+        domainEvent,
+        integrationEvent,
+        domainService,
+        factory,
+        specification,
+        domainException,
+        useCaseException,
+        transactionBoundary,
+        DCA_BUILDING_BLOCKS + ".application.Refusal",
+        inputPort,
+        useCase,
+        outputPort,
+        repository,
+        store,
+        domainEventPublisher,
+        integrationEventPublisher,
+        boundedContext,
+        sharedKernel,
+        integrationEventType,
+        recognisedBy);
+  }
+
+  /**
+   * The vocabulary before the roles portException, inputPortException, outputPortException existed:
+   * they keep the library's own type.
+   */
+  public DcaMarkers(
+      String name,
+      String aggregateRoot,
+      String entity,
+      String value,
+      String id,
+      String domainEvent,
+      String integrationEvent,
+      String domainService,
+      String factory,
+      String specification,
+      String domainException,
+      String useCaseException,
+      String transactionBoundary,
+      String refusal,
+      String inputPort,
+      String useCase,
+      String outputPort,
+      String repository,
+      String store,
+      String domainEventPublisher,
+      String integrationEventPublisher,
+      String boundedContext,
+      String sharedKernel,
+      String integrationEventType,
+      Map<String, DcaMarker> recognisedBy) {
+    this(
+        name,
+        aggregateRoot,
+        entity,
+        value,
+        id,
+        domainEvent,
+        integrationEvent,
+        domainService,
+        factory,
+        specification,
+        domainException,
+        useCaseException,
+        DCA_BUILDING_BLOCKS + ".application.PortException",
+        DCA_BUILDING_BLOCKS + ".application.InputPortException",
+        DCA_BUILDING_BLOCKS + ".application.OutputPortException",
+        transactionBoundary,
+        refusal,
+        inputPort,
+        useCase,
+        outputPort,
+        repository,
+        store,
+        domainEventPublisher,
+        integrationEventPublisher,
+        boundedContext,
+        sharedKernel,
+        integrationEventType,
+        recognisedBy);
+  }
 
   /** The vocabulary as before WP-160: every role its type, command and query by suffix. */
   public DcaMarkers(
@@ -216,7 +345,11 @@ public record DcaMarkers(
     specification = type(specification, "specification");
     domainException = type(domainException, "domainException");
     useCaseException = type(useCaseException, "useCaseException");
+    portException = type(portException, "portException");
+    inputPortException = type(inputPortException, "inputPortException");
+    outputPortException = type(outputPortException, "outputPortException");
     transactionBoundary = type(transactionBoundary, "transactionBoundary");
+    refusal = type(refusal, "refusal");
     inputPort = type(inputPort, "inputPort");
     useCase = type(useCase, "useCase");
     outputPort = type(outputPort, "outputPort");
@@ -260,7 +393,11 @@ public record DcaMarkers(
         DCA_BUILDING_BLOCKS + ".ddd.tactical.Specification",
         DCA_BUILDING_BLOCKS + ".ddd.tactical.DomainException",
         DCA_BUILDING_BLOCKS + ".application.UseCaseException",
+        DCA_BUILDING_BLOCKS + ".application.PortException",
+        DCA_BUILDING_BLOCKS + ".application.InputPortException",
+        DCA_BUILDING_BLOCKS + ".application.OutputPortException",
         DCA_BUILDING_BLOCKS + ".application.TransactionBoundary",
+        DCA_BUILDING_BLOCKS + ".application.Refusal",
         DCA_BUILDING_BLOCKS + ".hexagonal.port.in.InputPort",
         DCA_BUILDING_BLOCKS + ".hexagonal.port.in.UseCase",
         DCA_BUILDING_BLOCKS + ".hexagonal.port.out.OutputPort",
@@ -270,7 +407,8 @@ public record DcaMarkers(
         DCA_BUILDING_BLOCKS + ".hexagonal.port.out.IntegrationEventPublisher",
         DCA_BUILDING_BLOCKS + ".ddd.strategic.BoundedContext",
         DCA_BUILDING_BLOCKS + ".ddd.strategic.relationships.SharedKernel",
-        DCA_BUILDING_BLOCKS + ".ddd.tactical.IntegrationEventType");
+        DCA_BUILDING_BLOCKS + ".ddd.tactical.IntegrationEventType",
+        DEFAULT_RECOGNITION);
   }
 
   /** The same vocabulary under a different name, which the test report shows. */
@@ -440,7 +578,11 @@ public record DcaMarkers(
         roles.get("specification"),
         roles.get("domainException"),
         roles.get("useCaseException"),
+        roles.get("portException"),
+        roles.get("inputPortException"),
+        roles.get("outputPortException"),
         roles.get("transactionBoundary"),
+        roles.get("refusal"),
         roles.get("inputPort"),
         roles.get("useCase"),
         roles.get("outputPort"),
@@ -498,8 +640,24 @@ public record DcaMarkers(
     return withRole("useCaseException", fqn);
   }
 
+  public DcaMarkers withPortException(String fqn) {
+    return withRole("portException", fqn);
+  }
+
+  public DcaMarkers withInputPortException(String fqn) {
+    return withRole("inputPortException", fqn);
+  }
+
+  public DcaMarkers withOutputPortException(String fqn) {
+    return withRole("outputPortException", fqn);
+  }
+
   public DcaMarkers withTransactionBoundary(String fqn) {
     return withRole("transactionBoundary", fqn);
+  }
+
+  public DcaMarkers withRefusal(String fqn) {
+    return withRole("refusal", fqn);
   }
 
   public DcaMarkers withInputPort(String fqn) {
@@ -599,8 +757,24 @@ public record DcaMarkers(
     return withRole("useCaseException", marker);
   }
 
+  public DcaMarkers withPortException(DcaMarker marker) {
+    return withRole("portException", marker);
+  }
+
+  public DcaMarkers withInputPortException(DcaMarker marker) {
+    return withRole("inputPortException", marker);
+  }
+
+  public DcaMarkers withOutputPortException(DcaMarker marker) {
+    return withRole("outputPortException", marker);
+  }
+
   public DcaMarkers withTransactionBoundary(DcaMarker marker) {
     return withRole("transactionBoundary", marker);
+  }
+
+  public DcaMarkers withRefusal(DcaMarker marker) {
+    return withRole("refusal", marker);
   }
 
   public DcaMarkers withInputPort(DcaMarker marker) {
@@ -734,7 +908,11 @@ public record DcaMarkers(
     roles.put("specification", specification);
     roles.put("domainException", domainException);
     roles.put("useCaseException", useCaseException);
+    roles.put("portException", portException);
+    roles.put("inputPortException", inputPortException);
+    roles.put("outputPortException", outputPortException);
     roles.put("transactionBoundary", transactionBoundary);
+    roles.put("refusal", refusal);
     roles.put("inputPort", inputPort);
     roles.put("useCase", useCase);
     roles.put("outputPort", outputPort);

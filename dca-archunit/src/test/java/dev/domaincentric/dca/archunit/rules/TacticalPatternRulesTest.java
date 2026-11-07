@@ -243,13 +243,18 @@ class TacticalPatternRulesTest {
     Fixtures.passes(Fixtures.ROOT + ".tactical.factories.good", "DCA-TAC-024");
   }
 
-  /** DCA-TAC-025: a flag, a count, a moment, a list of strings and a value's bare components. */
+  /**
+   * DCA-TAC-025: a flag argument, a count, a moment, a list of strings and a value's bare
+   * components; the boolean field behind a single yes/no fact passes.
+   */
   @Test
   void barePrimitivesInTheDomainAreReported() {
     String message =
         Fixtures.violation(Fixtures.ROOT + ".tactical.primitives.bad", "DCA-TAC-025").getMessage();
 
-    assertTrue(message.contains("Account: field closed is boolean"), message);
+    assertFalse(message.contains("field closed"), message);
+    assertTrue(message.contains("markClosed(...) takes boolean as parameter 1"), message);
+    assertTrue(message.contains("field frozen is a public boolean anyone may set"), message);
     assertTrue(message.contains("field overdraftCount is int"), message);
     assertTrue(message.contains("field openedAt is Instant"), message);
     assertTrue(message.contains("field tags is String"), message);
@@ -264,7 +269,10 @@ class TacticalPatternRulesTest {
     assertFalse(message.contains("toString"), message);
   }
 
-  /** Values of values, an enum for a flag and an event's occurredOn pass. */
+  /**
+   * Values of values, an enum for a status, a boolean field told by freeze() and asked by
+   * isFrozen(), and an event's occurredOn pass.
+   */
   @Test
   void aDomainOfValueObjectsPasses() {
     Fixtures.passes(Fixtures.ROOT + ".tactical.primitives.good", "DCA-TAC-025");

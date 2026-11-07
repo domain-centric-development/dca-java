@@ -3,14 +3,26 @@ package dev.domaincentric.dca.archunit.rules;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import com.tngtech.archunit.core.importer.ClassFileImporter;
+import com.tngtech.archunit.core.importer.Location;
+import com.tngtech.archunit.core.importer.Locations;
+import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.Fixtures;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.stream.Stream;
+import javax.tools.JavaCompiler;
+import javax.tools.ToolProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
+import org.junit.jupiter.api.io.TempDir;
 
 /** Self-test of {@link ErrorHandlingRules} against the error-handling fixture tree. */
 class ErrorHandlingRulesTest {
@@ -162,6 +174,106 @@ class ErrorHandlingRulesTest {
     assertFalse(observed.get(0).contains("adapter.incoming.rest:"), observed.toString());
   }
 
+  /** An exhaustive switch over a sealed use-case result translates the use case's refusals. */
+  @Test
+  void aSwitchOverTheCasesOfASealedResultCountsAsTranslation() {
+    var observed = Fixtures.observed(FIXTURES + ".results", "DCA-ERR-006");
+
+    assertTrue(
+        observed.stream().noneMatch(line -> line.contains("adapter.incoming.page:")),
+        observed.toString());
+  }
+
+  /**
+   * A pattern-matching switch whose arms never touch the bound case: the import model sees no
+   * reference to a case type, the class file's constant pool does. The library compiles for Java
+   * 17, so the switch is compiled here, on a runtime that knows it.
+   */
+  @Test
+  void aPatternSwitchThatTouchesNoCaseMemberCountsAsTranslation(@TempDir Path compiled)
+      throws Exception {
+    assumeTrue(Runtime.version().feature() >= 21, "pattern switch needs Java 21");
+    String pkg = FIXTURES + ".results.lending.adapter.incoming.web";
+    String app = FIXTURES + ".results.lending.application";
+    String source =
+        "package "
+            + pkg
+            + ";\n"
+            + "public final class LendingWebController {\n"
+            + "  private final "
+            + app
+            + ".lendcopy.LendCopyInputPort lendCopy;\n"
+            + "  public LendingWebController("
+            + app
+            + ".lendcopy.LendCopyInputPort lendCopy) { this.lendCopy = lendCopy; }\n"
+            + "  public String lend(String member, String copy) {\n"
+            + "    return switch (lendCopy.execute(new "
+            + app
+            + ".lendcopy.LendCopyCommand(member, copy))) {\n"
+            + "      case "
+            + app
+            + ".lendcopy.LendCopyResult.Lent lent -> \"lent\";\n"
+            + "      case "
+            + app
+            + ".lendcopy.LendCopyResult.LimitReached refused -> \"limit\";\n"
+            + "    };\n"
+            + "  }\n"
+            + "}\n";
+    Path file = compiled.resolve("LendingWebController.java");
+    Files.writeString(file, source);
+    JavaCompiler javac = ToolProvider.getSystemJavaCompiler();
+    int status =
+        javac.run(
+            null,
+            null,
+            null,
+            "--release",
+            "21",
+            "-cp",
+            System.getProperty("java.class.path"),
+            "-d",
+            compiled.toString(),
+            file.toString());
+    assertEquals(0, status, "the switch fixture compiles");
+    Files.delete(file);
+
+    String root = FIXTURES + ".results";
+    Set<Location> locations = new HashSet<>(Locations.ofPackage(root));
+    locations.add(Location.of(compiled));
+    DcaArchitecture arch =
+        DcaArchitecture.of(
+            DcaLayout.forBasePackage(root), new ClassFileImporter().importLocations(locations));
+    var observed = Fixtures.rule(root, "DCA-ERR-006").observe(arch);
+
+    assertTrue(
+        arch.classes().stream()
+            .anyMatch(type -> type.getSimpleName().equals("LendingWebController")),
+        "the compiled switch is imported");
+    assertTrue(
+        observed.stream().noneMatch(line -> line.contains("adapter.incoming.web:")),
+        observed.toString());
+  }
+
+  /** Neither a failure type nor a case of a closed result: the package is still listed. */
+  @Test
+  void anAdapterWithNeitherHandlerNorResultSwitchIsStillListed() {
+    var observed = Fixtures.observed(FIXTURES + ".results", "DCA-ERR-006");
+
+    assertTrue(
+        observed.stream().anyMatch(line -> line.contains("adapter.incoming.rest:")),
+        observed.toString());
+  }
+
+  /** Holding the closed result without looking at a case is no translation. */
+  @Test
+  void receivingASealedResultWithoutItsCasesIsStillListed() {
+    var observed = Fixtures.observed(FIXTURES + ".results", "DCA-ERR-006");
+
+    assertTrue(
+        observed.stream().anyMatch(line -> line.contains("adapter.incoming.feed:")),
+        observed.toString());
+  }
+
   /** Where failure types derive from the markers, DCA-ERR-006 lists packages as before. */
   @Test
   void withFailureMarkerTypesTheDiagnosticListsPackages() {
@@ -170,5 +282,98 @@ class ErrorHandlingRulesTest {
     assertTrue(
         observed.stream().noneMatch(line -> line.contains("no class of the scan is assignable")),
         observed.toString());
+  }
+
+  @Test
+  @DisplayName("DCA-ERR-008 reports a closed result whose refusing case is not marked")
+  void aClosedResultWithoutARefusalCaseIsReported() {
+    String message = Fixtures.violation(FIXTURES + ".bad", "DCA-ERR-008").getMessage();
+
+    assertTrue(message.contains("CancelReservationResult is answered by"), message);
+    assertTrue(message.contains("[Cancelled, NotFound]"), message);
+    assertFalse(message.contains("ConfirmReservationResult"), "a plain record is no closed result");
+  }
+
+  @Test
+  @DisplayName("DCA-ERR-008 counts refusals grouped below a sealed case")
+  void aRefusalBelowASealedCaseCounts() {
+    Fixtures.passes(FIXTURES + ".good", "DCA-ERR-008");
+  }
+
+  @Test
+  @DisplayName("DCA-ERR-008 holds for a sealed interface and a sealed class with a marked case")
+  void theResultFixtureMarksItsRefusals() {
+    Fixtures.passes(FIXTURES + ".results", "DCA-ERR-008");
+  }
+
+  @Test
+  @DisplayName("DCA-ERR-002 reports an output-port failure the adapter declares itself")
+  void anOutputPortExceptionOutsideTheApplicationIsReported() {
+    String message = Fixtures.failure(FIXTURES + ".bad", "DCA-ERR-002").getMessage();
+
+    assertTrue(message.contains("StoreRefusedReservationException"), message);
+  }
+
+  @Test
+  @DisplayName(
+      "DCA-ERR-003 reports an application failure that extends InputPortException directly")
+  void aDirectInputPortExceptionIsReported() {
+    String message = Fixtures.failure(FIXTURES + ".bad", "DCA-ERR-003").getMessage();
+
+    assertTrue(message.contains("ReservationQuotaExceededException"), message);
+  }
+
+  @Test
+  @DisplayName("DCA-ERR-002/003 accept an output-port failure declared beside its port")
+  void anOutputPortExceptionBesideItsPortPasses() {
+    Fixtures.passes(FIXTURES + ".good", "DCA-ERR-002");
+    Fixtures.passes(FIXTURES + ".good", "DCA-ERR-003");
+  }
+
+  @Test
+  @DisplayName("DCA-ERR-006 lists an incoming adapter that catches the abstract port failure")
+  void anAdapterCatchingThePortFailureGenericallyIsListed() {
+    var observed = Fixtures.observed(FIXTURES + ".bad", "DCA-ERR-006");
+
+    assertTrue(
+        observed.stream()
+            .anyMatch(
+                line ->
+                    line.contains(
+                        "ReservationRestController: names the abstract base PortException")),
+        observed.toString());
+  }
+
+  @Test
+  @DisplayName("DCA-ERR-006 lists no generic catch where the adapters name the failures")
+  void noGenericCatchInTheGoodFixture() {
+    var observed = Fixtures.observed(FIXTURES + ".good", "DCA-ERR-006");
+
+    assertTrue(
+        observed.stream().noneMatch(line -> line.contains("names the abstract base")),
+        observed.toString());
+  }
+
+  @Test
+  @DisplayName("DCA-ERR-009 reports a use case that constructs a domain exception for a not-found")
+  void aUseCaseConstructingADomainExceptionIsReported() {
+    String message = Fixtures.violation(FIXTURES + ".bad", "DCA-ERR-009").getMessage();
+
+    assertTrue(message.contains("CancelReservationUseCase"), message);
+    assertTrue(
+        message.contains(
+            "constructs " + FIXTURES + ".bad.reservation.domain.model.ReservationUnknownException"),
+        message);
+    assertFalse(
+        message.contains("ReservationOverbookedException("),
+        "a constructor's call to its parent is no construction");
+    assertFalse(message.contains("Reservation.confirm"), "the aggregate raises its own failure");
+  }
+
+  @Test
+  @DisplayName(
+      "DCA-ERR-009 holds for an aggregate and a domain service that raise a domain failure")
+  void theDomainLayerConstructsItsOwnFailures() {
+    Fixtures.passes(FIXTURES + ".good", "DCA-ERR-009");
   }
 }

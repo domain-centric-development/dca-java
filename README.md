@@ -8,9 +8,9 @@ Hexagonal Architecture and Clean Architecture.
 
 | Artifact | What it is | Dependencies |
 |----------|------------|--------------|
-| `dev.domaincentric:dca-building-blocks` | The building blocks your code implements: DDD tactical markers (`AggregateRoot`, `Entity`, `Value`, `DomainEvent`, …), strategic annotations (`@BoundedContext`, `@SharedKernel`, `@Upstream`, `@Partnership`, …) and hexagonal port interfaces (`UseCase`, `Repository`, `Store`, …), the application-layer `TransactionBoundary` and the two exception base types (`DomainException`, `UseCaseException`) | none |
+| `dev.domaincentric:dca-building-blocks` | The building blocks your code implements: DDD tactical markers (`AggregateRoot`, `Entity`, `Value`, `DomainEvent`, …), strategic annotations (`@BoundedContext`, `@SharedKernel`, `@Upstream`, `@Partnership`, …) and hexagonal port interfaces (`UseCase`, `Repository`, `Store`, …), the application-layer `TransactionBoundary` and the exception base types (`DomainException`; `PortException` with `InputPortException` → `UseCaseException` and `OutputPortException`), the `Refusal` marker | none |
 | `dev.domaincentric:dca-archunit` | The governance rules: 119 ArchUnit rules pinned to those building blocks, plus an executable context map | `dca-building-blocks`, ArchUnit |
-| `dev.domaincentric:dca-spring` | The runtime adapters the rules demand: `SpringDomainEventPublisher` (over `ApplicationEventPublisher`), `SpringTransactionBoundary` (over `TransactionTemplate`), an `InMemoryTransactionBoundary` for tests, and a Spring Boot auto-configuration | `dca-building-blocks`; Spring `compileOnly` — your Boot BOM pins the version |
+| `dev.domaincentric:dca-spring` | The runtime adapters the rules demand: `SpringDomainEventPublisher` (over `ApplicationEventPublisher`), `SpringTransactionBoundary` (over `TransactionTemplate`), an `InMemoryTransactionBoundary` for tests, a Spring Boot auto-configuration, and the net that rolls back a `@Transactional` method returning a `Refusal` (`dca.spring.refusal-rollback.enabled`, on by default) | `dca-building-blocks`; Spring `compileOnly` — your Boot BOM pins the version |
 | `dev.domaincentric:dca-archunit-spring-modulith` | Spring Modulith's module verification as a DCA test: `DcaSpringModulithTest` next to `DcaArchitectureTest`, with the test-class exclusion Modulith needs | `dca-archunit`; `spring-modulith-core` `compileOnly` |
 
 A Spring / Spring Modulith project ends up with two production and two test dependencies; every one
@@ -74,7 +74,9 @@ dev.domaincentric.dca.buildingblocks
 ├── hexagonal.port.in / .out     InputPort, UseCase  |  OutputPort, Repository, Store,
 │                                DomainEventPublisher, IntegrationEventPublisher
 └── application                  TransactionBoundary (execution abstraction, not a port),
-                                 UseCaseException
+                                 PortException ← InputPortException ← UseCaseException,
+                                 PortException ← OutputPortException,
+                                 Refusal (a refusing case of a result)
 ```
 
 ### 2. Rules in an architecture test

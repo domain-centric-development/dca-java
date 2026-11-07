@@ -6,6 +6,7 @@ public class Account extends BaseAggregateRoot<Account, AccountId> {
   private final AccountId id;
   private AccountStatus status;
   private Address address;
+  private boolean frozen;
 
   Account(AccountId id) {
     this.id = id;
@@ -23,6 +24,14 @@ public class Account extends BaseAggregateRoot<Account, AccountId> {
 
   public void moveTo(Address address) {
     this.address = address;
+  }
+
+  public void freeze() {
+    this.frozen = true;
+  }
+
+  public boolean isFrozen() {
+    return frozen;
   }
 
   @Override

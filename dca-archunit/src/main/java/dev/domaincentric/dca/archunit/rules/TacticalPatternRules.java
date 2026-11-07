@@ -983,20 +983,26 @@ public final class TacticalPatternRules implements DcaRuleSet {
       Set.of("equals", "hashCode", "toString", "compareTo");
 
   /**
-   * DCA-TAC-025. A string, a number, a flag or a moment that means something in the domain carries
-   * its rules in a value object of its own - a postal code, a quantity, a status. Held bare, its
-   * rules are repeated wherever it is used, or nowhere.
+   * DCA-TAC-025. A string, a number or a moment that means something in the domain carries its
+   * rules in a value object of its own - a postal code, a quantity, a moment. Held bare, its rules
+   * are repeated wherever it is used, or nowhere. A single yes/no fact is the exception: the domain
+   * type keeps it in a boolean field, is told to change it and answers it with a predicate; only a
+   * boolean parameter - a flag argument - is reported.
    */
   public static DcaRule domainHoldsNoBarePrimitives() {
     return DcaRule.check(
             "DCA-TAC-025",
-            "Domain types must not hold bare primitives, strings or time types",
-            "A value with rules of its own - a postal code, a quantity, a status, a moment, an"
-                + " identifier - is a value object; held as a bare String, int, boolean, Instant or UUID its"
-                + " validation is"
+            "Domain types must not hold bare primitives, strings or time types; a boolean only as a"
+                + " field or a predicate",
+            "A value with rules of its own - a postal code, a quantity, a moment, an identifier -"
+                + " is a value object; held as a bare String, int, Instant or UUID its validation is"
                 + " repeated at every use or missing. A value object with several components holds"
                 + " value objects too; only a wrapper - a value of exactly one component - holds the"
-                + " primitive it wraps",
+                + " primitive it wraps. A single yes/no fact may stay a boolean field: the type is"
+                + " told (complete()) and answers (isCompleted()). A boolean parameter is a flag"
+                + " argument - setCompleted(true) lets the caller set the state instead of"
+                + " triggering the behaviour - and three or more states, or transitions with rules,"
+                + " are an enum or a value",
             arch -> {
               DcaMarkers markers = arch.layout().markers();
               Set<String> buildingBlocks = buildingBlockTypes(markers);
@@ -1026,6 +1032,16 @@ public final class TacticalPatternRules implements DcaRuleSet {
                       || exemptAccessors.contains(field.getName())) {
                     continue;
                   }
+                  if (isBoolean(field.getRawType())) {
+                    if (field.getModifiers().contains(JavaModifier.PUBLIC)
+                        && !field.getModifiers().contains(JavaModifier.FINAL)) {
+                      bare.add(
+                          "field "
+                              + field.getName()
+                              + " is a public boolean anyone may set - a flag argument");
+                    }
+                    continue;
+                  }
                   String found = bareTypesIn(field.getType());
                   if (!found.isEmpty()) {
                     bare.add("field " + field.getName() + " is " + found);
@@ -1044,9 +1060,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
                   boolean accessorOfReportedField =
                       method.getRawParameterTypes().isEmpty()
                           && reportedFields.contains(method.getName());
-                  String returnType = method.getRawReturnType().getName();
-                  boolean predicate =
-                      returnType.equals("boolean") || returnType.equals("java.lang.Boolean");
+                  boolean predicate = isBoolean(method.getRawReturnType());
                   String returned = bareTypesIn(method.getReturnType());
                   if (!returned.isEmpty() && !accessorOfReportedField && !predicate) {
                     bare.add(method.getName() + "() returns " + returned);
@@ -1073,9 +1087,10 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 }
               }
               fail(
-                  "Domain types must not hold bare primitives, strings or time types. Fix: wrap each"
-                      + " in a value object that carries its rules - a value of one component"
-                      + " may hold the primitive it wraps.",
+                  "Domain types must not hold bare primitives, strings or time types; a boolean only"
+                      + " as a field or a predicate. Fix: wrap each in a value object that carries its"
+                      + " rules - a value of one component may hold the primitive it wraps; replace a"
+                      + " boolean parameter by a method that names the behaviour.",
                   violations);
             })
         .experimental()
@@ -1091,22 +1106,32 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 + " bridge members; equals, hashCode, toString and compareTo; the values() and"
                 + " valueOf(String) the language declares on an enum; a method that implements a"
                 + " method of a building block, such as a domain event's occurredOn() or a"
-                + " specification's isSatisfiedBy, and the field of the same name behind it. A boolean"
-                + " return is a question to the object - a predicate - and passes; a boolean field or"
-                + " parameter does not.")
+                + " specification's isSatisfiedBy, and the field of the same name behind it. A field"
+                + " whose type is boolean or Boolean - a single yes/no fact - and a boolean return -"
+                + " a question to the object, a predicate - pass; a boolean parameter and a public"
+                + " non-final boolean field, flag arguments, do not.")
         .checking(
             "No selected field, return type or parameter type involves String, a primitive or its"
                 + " box, or a point in time (java.time.Instant, LocalDate, LocalDateTime, LocalTime,"
                 + " OffsetDateTime, ZonedDateTime, java.util.Date), nor a bare java.util.UUID - an"
                 + " identifier says whose it is through a typed id - generic type arguments"
                 + " included, so List<String> counts. BigDecimal, BigInteger, Duration and the"
-                + " project's own types pass. A value object with several components is checked"
+                + " project's own types pass. A field typed boolean or Boolean and a method"
+                + " returning one pass; a boolean among the parameters is a flag argument and"
+                + " counts, and so do a public non-final boolean field, which anyone may set, and"
+                + " a List<Boolean> field. A value object with several components is checked"
                 + " like any other type: each component is a value object itself. A record's"
                 + " accessor is not reported again beside its field. A reported type with exactly one"
                 + " instance field that is no value or id is told to carry the value or id role to"
                 + " count as a wrapper. An empty selection passes.",
             "wrap the primitive in a value object that carries its rules; a value of one"
-                + " component may hold it");
+                + " component may hold it; a boolean parameter becomes a method that names the"
+                + " behaviour - complete() instead of setCompleted(true)");
+  }
+
+  /** A boolean or its box: a yes/no fact as a field, a predicate as a return type. */
+  private static boolean isBoolean(JavaClass type) {
+    return type.getName().equals("boolean") || type.getName().equals("java.lang.Boolean");
   }
 
   /** A value or an identifier of exactly one instance field: it wraps that field's primitive. */
@@ -1128,7 +1153,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
 
   /** A failure reports what was refused - the raw input included - and is no value itself. */
   private static boolean isFailure(JavaClass type, DcaMarkers markers) {
-    return markers.is("domainException").test(type) || markers.is("useCaseException").test(type);
+    return markers.is("domainException").test(type) || markers.is("portException").test(type);
   }
 
   /**

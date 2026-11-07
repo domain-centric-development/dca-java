@@ -4,6 +4,7 @@ import dev.domaincentric.dca.buildingblocks.application.TransactionBoundary;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.out.DomainEventPublisher;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
@@ -13,7 +14,14 @@ import org.springframework.transaction.PlatformTransactionManager;
 /**
  * Spring Boot auto-configuration: registers {@link SpringDomainEventPublisher} and — when a {@link
  * PlatformTransactionManager} exists — {@link SpringTransactionBoundary}, each only if the
- * application defines no bean of that port itself.
+ * application defines no bean of that port itself, and the {@link RefusalRollbackPostProcessor}
+ * that rolls back a {@code @Transactional} method returning a {@link
+ * dev.domaincentric.dca.buildingblocks.application.Refusal}.
+ *
+ * <p><b>The refusal roll-back is on by default.</b> A use case that returns its expected refusals
+ * as cases of a result must roll back like one that throws them; {@code
+ * dca.spring.refusal-rollback.enabled=false} switches the wrapping of the transaction advisor off
+ * (the boundaries keep their contract — it is theirs, not this switch's).
  *
  * <p><b>A default, not a prescription.</b> The DCA rules check that a use case publishes through
  * the {@code DomainEventPublisher} port inside a transaction boundary; which implementation stands
@@ -54,6 +62,20 @@ public class DcaSpringAutoConfiguration {
   public SpringDomainEventPublisher dcaDomainEventPublisher(
       ApplicationEventPublisher eventPublisher) {
     return new SpringDomainEventPublisher(eventPublisher);
+  }
+
+  /**
+   * Wraps the transaction advisor so that a {@code @Transactional} method returning a refusal rolls
+   * back. Static: a bean post-processor must not drag this configuration in early.
+   */
+  @Bean
+  @ConditionalOnClass(name = "org.springframework.transaction.interceptor.TransactionInterceptor")
+  @ConditionalOnProperty(
+      name = "dca.spring.refusal-rollback.enabled",
+      havingValue = "true",
+      matchIfMissing = true)
+  public static RefusalRollbackPostProcessor dcaRefusalRollbackPostProcessor() {
+    return new RefusalRollbackPostProcessor();
   }
 
   @Bean

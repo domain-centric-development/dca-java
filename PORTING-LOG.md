@@ -401,6 +401,32 @@ The decision behind the set, the naming and the limits is `docs/adr/adr-002-exce
   adapter catches a generic exception" nor "a business rule is raised as a state exception" is checkable. The
   diagnostic lists incoming adapters that drive an input port and depend on neither failure type; the
   semantic checks belong to the review perspectives.
+- **ERR-006 counts a switch over a closed result (WP-171, 2026-11-07).** A use case may return its expected
+  refusals as cases of a sealed result; the package that switches over the cases translates them. A closed
+  result is a sealed type an input port's method returns or its `UseCase<…>` interface binds; a package that
+  refers to one of its permitted subclasses (recursively) is not listed. ArchUnit's import model sees neither
+  the `checkcast` nor the type-switch bootstrap arguments of a pattern `switch`, so `ClassFileReferences` reads
+  the class file's constant pool beside it. One reference to one case counts; exhaustiveness is the compiler's.
+  The fixture compiles for Java 17, so its pattern switch is compiled by the test on a Java 21+ runtime.
+- **ERR-008 — a closed result has a refusal case (WP-171, 2026-11-07), experimental, enforced.** New rule, same id
+  in `dca-dotnet` and `dca-rust`. Selects the closed results ERR-006 knows (a sealed type an input port's public
+  method returns or its `UseCase<…>` interface binds), restricted to the application layer and with commands and
+  queries excluded; asks one of its permitted subclasses, recursively, to be assignable to the new `refusal` role
+  of `DcaMarkers` (default `application.Refusal`). The marker is what the transaction boundaries and the
+  `@Transactional` net of `dca-spring` roll back on.
+- **Port failures (WP-171, decision 8, 2026-11-07).** `PortException` → `InputPortException` → `UseCaseException`,
+  and `PortException` → `OutputPortException`, abstract, in the building blocks' application package. Three new
+  `DcaMarkers` roles. ERR-002 places every `portException` subtype in the application layer; ERR-003 accepts
+  `useCaseException` or `outputPortException`; ERR-004/005/007 and TAC-025 select through `portException`.
+  ERR-006 also lists an incoming-adapter class that names one of the three abstract bases (constant pool, so a
+  `catch (PortException e)` is seen) — the generic catch the coordinator asked for, folded into the existing
+  diagnostic rather than a new id.
+- **ERR-009 — a domain exception is constructed only in the domain layer (WP-186, 2026-11-07), experimental,
+  enforced.** New rule, same id in `dca-dotnet` and `dca-rust`. Reads `getConstructorCallsFromSelf()` and
+  `getConstructorReferencesFromSelf()` of every scanned class outside `inDomain()`; a call whose target owner is
+  assignable to the `domainException` role fails, except a constructor of a subtype chaining to its parent
+  (`super(...)`/`this(...)`) and origins in the role's own package. Exact for bytecode constructions; reflection and
+  generic factories are not seen.
 - **The base types are excluded from every selection** by their package (`dev.domaincentric.dca.buildingblocks`):
   they are library code, and ERR-002 would otherwise report them as residing outside the project's layers.
 
@@ -419,3 +445,13 @@ for a shape the suite passed.
   interfaces below `<module>.<events>`. `package-info` compiles to a synthetic interface and is
   excluded by name; the good fixture carries one so the exclusion stays tested.
 
+
+## 2026-11-07 — DCA-TAC-025: a yes/no fact may be a boolean field (WP-186)
+
+- The field loop skips a field whose raw type is `boolean` or `java.lang.Boolean`; the parameter loop is unchanged,
+  so a boolean parameter is still reported as a flag argument. The predicate test and the field test share
+  `isBoolean(JavaClass)`, both on the raw type, so `List<Boolean>` is still reported. Constructors were never
+  selected, which keeps a restoring constructor passing; a static factory taking a boolean is a method and is
+  reported, like one taking a `String`. Same change in `dca-dotnet` (fields, and a `bool` property without a public
+  setter) and `dca-rust` (fields). A public non-final boolean field - in .NET a public non-readonly field or a
+  public non-init setter, in Rust a `pub` struct field - is one anyone may set and is reported as a flag argument.

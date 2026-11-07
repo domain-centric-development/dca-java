@@ -11,6 +11,18 @@ import java.io.Serial;
  * to the application layer, which knows the request, and they get a name that says which of them
  * happened — one type per outcome, so a caller can tell them apart without reading a message.
  *
+ * <p><b>Who declares, raises and catches it.</b> It is the failure of an input port's contract (see
+ * {@link InputPortException}): the input port declares it, <em>only the use case</em> raises it,
+ * and the incoming adapter catches each named subtype and answers it. An outgoing adapter never
+ * raises it — a failure an output port declares is an {@link OutputPortException}, which the use
+ * case catches.
+ *
+ * <p><b>Thrown or returned - per bounded context.</b> A use case answers its expected refusals (not
+ * found, not owned, a precondition) in one of two styles, chosen per bounded context and uniform
+ * within it: it throws them as subtypes of this class, or it returns them as cases of a closed
+ * result, each marked {@link Refusal}. Both styles are equally valid. In a context that returns
+ * results, not-found and not-owned are cases of the result, not exceptions.
+ *
  * <p><b>What is not a use-case failure.</b> A broken rule of the model is a {@link
  * dev.domaincentric.dca.buildingblocks.ddd.tactical.DomainException} and stays in the domain layer;
  * an argument guard stays the platform's own argument exception. A use-case failure is raised by
@@ -25,7 +37,7 @@ import java.io.Serial;
  * <p><b>Unchecked on purpose.</b> A failure the caller cannot repair by retrying with the same
  * request is not an alternative return value; it travels to the boundary that can answer it.
  */
-public abstract class UseCaseException extends RuntimeException {
+public abstract class UseCaseException extends InputPortException {
 
   @Serial private static final long serialVersionUID = 1L;
 

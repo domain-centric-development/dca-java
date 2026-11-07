@@ -2,6 +2,7 @@ package dev.domaincentric.dca.archunit.fixtures.errors.bad.reservation.adapter.i
 
 import dev.domaincentric.dca.archunit.fixtures.errors.bad.reservation.application.confirmreservation.ConfirmReservationCommand;
 import dev.domaincentric.dca.archunit.fixtures.errors.bad.reservation.application.confirmreservation.ConfirmReservationInputPort;
+import dev.domaincentric.dca.buildingblocks.application.PortException;
 
 public final class ReservationRestController {
   private final ConfirmReservationInputPort confirmReservation;
@@ -17,6 +18,15 @@ public final class ReservationRestController {
           .reservationId();
     } catch (RuntimeException anything) {
       return "500";
+    }
+  }
+
+  /** Catches every port failure alike. */
+  public String confirmOrConflict(String reservationId) {
+    try {
+      return confirm(reservationId);
+    } catch (PortException anyPortFailure) {
+      return "409";
     }
   }
 }

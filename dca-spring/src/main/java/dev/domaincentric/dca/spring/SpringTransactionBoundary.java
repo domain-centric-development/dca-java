@@ -1,5 +1,6 @@
 package dev.domaincentric.dca.spring;
 
+import dev.domaincentric.dca.buildingblocks.application.Refusal;
 import dev.domaincentric.dca.buildingblocks.application.TransactionBoundary;
 import java.util.function.Supplier;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -19,6 +20,13 @@ import org.springframework.transaction.support.TransactionTemplate;
  * outer block catches the exception — the outermost {@code inTransaction} then rolls back and
  * throws {@link org.springframework.transaction.UnexpectedRollbackException} instead of committing
  * half of the work. That is Spring's behaviour; this class does nothing to soften it.
+ *
+ * <p><b>A returned refusal rolls back.</b> When the work returns a {@link Refusal}, the status is
+ * marked rollback-only before the template completes: the transaction rolls back and the refusal is
+ * returned, without an exception. Marked locally, the rollback is an expected one — no {@link
+ * org.springframework.transaction.UnexpectedRollbackException} even when an inner block failed
+ * before and was caught. In a nested block the mark reaches the shared transaction, exactly like an
+ * inner failure: an outermost block that then returns a success throws.
  *
  * <p><b>Prerequisite.</b> A {@link PlatformTransactionManager} bean. The JDBC and JPA starters
  * bring one; an in-memory application has none, and {@code @Transactional} is then silently inert —
@@ -40,6 +48,13 @@ public class SpringTransactionBoundary implements TransactionBoundary {
     if (work == null) {
       throw new IllegalArgumentException("work must not be null");
     }
-    return transactionTemplate.execute(status -> work.get());
+    return transactionTemplate.execute(
+        status -> {
+          T result = work.get();
+          if (result instanceof Refusal) {
+            status.setRollbackOnly();
+          }
+          return result;
+        });
   }
 }

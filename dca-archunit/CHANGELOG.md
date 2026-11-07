@@ -4,6 +4,66 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Added
+
+**`DCA-ERR-009` — a domain exception is constructed only in the domain layer (WP-186), experimental.** The model
+refuses; a use case never invents a domain failure. A failure the application finds itself — an output port returned
+nothing, the caller does not own what it names — is a case of its result or a use-case exception. The rule reads
+every constructor call and constructor reference (lambdas, anonymous and nested classes included) made by a class
+outside the domain layer and fails for each one whose target is assignable to the `domainException` role. A
+subclass constructor chaining to its parent is no construction; the role's own package is library code and not
+selected. Reflection and generic factories are not seen. Enforced once experimental rules are switched on.
+
+**`DCA-ERR-008` — a closed use-case result has at least one case marked as a refusal (WP-171), experimental.** A
+use case that returns its expected refusals as cases of a closed result marks each refusing case with
+`Refusal` from the building blocks, so the transaction boundary rolls a returned refusal back like a thrown
+failure. The rule selects the closed results `DCA-ERR-006` knows — a sealed type an input port's public method
+returns or its use-case interface binds as a type argument, in the application layer, commands and queries
+excluded — and fails for each one none of whose permitted subclasses (recursively) is a refusal. A context that
+throws its refusals has no closed result and passes. Enforced once experimental rules are switched on.
+
+**`DcaMarkers` role `refusal`** (default `dev.domaincentric.dca.buildingblocks.application.Refusal`;
+`withRefusal(String)` / `withRefusal(DcaMarker)`). The record gained a component; the previous canonical
+constructor stays as a compatibility constructor that fills the role with the library's type.
+
+**Port failures (WP-171, decision 8).** `DcaMarkers` roles `portException`, `inputPortException` and
+`outputPortException` (defaults: the new building-block types; `withPortException` & co.), the record's previous
+canonical constructor kept as a compatibility constructor.
+
+### Changed
+
+- **`DCA-TAC-025` lets a domain type keep a boolean field; a boolean parameter is still a flag argument (WP-186).**
+  A single yes/no fact of an aggregate may be a field typed `boolean` or `Boolean`: the type is told
+  (`complete()`) and answers (`isCompleted()`). A boolean parameter of a method — `setCompleted(true)` — lets the
+  caller set the state instead of triggering the behaviour and is still reported, and so are a public non-final
+  boolean field, which anyone may set, and a `List<Boolean>` field. A boolean return passes as before. Constructors stay unselected, so a constructor that restores the field
+  passes; a static factory taking a boolean is a method and is reported, like one taking a `String`. Three or more
+  states, or transitions with rules, remain an enum or a value — that is a review question, not the rule's. Title:
+  "Domain types must not hold bare primitives, strings or time types; a boolean only as a field or a predicate".
+- **`DCA-ERR-002`** places every subtype of the port-exception role — `UseCaseException`, `OutputPortException` —
+  in the application layer; an output port's failure is declared beside the port although its adapter raises it.
+  Title: "Domain and port exceptions reside in the layer whose failure they name".
+- **`DCA-ERR-003`** accepts `OutputPortException` beside `UseCaseException` as the base of an application-layer
+  exception; extending `PortException` or `InputPortException` directly does not count.
+- **`DCA-ERR-004`, `-005`, `-007`** and the failure exclusion of `DCA-TAC-025` select through the port-exception
+  role instead of the use-case-exception role, so an output port's failure is held to the same metadata, naming and
+  field rules. Titles say "port exceptions".
+- **`DCA-ERR-006`** also lists every incoming-adapter class that names the abstract base `PortException`,
+  `InputPortException` or `OutputPortException` itself — read from the import model and the class file's constant
+  pool, where a catch clause's type is recorded: it catches the port failures generically and answers every outcome
+  the same way. Still informational.
+
+### Changed
+
+**`DCA-ERR-006` counts a switch over a closed use-case result as translation (WP-171).** A use case may return
+its expected refusals as cases of a sealed result instead of throwing them. An incoming adapter package that
+refers to a case of such a result — a sealed type an input port's method returns or its use-case interface binds
+as a type argument, and its permitted subclasses — is no longer listed. The reference is read from the class
+file's constant pool as well as from the import model, because the import model leaves out the casts and the
+type-switch bootstrap arguments a pattern `switch` compiles to. One reference to one case counts; whether the
+switch is exhaustive is left to the compiler. A package that only holds the result without looking at a case is
+still listed.
+
 ## [0.11.0] - 2026-10-29
 
 ### Added

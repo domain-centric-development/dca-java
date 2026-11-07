@@ -4,7 +4,30 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Added
+
+- `application.Refusal` — a marker for a case of a use-case result that refuses the request (WP-171). A use case
+  may return its expected refusals as cases of a closed result instead of throwing them, chosen per bounded
+  context; every refusing case implements `Refusal`, a success case never does. The marker carries the roll-back
+  contract below.
+- `application.PortException` (abstract) — the base of every failure a port's contract declares, with two abstract
+  branches: `InputPortException` (declared by an input port, raised by the use case, caught by the incoming
+  adapter) and `OutputPortException` (declared by an output port, raised by the adapter that implements it, caught
+  by the use case — for an expected conflict the store or remote system sees, not for infrastructure failure).
+  Neither base is caught as such; each is a classification (WP-171, decision 8).
+
 ### Changed
+
+- `UseCaseException` now extends `InputPortException` (was `RuntimeException`). Name, constructors and use are
+  unchanged and it stays assignable to `RuntimeException`; a concrete failure keeps extending it. Javadoc: raised
+  only by a use case, never by an outgoing adapter; in a context that returns its refusals as cases of a result,
+  not-found and not-owned are cases, not exceptions — both styles valid, uniform per context.
+
+- `TransactionBoundary` contract: when the work returns a `Refusal`, the boundary rolls back and returns the
+  refusal unchanged, without throwing — a returned refusal undoes earlier writes exactly as a thrown failure does.
+  Only the returned value is looked at; a wrapper type that carries a refusal lets its refusing case implement
+  `Refusal` too. Nested, a refusal behaves like a failure: the shared transaction becomes rollback-only, an
+  outermost block that returns a refusal rolls back cleanly, one that returns a success throws.
 
 `DomainEvent` javadoc: a domain event has no published contract and no version number, but once an
 outbox or event publication registry stores it for a transactional listener, the next deployment

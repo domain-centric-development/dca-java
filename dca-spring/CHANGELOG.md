@@ -4,6 +4,19 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Added
+
+- **A returned refusal rolls back (WP-171).** `SpringTransactionBoundary` marks the status rollback-only when the
+  work returns a `Refusal` (from `dca-building-blocks`) and returns it without throwing; marked locally, the
+  rollback raises no `UnexpectedRollbackException`, also after a caught inner failure. `InMemoryTransactionBoundary`
+  keeps the same contract and answers `lastBlockRolledBack()` for tests.
+- `RefusalRollbackInterceptor` and `RefusalRollbackPostProcessor`: a `@Transactional` method that returns a
+  `Refusal` rolls back. The post-processor wraps the advice of the transaction advisor that
+  `@EnableTransactionManagement` registers, so the check runs between the method and the commit whatever else is
+  ordered around it (Boot registers the transaction advisor with the lowest precedence, so a second advisor could
+  not be ordered inside it). Registered by `DcaSpringAutoConfiguration`, **on by default**, switched off with
+  `dca.spring.refusal-rollback.enabled=false`. AspectJ-woven transactions have no advisor and are not covered.
+
 ## [0.2.0] - 2026-09-21
 
 ### Changed

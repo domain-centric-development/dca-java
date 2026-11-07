@@ -1,8 +1,11 @@
 package dev.domaincentric.dca.spring;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import dev.domaincentric.dca.buildingblocks.application.Refusal;
 import java.util.List;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
@@ -56,6 +59,52 @@ class SpringTransactionBoundaryTest {
                   } catch (IllegalStateException swallowed) {
                     // the outer block believes it can continue
                   }
+                  return "half of the work";
+                }));
+
+    assertEquals(List.of("begin", "rollback"), manager.log);
+  }
+
+  record Refused() implements Refusal {}
+
+  @Test
+  void rollsBackAndReturnsTheRefusalWhenTheWorkReturnsOne() {
+    Refused refused = new Refused();
+
+    Object result = boundary.inTransaction(() -> refused);
+
+    assertSame(refused, result);
+    assertEquals(List.of("begin", "rollback"), manager.log);
+  }
+
+  @Test
+  void aRefusalAfterACaughtInnerFailureRollsBackWithoutThrowing() {
+    Object result =
+        boundary.inTransaction(
+            () -> {
+              try {
+                boundary.inTransaction(
+                    () -> {
+                      throw new IllegalStateException("inner failure");
+                    });
+              } catch (IllegalStateException swallowed) {
+                // answered as a refusal below
+              }
+              return new Refused();
+            });
+
+    assertInstanceOf(Refused.class, result);
+    assertEquals(List.of("begin", "rollback"), manager.log);
+  }
+
+  @Test
+  void anInnerRefusalFollowedByAnOuterSuccessFailsLikeAnInnerFailure() {
+    assertThrows(
+        UnexpectedRollbackException.class,
+        () ->
+            boundary.inTransaction(
+                () -> {
+                  boundary.inTransaction(Refused::new);
                   return "half of the work";
                 }));
 
