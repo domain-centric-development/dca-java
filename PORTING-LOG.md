@@ -470,3 +470,13 @@ ones included — with a parameter of the aggregate id type and one of the owner
 any name) whose return involves the aggregate (`Optional<A>`, `A`, a container). A boolean `exists…` does not
 count. Raw `Owned` is reported. Not seen: whether a use case calls the scoped lookup (rule B of WP-121, not built);
 a generic intermediate port whose parameters are type variables.
+
+## 2026-11-07 — DCA-HEX-020: a claims-only check is declared on the route (WP-121 decision 2)
+
+New rule, same id in `dca-dotnet` and `dca-rust`, experimental, informational. New `FrameworkAnnotations` role
+`authorizationAnnotation` (last component; the 0.11.0 shape stays as a compatibility constructor). Reads
+`getMethodCallsFromSelf()` of every class in `inIncomingAdapter()` (skipping `$deserializeLambda$`) and lists a call
+whose name matches `is(User)?InRole|has(Any)?(Role|Authority)`. A first cut also matched the plain accessors
+(`roles`, `authorities`, `getRoles`, `getAuthorities`) and listed six methods of the Java sample that issue tokens
+or build the principal from an identity's roles — no decision among them — so the accessors went. An annotation's
+expression is a constant, never a call, so a declared gate is never listed. Empty role: the rule returns nothing.

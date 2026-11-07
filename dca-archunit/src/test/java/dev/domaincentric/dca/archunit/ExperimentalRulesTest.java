@@ -55,6 +55,7 @@ class ExperimentalRulesTest {
             "DCA-HEX-017",
             "DCA-HEX-018",
             "DCA-HEX-019",
+            "DCA-HEX-020",
             "DCA-TAC-024",
             "DCA-TAC-025",
             "DCA-TAC-026",

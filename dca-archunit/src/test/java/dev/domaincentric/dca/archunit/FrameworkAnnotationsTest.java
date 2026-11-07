@@ -98,8 +98,10 @@ class FrameworkAnnotationsTest {
     assertEquals(List.of(), written.transactionalEventListener());
     assertEquals(
         spring,
-        written.withTransactionalEventListener(
-            spring.transactionalEventListener().toArray(String[]::new)));
+        written
+            .withTransactionalEventListener(
+                spring.transactionalEventListener().toArray(String[]::new))
+            .withAuthorizationAnnotation(spring.authorizationAnnotation().toArray(String[]::new)));
     assertEquals(spring, spring.withInstanceLocalState("x.Session"));
     assertEquals(List.of(), spring.instanceLocalState());
   }
@@ -119,6 +121,39 @@ class FrameworkAnnotationsTest {
             .withTransactional("x.Tx")
             .transactionalEventListener());
     assertEquals(List.of(), FrameworkAnnotations.none().transactionalEventListener());
+  }
+
+  /** A preset written against 0.11.0 still compiles; it has no authorization-annotation role. */
+  @Test
+  void aPresetWithoutTheAuthorizationAnnotationRoleStillCompiles() {
+    FrameworkAnnotations spring = FrameworkAnnotations.spring();
+    FrameworkAnnotations written =
+        new FrameworkAnnotations(
+            spring.name(),
+            spring.injectable(),
+            spring.webController(),
+            spring.restController(),
+            spring.transactional(),
+            spring.eventListener(),
+            spring.moduleDeclaration(),
+            spring.publishedInterface(),
+            spring.persistenceEntity(),
+            spring.injectionSite(),
+            spring.persistenceMapping(),
+            spring.transactionApi(),
+            spring.transactionManager(),
+            spring.transportStatus(),
+            spring.getMapping(),
+            spring.transactionalEventListener());
+    assertEquals(List.of(), written.authorizationAnnotation());
+    assertEquals(
+        spring,
+        written.withAuthorizationAnnotation(
+            spring.authorizationAnnotation().toArray(String[]::new)));
+    assertEquals(
+        spring.authorizationAnnotation(),
+        spring.withGetMapping("x.Get").withTransactional("x.Tx").authorizationAnnotation());
+    assertEquals(List.of(), FrameworkAnnotations.none().authorizationAnnotation());
   }
 
   @Test

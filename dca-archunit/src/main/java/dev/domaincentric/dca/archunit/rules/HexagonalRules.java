@@ -53,7 +53,87 @@ public final class HexagonalRules implements DcaRuleSet {
             adaptersPublishNoEnumMemberName(),
             listenersThatDriveAnInputPortRunAfterTheCommit(),
             controllersResideInIncomingAdapters(),
-            outputPortImplementationsResideInOutgoingAdapters());
+            outputPortImplementationsResideInOutgoingAdapters(),
+            claimsOnlyAuthorizationIsDeclaredOnTheRoute());
+  }
+
+  /**
+   * The names of the methods through which code asks whether the caller holds a role or an
+   * authority - a request's {@code isUserInRole}, a principal's {@code isInRole}, a security
+   * expression's {@code hasRole}. Matched by name on any owner, so the rule names no framework
+   * type. A method that only hands the roles over ({@code roles()}, {@code getAuthorities()}) is no
+   * question: an adapter that issues a token or builds a principal passes roles on without deciding
+   * anything.
+   */
+  private static final java.util.regex.Pattern ROLE_ACCESSOR =
+      java.util.regex.Pattern.compile("is(User)?InRole|has(Any)?(Role|Authority)");
+
+  /**
+   * DCA-HEX-020. A check that reads nothing but the caller's roles or claims is declared on the
+   * route, with the framework's own authorization annotation - not decided by a branch in the
+   * adapter's code, where it renders whatever status the branch writes and nobody sees it in the
+   * route's declaration.
+   */
+  public DcaRule claimsOnlyAuthorizationIsDeclaredOnTheRoute() {
+    return DcaRule.informational(
+            "DCA-HEX-020",
+            "Diagnostic: incoming adapters that read the caller's roles in their own code",
+            "A check that reads nothing but the caller's roles or claims - is this caller staff? -"
+                + " is a property of the exposure and is declared on the route, with the"
+                + " framework's authorization annotation, where a reader of the route sees it and"
+                + " the framework answers an unauthenticated and an unauthorized caller apart. A"
+                + " branch on the caller's roles inside the adapter's code hides the gate and"
+                + " renders whatever status the branch writes. A check that needs the stored data -"
+                + " is this yours? - is not claims-only and belongs to the use case",
+            arch -> {
+              if (layout.frameworkAnnotations().authorizationAnnotation().isEmpty()) {
+                return List.of();
+              }
+              java.util.Set<String> observed = new java.util.TreeSet<>();
+              for (JavaClass adapter : arch.classes()) {
+                if (!arch.inIncomingAdapter().test(adapter)) {
+                  continue;
+                }
+                for (JavaMethodCall call : adapter.getMethodCallsFromSelf()) {
+                  if (call.getOrigin().getName().equals("$deserializeLambda$")
+                      || !ROLE_ACCESSOR.matcher(call.getName()).matches()) {
+                    continue;
+                  }
+                  observed.add(
+                      call.getOrigin().getFullName()
+                          + " reads the caller's roles through "
+                          + call.getTargetOwner().getSimpleName()
+                          + "."
+                          + call.getName()
+                          + "() - declare a claims-only check on the route with "
+                          + String.join(
+                              " or ",
+                              layout.frameworkAnnotations().authorizationAnnotation().stream()
+                                  .map(a -> "@" + a.substring(a.lastIndexOf('.') + 1))
+                                  .toList())
+                          + "; a check that needs the stored data belongs to the use case");
+                }
+              }
+              return new ArrayList<>(observed);
+            })
+        .experimental()
+        .selecting(
+            "Classes in the incoming adapter layer of every module root - by default"
+                + " <module>.adapter.incoming.. - and their method calls, lambdas and nested"
+                + " classes included. Nothing is selected when the configured"
+                + " authorization-annotation role is empty: without a declarative form there is"
+                + " nothing to advise.")
+        .checking(
+            "Informational diagnostic only: lists every call of a method whose name asks"
+                + " whether the caller holds a role or an authority - isUserInRole, isInRole,"
+                + " hasRole, hasAnyRole, hasAuthority, hasAnyAuthority - on any owner, and never"
+                + " fails. An expression inside the authorization annotation is a string, not a"
+                + " call, and is not listed. A method that only hands the roles over - roles(),"
+                + " getAuthorities() - is not listed, so an adapter that issues a token or builds"
+                + " the caller's principal passes; for the same reason a role compared by the"
+                + " adapter itself - roles().contains(\"STAFF\") - is not seen, nor is a helper of"
+                + " the project's own - isAdmin(), isStaff() - declared outside the incoming"
+                + " adapter.");
   }
 
   @Override

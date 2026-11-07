@@ -6,6 +6,22 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ### Added
 
+**`DCA-HEX-020` — diagnostic: incoming adapters that read the caller's roles in their own code (WP-121 decision 2),
+experimental, informational.** A check that reads nothing but the caller's roles or claims is declared on the route
+with the framework's own authorization annotation; a check that needs the stored data — is this yours? — belongs
+to the use case. The rule lists every call, from a class in the incoming adapter layer, of a method whose name asks
+whether the caller holds a role or an authority (`isUserInRole`, `isInRole`, `hasRole`, `hasAnyRole`,
+`hasAuthority`, `hasAnyAuthority`), on any owner. A method that only hands roles over (`roles()`,
+`getAuthorities()`) is not listed, so issuing a token or building a principal passes — and a role compared by the
+adapter itself (`roles().contains("STAFF")`) or a project helper declared elsewhere (`isAdmin()`) is not seen.
+Nothing is selected when the new role is empty. It never fails the build.
+
+**`FrameworkAnnotations` role `authorizationAnnotation`** — the annotations that declare a claims-only check on a
+route: Spring `PreAuthorize`, `Secured` and Jakarta `RolesAllowed`; Jakarta and Quarkus `RolesAllowed`, `PermitAll`,
+`DenyAll`; Micronaut `Secured` and `RolesAllowed`; empty in `none()`. No DCA annotation stands beside them.
+`withAuthorizationAnnotation(String...)`; the 0.11.0 canonical constructor stays as a compatibility constructor that
+leaves the role empty.
+
 **`DCA-TAC-026` — the repository of an owned aggregate declares a lookup by the aggregate's id and the owner's id
 (WP-121), experimental.** An object loaded by its id alone is reachable by anyone who knows or guesses the id (OWASP
 A01, broken access control). The rule selects every concrete aggregate root that also carries the new `owned` role

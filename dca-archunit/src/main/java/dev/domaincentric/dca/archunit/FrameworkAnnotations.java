@@ -98,6 +98,13 @@ import java.util.WeakHashMap;
  *       transactional role ({@code DCA-HEX-017}). An entry {@code <annotation>#<attribute>=<value>}
  *       asks for that attribute value, as for {@link #getMapping()}. Empty in {@code none()}; the
  *       rule then selects nothing.
+ *   <li>{@link #authorizationAnnotation()} — the annotations that declare a claims-only
+ *       authorization on a route or a handler class: a check that reads nothing but the caller's
+ *       roles or claims (Spring Security's {@code PreAuthorize} and {@code Secured}, Jakarta's
+ *       {@code RolesAllowed}, Micronaut's {@code Secured}). {@code DCA-HEX-020} lists an incoming
+ *       adapter that reads the caller's roles in its own code instead. No DCA annotation stands
+ *       beside them: the framework's own is the declaration. Empty in {@code none()}; the rule then
+ *       selects nothing.
  * </ul>
  *
  * @param name the preset's name, shown in the test report so a reader knows which vocabulary the
@@ -123,6 +130,8 @@ import java.util.WeakHashMap;
  *     mapping that names no HTTP method and answers GET too)
  * @param transactionalEventListener annotations that deliver an event to a listener method after
  *     the publishing transaction committed
+ * @param authorizationAnnotation annotations that declare a claims-only authorization on a route or
+ *     a handler class - read by {@code DCA-HEX-020}
  */
 public record FrameworkAnnotations(
     String name,
@@ -140,7 +149,8 @@ public record FrameworkAnnotations(
     List<String> transactionManager,
     List<String> transportStatus,
     List<String> getMapping,
-    List<String> transactionalEventListener) {
+    List<String> transactionalEventListener,
+    List<String> authorizationAnnotation) {
 
   public FrameworkAnnotations {
     if (name == null || name.isBlank()) {
@@ -161,8 +171,50 @@ public record FrameworkAnnotations(
     transportStatus = role(transportStatus, "transportStatus");
     getMapping = role(getMapping, "getMapping");
     transactionalEventListener = role(transactionalEventListener, "transactionalEventListener");
+    authorizationAnnotation = role(authorizationAnnotation, "authorizationAnnotation");
     requireAttributeEntries(getMapping, "getMapping");
     requireAttributeEntries(transactionalEventListener, "transactionalEventListener");
+  }
+
+  /**
+   * Compatibility constructor for presets written against 0.11.0, without the
+   * authorization-annotation role (empty).
+   */
+  public FrameworkAnnotations(
+      String name,
+      List<String> injectable,
+      List<String> webController,
+      List<String> restController,
+      List<String> transactional,
+      List<String> eventListener,
+      List<String> moduleDeclaration,
+      List<String> publishedInterface,
+      List<String> persistenceEntity,
+      List<String> injectionSite,
+      List<String> persistenceMapping,
+      List<String> transactionApi,
+      List<String> transactionManager,
+      List<String> transportStatus,
+      List<String> getMapping,
+      List<String> transactionalEventListener) {
+    this(
+        name,
+        injectable,
+        webController,
+        restController,
+        transactional,
+        eventListener,
+        moduleDeclaration,
+        publishedInterface,
+        persistenceEntity,
+        injectionSite,
+        persistenceMapping,
+        transactionApi,
+        transactionManager,
+        transportStatus,
+        getMapping,
+        transactionalEventListener,
+        List.of());
   }
 
   /**
@@ -432,7 +484,11 @@ public record FrameworkAnnotations(
             "org.springframework.web.bind.annotation.GetMapping",
             "org.springframework.web.bind.annotation.RequestMapping#method=GET",
             "org.springframework.web.bind.annotation.RequestMapping#method="),
-        List.of("org.springframework.transaction.event.TransactionalEventListener"));
+        List.of("org.springframework.transaction.event.TransactionalEventListener"),
+        List.of(
+            "org.springframework.security.access.prepost.PreAuthorize",
+            "org.springframework.security.access.annotation.Secured",
+            "jakarta.annotation.security.RolesAllowed"));
   }
 
   /**
@@ -469,7 +525,11 @@ public record FrameworkAnnotations(
         List.of("jakarta.transaction.TransactionManager"),
         List.of(),
         List.of("jakarta.ws.rs.GET", "jakarta.ws.rs.HttpMethod#value=GET"),
-        List.of("jakarta.enterprise.event.Observes#during=AFTER_SUCCESS"));
+        List.of("jakarta.enterprise.event.Observes#during=AFTER_SUCCESS"),
+        List.of(
+            "jakarta.annotation.security.RolesAllowed",
+            "jakarta.annotation.security.PermitAll",
+            "jakarta.annotation.security.DenyAll"));
   }
 
   /**
@@ -508,7 +568,11 @@ public record FrameworkAnnotations(
         List.of("jakarta.transaction.TransactionManager"),
         List.of(),
         List.of("jakarta.ws.rs.GET", "jakarta.ws.rs.HttpMethod#value=GET"),
-        List.of("jakarta.enterprise.event.Observes#during=AFTER_SUCCESS"));
+        List.of("jakarta.enterprise.event.Observes#during=AFTER_SUCCESS"),
+        List.of(
+            "jakarta.annotation.security.RolesAllowed",
+            "jakarta.annotation.security.PermitAll",
+            "jakarta.annotation.security.DenyAll"));
   }
 
   /**
@@ -557,7 +621,10 @@ public record FrameworkAnnotations(
         List.of("jakarta.transaction.TransactionManager"),
         List.of("io.micronaut.http.annotation.Status"),
         List.of("io.micronaut.http.annotation.Get"),
-        List.of("io.micronaut.transaction.annotation.TransactionalEventListener"));
+        List.of("io.micronaut.transaction.annotation.TransactionalEventListener"),
+        List.of(
+            "io.micronaut.security.annotation.Secured",
+            "jakarta.annotation.security.RolesAllowed"));
   }
 
   /**
@@ -569,7 +636,8 @@ public record FrameworkAnnotations(
   public static FrameworkAnnotations none() {
     return new FrameworkAnnotations(
         "none", List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
-        List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+        List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
+        List.of());
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -711,7 +779,8 @@ public record FrameworkAnnotations(
         transactionManager,
         transportStatus,
         getMapping,
-        transactionalEventListener);
+        transactionalEventListener,
+        authorizationAnnotation);
   }
 
   public FrameworkAnnotations withInjectable(String... annotationNames) {
@@ -731,7 +800,8 @@ public record FrameworkAnnotations(
         transactionManager,
         transportStatus,
         getMapping,
-        transactionalEventListener);
+        transactionalEventListener,
+        authorizationAnnotation);
   }
 
   public FrameworkAnnotations withWebController(String... annotationNames) {
@@ -751,7 +821,8 @@ public record FrameworkAnnotations(
         transactionManager,
         transportStatus,
         getMapping,
-        transactionalEventListener);
+        transactionalEventListener,
+        authorizationAnnotation);
   }
 
   public FrameworkAnnotations withRestController(String... annotationNames) {
@@ -771,7 +842,8 @@ public record FrameworkAnnotations(
         transactionManager,
         transportStatus,
         getMapping,
-        transactionalEventListener);
+        transactionalEventListener,
+        authorizationAnnotation);
   }
 
   public FrameworkAnnotations withTransactional(String... annotationNames) {
@@ -791,7 +863,8 @@ public record FrameworkAnnotations(
         transactionManager,
         transportStatus,
         getMapping,
-        transactionalEventListener);
+        transactionalEventListener,
+        authorizationAnnotation);
   }
 
   public FrameworkAnnotations withEventListener(String... annotationNames) {
@@ -811,7 +884,8 @@ public record FrameworkAnnotations(
         transactionManager,
         transportStatus,
         getMapping,
-        transactionalEventListener);
+        transactionalEventListener,
+        authorizationAnnotation);
   }
 
   public FrameworkAnnotations withModuleDeclaration(String... annotationNames) {
@@ -831,7 +905,8 @@ public record FrameworkAnnotations(
         transactionManager,
         transportStatus,
         getMapping,
-        transactionalEventListener);
+        transactionalEventListener,
+        authorizationAnnotation);
   }
 
   public FrameworkAnnotations withPublishedInterface(String... annotationNames) {
@@ -851,7 +926,8 @@ public record FrameworkAnnotations(
         transactionManager,
         transportStatus,
         getMapping,
-        transactionalEventListener);
+        transactionalEventListener,
+        authorizationAnnotation);
   }
 
   public FrameworkAnnotations withPersistenceEntity(String... annotationNames) {
@@ -871,7 +947,8 @@ public record FrameworkAnnotations(
         transactionManager,
         transportStatus,
         getMapping,
-        transactionalEventListener);
+        transactionalEventListener,
+        authorizationAnnotation);
   }
 
   public FrameworkAnnotations withInjectionSite(String... annotationNames) {
@@ -891,7 +968,8 @@ public record FrameworkAnnotations(
         transactionManager,
         transportStatus,
         getMapping,
-        transactionalEventListener);
+        transactionalEventListener,
+        authorizationAnnotation);
   }
 
   public FrameworkAnnotations withPersistenceMapping(String... annotationNames) {
@@ -911,7 +989,8 @@ public record FrameworkAnnotations(
         transactionManager,
         transportStatus,
         getMapping,
-        transactionalEventListener);
+        transactionalEventListener,
+        authorizationAnnotation);
   }
 
   public FrameworkAnnotations withTransactionApi(String... typeNames) {
@@ -931,7 +1010,8 @@ public record FrameworkAnnotations(
         transactionManager,
         transportStatus,
         getMapping,
-        transactionalEventListener);
+        transactionalEventListener,
+        authorizationAnnotation);
   }
 
   public FrameworkAnnotations withTransactionManager(String... typeNames) {
@@ -951,7 +1031,8 @@ public record FrameworkAnnotations(
         List.of(typeNames),
         transportStatus,
         getMapping,
-        transactionalEventListener);
+        transactionalEventListener,
+        authorizationAnnotation);
   }
 
   /**
@@ -976,7 +1057,8 @@ public record FrameworkAnnotations(
         transactionManager,
         List.of(annotationNames),
         getMapping,
-        transactionalEventListener);
+        transactionalEventListener,
+        authorizationAnnotation);
   }
 
   /**
@@ -1003,7 +1085,8 @@ public record FrameworkAnnotations(
         transactionManager,
         transportStatus,
         List.of(annotationNames),
-        transactionalEventListener);
+        transactionalEventListener,
+        authorizationAnnotation);
   }
 
   /**
@@ -1027,6 +1110,33 @@ public record FrameworkAnnotations(
         transactionManager,
         transportStatus,
         getMapping,
+        List.of(annotationNames),
+        authorizationAnnotation);
+  }
+
+  /**
+   * This set with another authorization-annotation role: the annotations that declare a claims-only
+   * authorization on a route - a check that reads nothing but the caller's roles or claims. {@code
+   * DCA-HEX-020} reads the role; pass no name to clear it, and the rule then selects nothing.
+   */
+  public FrameworkAnnotations withAuthorizationAnnotation(String... annotationNames) {
+    return new FrameworkAnnotations(
+        name,
+        injectable,
+        webController,
+        restController,
+        transactional,
+        eventListener,
+        moduleDeclaration,
+        publishedInterface,
+        persistenceEntity,
+        injectionSite,
+        persistenceMapping,
+        transactionApi,
+        transactionManager,
+        transportStatus,
+        getMapping,
+        transactionalEventListener,
         List.of(annotationNames));
   }
 

@@ -35,7 +35,9 @@ class HexagonalRulesTest {
         // negative fixture in .hexagonal.controllerplace
         "DCA-HEX-018",
         // negative fixture in .hexagonal.portplace
-        "DCA-HEX-019");
+        "DCA-HEX-019",
+        // informational diagnostic, never fails; observed in .hexagonal.authorization
+        "DCA-HEX-020");
   }
 
   /**
@@ -278,5 +280,41 @@ class HexagonalRulesTest {
   @Test
   void anExplicitCodeAndAnAdapterEnumAreNotListed() {
     assertTrue(Fixtures.observed(FIXTURES + ".enumnames.good", "DCA-HEX-016").isEmpty());
+  }
+
+  /** DCA-HEX-020 lists an incoming adapter that branches on the caller's role in its own code. */
+  @Test
+  void anAdapterReadingTheCallersRoleIsListed() {
+    var observed = Fixtures.observed(FIXTURES + ".authorization.bad", "DCA-HEX-020");
+
+    assertTrue(
+        observed.size() == 1
+            && observed.get(0).contains("LedgerController.closeBooks(")
+            && observed.get(0).contains("Caller.isUserInRole()")
+            && observed.get(0).contains("@PreAuthorize"),
+        observed.toString());
+  }
+
+  /** The claims-only check declared with the authorization annotation is not listed. */
+  @Test
+  void aCheckDeclaredOnTheRouteIsNotListed() {
+    assertTrue(Fixtures.observed(FIXTURES + ".authorization.good", "DCA-HEX-020").isEmpty());
+  }
+
+  /** Without an authorization annotation in the preset there is no declarative form to advise. */
+  @Test
+  void anEmptyAuthorizationRoleSelectsNothing() {
+    String pkg = FIXTURES + ".authorization.bad";
+    var layout =
+        dev.domaincentric.dca.archunit.DcaLayout.forBasePackage(pkg)
+            .withFrameworkAnnotations(dev.domaincentric.dca.archunit.FrameworkAnnotations.none());
+    var arch =
+        dev.domaincentric.dca.archunit.DcaArchitecture.of(
+            layout, new com.tngtech.archunit.core.importer.ClassFileImporter().importPackages(pkg));
+    var rule =
+        new HexagonalRules(layout)
+            .rules().stream().filter(r -> r.id().equals("DCA-HEX-020")).findFirst().orElseThrow();
+
+    assertTrue(rule.observe(arch).isEmpty());
   }
 }
