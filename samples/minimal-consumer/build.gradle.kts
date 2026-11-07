@@ -6,7 +6,7 @@ java { toolchain.languageVersion.set(JavaLanguageVersion.of(21)) }
 // release (see RELEASING.md). CI overrides them: once through the composite build, once against a
 // fresh local publication. While the version below is not on Maven Central yet, run this sample with
 // -PwithDcaJava, which substitutes the surrounding checkout.
-val buildingBlocksVersion = providers.gradleProperty("buildingBlocksVersion").getOrElse("0.3.1")
+val buildingBlocksVersion = providers.gradleProperty("buildingBlocksVersion").getOrElse("0.4.0")
 val archunitVersion = providers.gradleProperty("archunitVersion").getOrElse("0.11.0")
 
 dependencies {
