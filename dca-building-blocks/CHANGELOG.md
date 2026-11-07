@@ -4,6 +4,8 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-07
+
 ### Added
 
 - `ddd.tactical.Owned<OWNER extends Id>` — an empty marker for an aggregate root that belongs to someone; the type
