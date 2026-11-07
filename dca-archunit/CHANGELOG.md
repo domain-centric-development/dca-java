@@ -4,6 +4,8 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-07
+
 ### Added
 
 **`DCA-HEX-020` — diagnostic: incoming adapters that read the caller's roles in their own code (WP-121 decision 2),
@@ -83,8 +85,6 @@ canonical constructor kept as a compatibility constructor.
   `InputPortException` or `OutputPortException` itself — read from the import model and the class file's constant
   pool, where a catch clause's type is recorded: it catches the port failures generically and answers every outcome
   the same way. Still informational.
-
-### Changed
 
 **`DCA-ERR-006` counts a switch over a closed use-case result as translation (WP-171).** A use case may return
 its expected refusals as cases of a sealed result instead of throwing them. An incoming adapter package that
