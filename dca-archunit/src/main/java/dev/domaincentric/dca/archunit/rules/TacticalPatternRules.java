@@ -71,7 +71,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
             storeInterfacesHaveNoRepositorySemantics(),
             aggregateRootsHaveNoPublicConstructors(),
             valueObjectsHaveOneFactoryPerOrigin(),
-            domainHoldsNoBarePrimitives());
+            domainHoldsNoBarePrimitives(),
+            ownedAggregatesAreLoadedThroughTheirOwner());
   }
 
   @Override
@@ -1127,6 +1128,209 @@ public final class TacticalPatternRules implements DcaRuleSet {
             "wrap the primitive in a value object that carries its rules; a value of one"
                 + " component may hold it; a boolean parameter becomes a method that names the"
                 + " behaviour - complete() instead of setCompleted(true)");
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Ownership
+  // ---------------------------------------------------------------------------------------------
+
+  /**
+   * DCA-TAC-026. An aggregate that belongs to someone is found through its owner: its repository
+   * offers a lookup by the aggregate's id and the owner's id, so a use case acting for a caller
+   * never has to load it by id alone.
+   */
+  public static DcaRule ownedAggregatesAreLoadedThroughTheirOwner() {
+    return DcaRule.check(
+            "DCA-TAC-026",
+            "The repository of an owned aggregate declares a lookup by the aggregate's id and the"
+                + " owner's id",
+            "An object loaded by its id alone is reachable by anyone who knows or guesses the id -"
+                + " the insecure direct object reference of broken access control (OWASP Top 10,"
+                + " A01). An aggregate marked as owned belongs to someone; its repository offers a"
+                + " lookup scoped to the owner, so a use case acting for a caller can load it"
+                + " through the caller and an unscoped lookup is never the only way in. Whether the"
+                + " use case calls the scoped lookup, and whether it proved the caller's right to a"
+                + " change of owner, is logic the rule does not see",
+            arch -> {
+              DcaMarkers markers = arch.layout().markers();
+              List<String> violations = new ArrayList<>();
+              List<JavaClass> repositories = repositoryInterfaces(arch);
+              for (JavaClass aggregate : ownedAggregateRoots(arch)) {
+                Optional<JavaType> owner = typeArgument(aggregate, markers.owned(), 0);
+                if (owner.isEmpty() || owner.get() instanceof JavaTypeVariable) {
+                  violations.add(
+                      aggregate.getName()
+                          + " is owned but names no owner id type - bind "
+                          + simpleName(markers.owned())
+                          + " to the owner's id type");
+                  continue;
+                }
+                JavaClass ownerId = owner.get().toErasure();
+                for (JavaClass repository : repositoriesOf(aggregate, repositories, arch)) {
+                  JavaClass aggregateId =
+                      aggregateIdOf(aggregate, repository, markers).orElse(null);
+                  boolean scoped =
+                      repository.getAllMethods().stream()
+                          .anyMatch(
+                              method ->
+                                  isScopedLookup(method, aggregate, aggregateId, ownerId, markers));
+                  if (!scoped) {
+                    violations.add(
+                        repository.getName()
+                            + " declares no lookup taking "
+                            + (aggregateId == null
+                                ? "the aggregate's id"
+                                : aggregateId.getSimpleName())
+                            + " and "
+                            + ownerId.getSimpleName()
+                            + " for the owned aggregate "
+                            + aggregate.getName());
+                  }
+                }
+              }
+              fail(
+                  "The repository of an owned aggregate must declare a lookup by the aggregate's id"
+                      + " and the owner's id, so the aggregate is never reachable by its id alone."
+                      + " Fix: add a method such as findByIdForOwner(id, ownerId) returning the"
+                      + " aggregate, and load it through that method wherever a caller is known.",
+                  violations);
+            })
+        .experimental()
+        .selecting(
+            "Concrete classes anywhere under scan assignable to both the owned role (by default"
+                + " Owned of the building blocks) and the aggregate-root role, each with the"
+                + " repository interfaces that bind it: the first type argument of the repository"
+                + " marker or of an intermediate port assignable to it, or - where the binding is"
+                + " raw - the interface in the same context named after the aggregate plus the"
+                + " repository suffix. An owned aggregate without a repository is not selected.")
+        .checking(
+            "The owner id type is the type argument the aggregate binds on the owned marker,"
+                + " through its interfaces and superclasses; an aggregate that leaves it raw or a"
+                + " type variable is reported. The aggregate's id type is the second type argument"
+                + " of the repository's binding, or else the return type of the aggregate's id()."
+                + " At least one method of the repository, inherited ones included, takes a"
+                + " parameter whose raw type is the aggregate's id type and a further parameter"
+                + " whose raw type is the owner id type - in either position, under any name, other"
+                + " parameters allowed - and returns a type that involves the aggregate: the"
+                + " aggregate itself, an Optional of it or another container, a nullable return"
+                + " included. A method that answers only yes or no does not count. Where the id"
+                + " type cannot be resolved, any parameter assignable to the id role stands for"
+                + " it. Whether a use case calls the scoped lookup or the unscoped findById is not"
+                + " checked; a generic intermediate port whose parameters are type variables is"
+                + " not seen through. An empty selection passes.",
+            "add a lookup such as findByIdForOwner(id, ownerId) to the aggregate's repository and"
+                + " load the aggregate through it wherever a caller is known");
+  }
+
+  private static List<JavaClass> ownedAggregateRoots(DcaArchitecture arch) {
+    DcaMarkers markers = arch.layout().markers();
+    return classesMatching(
+        arch,
+        c ->
+            markers.is("owned").test(c)
+                && markers.is("aggregateRoot").test(c)
+                && !c.isInterface()
+                && !c.getModifiers().contains(JavaModifier.ABSTRACT));
+  }
+
+  /** The repository interfaces that bind the aggregate, by type argument or, raw, by name. */
+  private static List<JavaClass> repositoriesOf(
+      JavaClass aggregate, List<JavaClass> repositories, DcaArchitecture arch) {
+    String markerName = arch.layout().markers().repository();
+    List<JavaClass> bound = new ArrayList<>();
+    for (JavaClass repository : repositories) {
+      Optional<JavaType> argument = boundAggregateArgument(repository, markerName);
+      if (argument.isPresent()) {
+        if (!(argument.get() instanceof JavaTypeVariable)
+            && argument.get().toErasure().equals(aggregate)) {
+          bound.add(repository);
+        }
+      } else if (repository
+              .getSimpleName()
+              .equals(aggregate.getSimpleName() + arch.layout().repositorySuffix())
+          && Objects.equals(
+              arch.rootContextPackage(repository.getPackageName()),
+              arch.rootContextPackage(aggregate.getPackageName()))) {
+        bound.add(repository);
+      }
+    }
+    return bound;
+  }
+
+  /**
+   * The aggregate's id type: the second argument of the repository's binding, else the return type
+   * of the aggregate's own id().
+   */
+  private static Optional<JavaClass> aggregateIdOf(
+      JavaClass aggregate, JavaClass repository, DcaMarkers markers) {
+    Optional<JavaType> bound = typeArgument(repository, markers.repository(), 1);
+    if (bound.isPresent() && !(bound.get() instanceof JavaTypeVariable)) {
+      return Optional.of(bound.get().toErasure());
+    }
+    return aggregate.getAllMethods().stream()
+        .filter(m -> m.getName().equals("id") && m.getRawParameterTypes().isEmpty())
+        .map(JavaMethod::getRawReturnType)
+        .filter(type -> markers.is("id").test(type))
+        .filter(type -> !type.getName().equals(markers.id()))
+        .findFirst();
+  }
+
+  private static boolean isScopedLookup(
+      JavaMethod method,
+      JavaClass aggregate,
+      JavaClass aggregateId,
+      JavaClass ownerId,
+      DcaMarkers markers) {
+    if (!TypeInspection.involvedTypes(method.getReturnType()).contains(aggregate)) {
+      return false;
+    }
+    List<JavaClass> parameters = new ArrayList<>(method.getRawParameterTypes());
+    if (!parameters.remove(ownerId)) {
+      return false;
+    }
+    return parameters.stream()
+        .anyMatch(
+            type -> aggregateId != null ? type.equals(aggregateId) : markers.is("id").test(type));
+  }
+
+  /**
+   * The type argument at {@code index} that a type binds on the given marker, through its
+   * interfaces, the interfaces they extend and its superclasses; a type variable of an intermediate
+   * type is substituted by the argument the type binds for it. Empty where the marker is used raw
+   * or not at all.
+   */
+  private static Optional<JavaType> typeArgument(JavaClass type, String markerName, int index) {
+    List<JavaType> candidates = new ArrayList<>(type.getInterfaces());
+    type.getSuperclass().ifPresent(candidates::add);
+    for (JavaType candidate : candidates) {
+      JavaClass erasure = candidate.toErasure();
+      if (erasure.getName().equals(markerName)) {
+        if (candidate instanceof JavaParameterizedType parameterized
+            && parameterized.getActualTypeArguments().size() > index) {
+          return Optional.of(parameterized.getActualTypeArguments().get(index));
+        }
+        return Optional.empty();
+      }
+      if (!erasure.isAssignableTo(markerName)) {
+        continue;
+      }
+      Optional<JavaType> inherited = typeArgument(erasure, markerName, index);
+      if (inherited.isPresent()
+          && inherited.get() instanceof JavaTypeVariable<?> variable
+          && candidate instanceof JavaParameterizedType parameterized) {
+        List<? extends JavaTypeVariable<?>> parameters = erasure.getTypeParameters();
+        for (int i = 0; i < parameters.size(); i++) {
+          if (parameters.get(i).getName().equals(variable.getName())
+              && parameterized.getActualTypeArguments().size() > i) {
+            return Optional.of(parameterized.getActualTypeArguments().get(i));
+          }
+        }
+      }
+      if (inherited.isPresent()) {
+        return inherited;
+      }
+    }
+    return Optional.empty();
   }
 
   /** A boolean or its box: a yes/no fact as a field, a predicate as a return type. */

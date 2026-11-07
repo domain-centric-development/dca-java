@@ -9,6 +9,7 @@
  *   <li>{@link Entity} - Objects with identity
  *   <li>{@link Value} - Immutable objects defined by attributes
  *   <li>{@link AggregateRoot} - Entry point to aggregate clusters
+ *   <li>{@link Owned} - An aggregate root that belongs to someone, loaded through its owner
  *   <li>{@link DomainEvent} - Important domain occurrences
  *   <li>{@link DomainService} - Stateless domain operations
  *   <li>{@link Factory} - Complex object creation

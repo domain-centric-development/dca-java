@@ -8,7 +8,7 @@ Hexagonal Architecture and Clean Architecture.
 
 | Artifact | What it is | Dependencies |
 |----------|------------|--------------|
-| `dev.domaincentric:dca-building-blocks` | The building blocks your code implements: DDD tactical markers (`AggregateRoot`, `Entity`, `Value`, `DomainEvent`, …), strategic annotations (`@BoundedContext`, `@SharedKernel`, `@Upstream`, `@Partnership`, …) and hexagonal port interfaces (`UseCase`, `Repository`, `Store`, …), the application-layer `TransactionBoundary` and the exception base types (`DomainException`; `PortException` with `InputPortException` → `UseCaseException` and `OutputPortException`), the `Refusal` marker | none |
+| `dev.domaincentric:dca-building-blocks` | The building blocks your code implements: DDD tactical markers (`AggregateRoot`, `Entity`, `Value`, `DomainEvent`, …), the `Owned<OWNER>` marker for an aggregate that belongs to someone, strategic annotations (`@BoundedContext`, `@SharedKernel`, `@Upstream`, `@Partnership`, …) and hexagonal port interfaces (`UseCase`, `Repository`, `Store`, …), the application-layer `TransactionBoundary` and the exception base types (`DomainException`; `PortException` with `InputPortException` → `UseCaseException` and `OutputPortException`), the `Refusal` marker | none |
 | `dev.domaincentric:dca-archunit` | The governance rules: 119 ArchUnit rules pinned to those building blocks, plus an executable context map | `dca-building-blocks`, ArchUnit |
 | `dev.domaincentric:dca-spring` | The runtime adapters the rules demand: `SpringDomainEventPublisher` (over `ApplicationEventPublisher`), `SpringTransactionBoundary` (over `TransactionTemplate`), an `InMemoryTransactionBoundary` for tests, a Spring Boot auto-configuration, and the net that rolls back a `@Transactional` method returning a `Refusal` (`dca.spring.refusal-rollback.enabled`, on by default) | `dca-building-blocks`; Spring `compileOnly` — your Boot BOM pins the version |
 | `dev.domaincentric:dca-archunit-spring-modulith` | Spring Modulith's module verification as a DCA test: `DcaSpringModulithTest` next to `DcaArchitectureTest`, with the test-class exclusion Modulith needs | `dca-archunit`; `spring-modulith-core` `compileOnly` |
@@ -68,7 +68,7 @@ Packages:
 dev.domaincentric.dca.buildingblocks
 ├── ddd.tactical                 AggregateRoot, BaseAggregateRoot, Entity, Value, Id, DomainEvent,
 │                                IntegrationEvent, IntegrationEventType, DomainService, DomainGateway,
-│                                Factory, Specification, DomainException
+│                                Factory, Specification, DomainException, Owned
 ├── ddd.strategic                @BoundedContext
 ├── ddd.strategic.relationships  @SharedKernel, @OpenHostService, @Upstream, @ExternalUpstream, @Partnership
 ├── hexagonal.port.in / .out     InputPort, UseCase  |  OutputPort, Repository, Store,
@@ -311,7 +311,7 @@ selection passes. So the first day needs seven building blocks, not thirty-one:
 - `@BoundedContext` on one `package-info.java` — so the rules know where the module begins
 
 That is enough for `DcaArchitectureTest` to say something useful. `Entity`, `DomainEvent`,
-`IntegrationEvent`, `DomainService`, `Factory`, `Specification`, `Store`, the publishers and the
+`IntegrationEvent`, `DomainService`, `Factory`, `Specification`, `Owned`, `Store`, the publishers and the
 context-map annotations each switch on the rules that govern them, when and only when the project
 introduces the concept. The test source set's `fixtures/layout/greenfield` package is that shape,
 nine files, and every rule of the catalog passes over it.

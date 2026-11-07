@@ -457,3 +457,16 @@ for a shape the suite passed.
   reported, like one taking a `String`. Same change in `dca-dotnet` (fields, and a `bool` property without a public
   setter) and `dca-rust` (fields). A public non-final boolean field - in .NET a public non-readonly field or a
   public non-init setter, in Rust a `pub` struct field - is one anyone may set and is reported as a flag argument.
+
+## 2026-11-07 — DCA-TAC-026: an owned aggregate is loaded through its owner (WP-121)
+
+New rule, same id in `dca-dotnet` and `dca-rust`, experimental, enforced. New marker `ddd.tactical.Owned<OWNER extends
+Id>` and `DcaMarkers` role `owned` (inserted after `aggregateRoot`; the compatibility constructors fill it with the
+library's type). Selects concrete classes assignable to both `owned` and `aggregateRoot`; reads the owner id type
+from the type argument bound on `Owned` (through interfaces and superclasses, a type variable of an intermediate
+type substituted), the aggregate id from the repository's second type argument or else the aggregate's `id()`.
+The aggregate's repository interfaces (bound by type argument, by name where raw) each need one method — inherited
+ones included — with a parameter of the aggregate id type and one of the owner id type (raw types, any position,
+any name) whose return involves the aggregate (`Optional<A>`, `A`, a container). A boolean `exists…` does not
+count. Raw `Owned` is reported. Not seen: whether a use case calls the scoped lookup (rule B of WP-121, not built);
+a generic intermediate port whose parameters are type variables.

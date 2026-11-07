@@ -73,6 +73,9 @@ import java.util.Objects;
  *     differ from the default, so a reader knows which types the rules resolved; {@code
  *     DcaLayout.markersReport()} is the same line without JUnit
  * @param aggregateRoot the marker of an aggregate root
+ * @param owned the marker of an aggregate root that belongs to someone, whose type argument names
+ *     the owner's id type - read by {@code DCA-TAC-026}, which asks the aggregate's repository for
+ *     a lookup by the aggregate's id and the owner's id
  * @param entity the marker of an entity
  * @param value the marker of a value object
  * @param id the marker of an identifier
@@ -122,6 +125,7 @@ import java.util.Objects;
 public record DcaMarkers(
     String name,
     String aggregateRoot,
+    String owned,
     String entity,
     String value,
     String id,
@@ -247,6 +251,7 @@ public record DcaMarkers(
     this(
         name,
         aggregateRoot,
+        DCA_BUILDING_BLOCKS + ".ddd.tactical.Owned",
         entity,
         value,
         id,
@@ -335,6 +340,7 @@ public record DcaMarkers(
       throw new IllegalArgumentException("name must not be blank");
     }
     aggregateRoot = type(aggregateRoot, "aggregateRoot");
+    owned = type(owned, "owned");
     entity = type(entity, "entity");
     value = type(value, "value");
     id = type(id, "id");
@@ -383,6 +389,7 @@ public record DcaMarkers(
     return new DcaMarkers(
         "dca",
         DCA_BUILDING_BLOCKS + ".ddd.tactical.AggregateRoot",
+        DCA_BUILDING_BLOCKS + ".ddd.tactical.Owned",
         DCA_BUILDING_BLOCKS + ".ddd.tactical.Entity",
         DCA_BUILDING_BLOCKS + ".ddd.tactical.Value",
         DCA_BUILDING_BLOCKS + ".ddd.tactical.Id",
@@ -568,6 +575,7 @@ public record DcaMarkers(
     return new DcaMarkers(
         name,
         roles.get("aggregateRoot"),
+        roles.get("owned"),
         roles.get("entity"),
         roles.get("value"),
         roles.get("id"),
@@ -598,6 +606,10 @@ public record DcaMarkers(
 
   public DcaMarkers withAggregateRoot(String fqn) {
     return withRole("aggregateRoot", fqn);
+  }
+
+  public DcaMarkers withOwned(String fqn) {
+    return withRole("owned", fqn);
   }
 
   public DcaMarkers withEntity(String fqn) {
@@ -715,6 +727,10 @@ public record DcaMarkers(
 
   public DcaMarkers withAggregateRoot(DcaMarker marker) {
     return withRole("aggregateRoot", marker);
+  }
+
+  public DcaMarkers withOwned(DcaMarker marker) {
+    return withRole("owned", marker);
   }
 
   public DcaMarkers withEntity(DcaMarker marker) {
@@ -839,6 +855,7 @@ public record DcaMarkers(
   public static final List<String> DOMAIN_FACING_ROLES =
       List.of(
           "aggregateRoot",
+          "owned",
           "entity",
           "value",
           "id",
@@ -898,6 +915,7 @@ public record DcaMarkers(
   public Map<String, String> roles() {
     Map<String, String> roles = new LinkedHashMap<>();
     roles.put("aggregateRoot", aggregateRoot);
+    roles.put("owned", owned);
     roles.put("entity", entity);
     roles.put("value", value);
     roles.put("id", id);

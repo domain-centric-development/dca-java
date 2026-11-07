@@ -6,6 +6,19 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ### Added
 
+**`DCA-TAC-026` — the repository of an owned aggregate declares a lookup by the aggregate's id and the owner's id
+(WP-121), experimental.** An object loaded by its id alone is reachable by anyone who knows or guesses the id (OWASP
+A01, broken access control). The rule selects every concrete aggregate root that also carries the new `owned` role
+(`Owned<OWNER>` of the building blocks) and asks each repository interface that binds it for at least one method —
+inherited ones included — taking the aggregate's id type and the owner id type bound on `Owned` (any name, either
+position, further parameters allowed) and returning the aggregate, an `Optional` of it or another container. A
+yes/no question (`exists…`) does not count; an aggregate that leaves `Owned` raw is reported. Whether a use case
+calls the scoped lookup is not checked. Enforced once experimental rules are switched on.
+
+**`DcaMarkers` role `owned`** (default `dev.domaincentric.dca.buildingblocks.ddd.tactical.Owned`; `withOwned(String)`
+/ `withOwned(DcaMarker)`), listed among the domain-facing roles. The canonical constructor gained the component
+after `aggregateRoot`; the released compatibility constructors fill it with the library's type.
+
 **`DCA-ERR-009` — a domain exception is constructed only in the domain layer (WP-186), experimental.** The model
 refuses; a use case never invents a domain failure. A failure the application finds itself — an output port returned
 nothing, the caller does not own what it names — is a case of its result or a use-case exception. The rule reads

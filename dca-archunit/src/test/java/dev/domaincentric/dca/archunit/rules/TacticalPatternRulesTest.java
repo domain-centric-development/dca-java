@@ -27,7 +27,7 @@ class TacticalPatternRulesTest {
   void ruleSetHasStableShape() {
     TacticalPatternRules set = new TacticalPatternRules(DcaLayout.forBasePackage(GOOD));
     assertEquals("tactical", set.name());
-    assertEquals(24, set.rules().size());
+    assertEquals(25, set.rules().size());
     Fixtures.assertIdsAreSequential(set, "TAC");
   }
 
@@ -37,7 +37,9 @@ class TacticalPatternRulesTest {
         TacticalPatternRules::new,
         GOOD,
         // experimental and stricter than this fixture; its positive fixture is .tactical.primitives
-        "DCA-TAC-025");
+        "DCA-TAC-025",
+        // positive fixture in .tactical.ownership
+        "DCA-TAC-026");
   }
 
   /** Every tactical rule has a negative fixture. */
@@ -49,7 +51,9 @@ class TacticalPatternRulesTest {
         // negative fixture in .tactical.factories
         "DCA-TAC-024",
         // negative fixture in .tactical.primitives
-        "DCA-TAC-025");
+        "DCA-TAC-025",
+        // negative fixture in .tactical.ownership
+        "DCA-TAC-026");
   }
 
   @Test
@@ -276,5 +280,30 @@ class TacticalPatternRulesTest {
   @Test
   void aDomainOfValueObjectsPasses() {
     Fixtures.passes(Fixtures.ROOT + ".tactical.primitives.good", "DCA-TAC-025");
+  }
+
+  /**
+   * DCA-TAC-026: an owned aggregate whose repository loads it by id alone, and one that names no
+   * owner id type.
+   */
+  @Test
+  void anOwnedAggregateWithoutAScopedLookupIsReported() {
+    String message =
+        Fixtures.violation(Fixtures.ROOT + ".tactical.ownership.bad", "DCA-TAC-026").getMessage();
+
+    assertTrue(
+        message.contains(
+            "MedicalRecordRepository declares no lookup taking RecordId and PatientId for the owned"
+                + " aggregate"),
+        message);
+    assertTrue(message.contains("Consent is owned but names no owner id type"), message);
+  }
+
+  /**
+   * A scoped lookup in either parameter order passes; an aggregate that is not owned needs none.
+   */
+  @Test
+  void anOwnedAggregateWithAScopedLookupPasses() {
+    Fixtures.passes(Fixtures.ROOT + ".tactical.ownership.good", "DCA-TAC-026");
   }
 }

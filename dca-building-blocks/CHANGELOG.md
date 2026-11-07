@@ -6,6 +6,13 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ### Added
 
+- `ddd.tactical.Owned<OWNER extends Id>` — an empty marker for an aggregate root that belongs to someone; the type
+  argument names the owner's id type (`Owned<PatientId>`, `Owned<TenantId>`). The aggregate's repository declares a
+  lookup by its id and the owner's id, and a use case acting for a caller loads it through that lookup — an object
+  loaded by id alone is reachable by anyone who knows or guesses the id (OWASP A01). The owner may change only
+  through an explicit operation of the aggregate after the use case proved the right to it; a guest with a
+  pseudonymous identity from a signed token is an owner; where no identity exists and the id itself is the
+  secret, the aggregate is not `Owned` (WP-121).
 - `application.Refusal` — a marker for a case of a use-case result that refuses the request (WP-171). A use case
   may return its expected refusals as cases of a closed result instead of throwing them, chosen per bounded
   context; every refusing case implements `Refusal`, a success case never does. The marker carries the roll-back
