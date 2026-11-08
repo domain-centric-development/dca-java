@@ -4,6 +4,16 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Changed
+
+**`DCA-TAC-025` exempts the factory that rebuilds a stored object.** A `boolean` parameter of a static method that
+returns its own type and is named as the layout configures — `reconstitute` and `restore` by default, case ignored —
+is no flag argument: it hands a stored yes/no fact back to the type that holds it, so "a single yes/no fact may be a
+boolean field" holds for persisted aggregates too. The factory's other parameters are checked as before; an instance
+method of the same name is no factory. `DcaLayout.withReconstitutingFactories(String...)` replaces the names (an
+empty list exempts none). The building blocks carry no reconstitution marker, and none is added: the name is what
+the factory already says, and `DCA-TAC-023`'s fix text already names `reconstitute(...)`.
+
 ## [0.12.0] - 2026-11-07
 
 ### Added

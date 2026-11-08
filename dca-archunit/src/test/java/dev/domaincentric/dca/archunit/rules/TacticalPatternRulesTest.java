@@ -2,6 +2,7 @@ package dev.domaincentric.dca.archunit.rules;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tngtech.archunit.core.importer.ClassFileImporter;
@@ -258,6 +259,9 @@ class TacticalPatternRulesTest {
 
     assertFalse(message.contains("field closed"), message);
     assertTrue(message.contains("markClosed(...) takes boolean as parameter 1"), message);
+    assertTrue(message.contains("restore(...) takes int as parameter 3"), message);
+    assertTrue(message.contains("restore(...) takes boolean as parameter 1"), message);
+    assertFalse(message.contains("restore(...) takes boolean as parameter 2"), message);
     assertTrue(message.contains("field frozen is a public boolean anyone may set"), message);
     assertTrue(message.contains("field overdraftCount is int"), message);
     assertTrue(message.contains("field openedAt is Instant"), message);
@@ -280,6 +284,27 @@ class TacticalPatternRulesTest {
   @Test
   void aDomainOfValueObjectsPasses() {
     Fixtures.passes(Fixtures.ROOT + ".tactical.primitives.good", "DCA-TAC-025");
+  }
+
+  /**
+   * DCA-TAC-025 reads the reconstituting factory by the configured names: a project that names it
+   * otherwise lists its own name, and the default reconstitute is then a flag argument again.
+   */
+  @Test
+  void theReconstitutingFactoryFollowsTheConfiguredNames() {
+    String pkg = Fixtures.ROOT + ".tactical.primitives.good";
+    DcaLayout renamed = DcaLayout.forBasePackage(pkg).withReconstitutingFactories("rehydrate");
+
+    AssertionError reported =
+        assertThrows(
+            AssertionError.class,
+            () ->
+                TacticalPatternRules.domainHoldsNoBarePrimitives()
+                    .check(
+                        DcaArchitecture.of(renamed, new ClassFileImporter().importPackages(pkg))));
+    assertTrue(
+        reported.getMessage().contains("reconstitute(...) takes boolean as parameter 4"),
+        reported.getMessage());
   }
 
   /**

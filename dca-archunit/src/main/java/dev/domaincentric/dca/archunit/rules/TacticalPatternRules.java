@@ -988,7 +988,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
    * rules in a value object of its own - a postal code, a quantity, a moment. Held bare, its rules
    * are repeated wherever it is used, or nowhere. A single yes/no fact is the exception: the domain
    * type keeps it in a boolean field, is told to change it and answers it with a predicate; only a
-   * boolean parameter - a flag argument - is reported.
+   * boolean parameter - a flag argument - is reported. The factory that rebuilds a stored object
+   * hands that fact back to it and may take the boolean.
    */
   public static DcaRule domainHoldsNoBarePrimitives() {
     return DcaRule.check(
@@ -1002,10 +1003,15 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 + " primitive it wraps. A single yes/no fact may stay a boolean field: the type is"
                 + " told (complete()) and answers (isCompleted()). A boolean parameter is a flag"
                 + " argument - setCompleted(true) lets the caller set the state instead of"
-                + " triggering the behaviour - and three or more states, or transitions with rules,"
-                + " are an enum or a value",
+                + " triggering the behaviour - except in the factory that rebuilds a stored object,"
+                + " which hands the stored fact back to the type that holds it. Three or more"
+                + " states, or transitions with rules, are an enum or a value",
             arch -> {
               DcaMarkers markers = arch.layout().markers();
+              Set<String> reconstituting =
+                  arch.layout().reconstitutingFactories().stream()
+                      .map(name -> name.toLowerCase(java.util.Locale.ROOT))
+                      .collect(java.util.stream.Collectors.toSet());
               Set<String> buildingBlocks = buildingBlockTypes(markers);
               List<String> violations = new ArrayList<>();
               for (JavaClass type :
@@ -1066,8 +1072,12 @@ public final class TacticalPatternRules implements DcaRuleSet {
                   if (!returned.isEmpty() && !accessorOfReportedField && !predicate) {
                     bare.add(method.getName() + "() returns " + returned);
                   }
+                  boolean rebuilds = isReconstitutingFactory(type, method, reconstituting);
                   List<JavaType> parameters = method.getParameterTypes();
                   for (int i = 0; i < parameters.size(); i++) {
+                    if (rebuilds && isBoolean(method.getRawParameterTypes().get(i))) {
+                      continue;
+                    }
                     String taken = bareTypesIn(parameters.get(i));
                     if (!taken.isEmpty()) {
                       bare.add(
@@ -1110,7 +1120,10 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 + " specification's isSatisfiedBy, and the field of the same name behind it. A field"
                 + " whose type is boolean or Boolean - a single yes/no fact - and a boolean return -"
                 + " a question to the object, a predicate - pass; a boolean parameter and a public"
-                + " non-final boolean field, flag arguments, do not.")
+                + " non-final boolean field, flag arguments, do not. A boolean parameter of the"
+                + " factory that rebuilds a stored object - a static method returning its own"
+                + " type and named as configured, reconstitute or restore by default, case"
+                + " ignored - passes.")
         .checking(
             "No selected field, return type or parameter type involves String, a primitive or its"
                 + " box, or a point in time (java.time.Instant, LocalDate, LocalDateTime, LocalTime,"
@@ -1119,7 +1132,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 + " included, so List<String> counts. BigDecimal, BigInteger, Duration and the"
                 + " project's own types pass. A field typed boolean or Boolean and a method"
                 + " returning one pass; a boolean among the parameters is a flag argument and"
-                + " counts, and so do a public non-final boolean field, which anyone may set, and"
+                + " counts - except in the reconstituting factory, whose other parameters are"
+                + " checked like any other - and so do a public non-final boolean field, which anyone may set, and"
                 + " a List<Boolean> field. A value object with several components is checked"
                 + " like any other type: each component is a value object itself. A record's"
                 + " accessor is not reported again beside its field. A reported type with exactly one"
@@ -1331,6 +1345,17 @@ public final class TacticalPatternRules implements DcaRuleSet {
       }
     }
     return Optional.empty();
+  }
+
+  /**
+   * The factory that rebuilds a stored object: static, returning the type that declares it, named
+   * as the layout configures ({@code reconstitute}, {@code restore} by default), case ignored.
+   */
+  private static boolean isReconstitutingFactory(
+      JavaClass type, JavaMethod method, Set<String> names) {
+    return method.getModifiers().contains(JavaModifier.STATIC)
+        && method.getRawReturnType().equals(type)
+        && names.contains(method.getName().toLowerCase(java.util.Locale.ROOT));
   }
 
   /** A boolean or its box: a yes/no fact as a field, a predicate as a return type. */

@@ -341,8 +341,9 @@ rules follow the role, not the base class.
 
 **Your own names.** Where a rule finds something by name rather than by role — the use-case,
 controller, REST-controller, aggregate-root, repository, store, factory and specification suffixes,
-the segments of the package layout, and the types a domain event may store its occurrence time in
-(`withTimestampTypes`) — `DcaLayout` has a `with…` for it. Configure the name; do not switch the
+the segments of the package layout, the types a domain event may store its occurrence time in
+(`withTimestampTypes`) and the names of the factory that rebuilds a stored object (`withReconstitutingFactories`,
+`reconstitute` and `restore` by default) — `DcaLayout` has a `with…` for it. Configure the name; do not switch the
 rule off.
 
 **Your own layers and annotations.** A layer is its package by default. A project that keeps a layer under

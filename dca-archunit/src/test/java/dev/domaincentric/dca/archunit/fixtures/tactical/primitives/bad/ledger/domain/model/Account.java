@@ -7,7 +7,9 @@ import java.util.List;
 /**
  * An aggregate holding a count, a moment and a list of strings bare, and taking flag arguments - a
  * boolean parameter and a public boolean field. Its yes/no fact {@code closed}, a private boolean
- * field, passes.
+ * field, passes, and so does the boolean its reconstituting factory {@code restore} takes - the
+ * factory's bare count does not. An instance method of the same name is no factory: its boolean is
+ * a flag argument.
  */
 public class Account extends BaseAggregateRoot<Account, AccountId> {
   private final AccountId id;
@@ -20,6 +22,17 @@ public class Account extends BaseAggregateRoot<Account, AccountId> {
 
   Account(AccountId id) {
     this.id = id;
+  }
+
+  static Account restore(AccountId id, boolean closed, int overdraftCount) {
+    Account account = new Account(id);
+    account.closed = closed;
+    account.overdraftCount = overdraftCount;
+    return account;
+  }
+
+  public void restore(boolean closed) {
+    this.closed = closed;
   }
 
   @Override

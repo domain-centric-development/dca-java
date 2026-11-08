@@ -57,6 +57,9 @@ public final class DcaLayout {
           "java.time.ZonedDateTime",
           "java.time.LocalDateTime");
 
+  private static final List<String> DEFAULT_RECONSTITUTING_FACTORIES =
+      List.of("reconstitute", "restore");
+
   private static final List<String> DEFAULT_THIRD_PARTY_ALLOWED_IN_DOMAIN =
       List.of(
           "java..",
@@ -90,6 +93,7 @@ public final class DcaLayout {
   private final String factorySuffix;
   private final String specificationSuffix;
   private final List<String> timestampTypes;
+  private final List<String> reconstitutingFactories;
   private final List<String> thirdPartyPackagesAllowedInDomain;
   private final List<String> excludedPackages;
   private final List<String> localOutputPorts;
@@ -178,6 +182,8 @@ public final class DcaLayout {
     this.factorySuffix = requireSuffix(settings.factorySuffix, "factorySuffix");
     this.specificationSuffix = requireSuffix(settings.specificationSuffix, "specificationSuffix");
     this.timestampTypes = requireTypeNames(settings.timestampTypes, "timestampTypes");
+    this.reconstitutingFactories =
+        requireNames(settings.reconstitutingFactories, "reconstitutingFactories");
     this.thirdPartyPackagesAllowedInDomain =
         List.copyOf(
             Objects.requireNonNull(
@@ -243,6 +249,7 @@ public final class DcaLayout {
     defaults.factorySuffix = "Factory";
     defaults.specificationSuffix = "Specification";
     defaults.timestampTypes = DEFAULT_TIMESTAMP_TYPES;
+    defaults.reconstitutingFactories = DEFAULT_RECONSTITUTING_FACTORIES;
     defaults.thirdPartyPackagesAllowedInDomain = DEFAULT_THIRD_PARTY_ALLOWED_IN_DOMAIN;
     defaults.markers = DcaMarkers.dca();
     FrameworkAnnotations.Detection detection = FrameworkAnnotations.detect();
@@ -277,6 +284,11 @@ public final class DcaLayout {
   }
 
   /** A non-empty list of fully qualified type names, none of them blank. */
+  private static List<String> requireNames(List<String> values, String name) {
+    Objects.requireNonNull(values, name).forEach(value -> requireNotBlank(value, name));
+    return List.copyOf(values);
+  }
+
   private static List<String> requireTypeNames(List<String> values, String name) {
     Objects.requireNonNull(values, name);
     if (values.isEmpty()) {
@@ -598,6 +610,16 @@ public final class DcaLayout {
   }
 
   /**
+   * Names of the static factory method that rebuilds a stored domain object, matched ignoring case.
+   * Replaces the default list ({@code reconstitute}, {@code restore}). {@code DCA-TAC-025} lets
+   * such a factory take a boolean parameter: it hands a stored yes/no fact back to the object that
+   * holds it, which is no flag argument. An empty list exempts no factory.
+   */
+  public DcaLayout withReconstitutingFactories(String... names) {
+    return copy(settings -> settings.reconstitutingFactories = List.of(names));
+  }
+
+  /**
    * Third-party packages the domain layer may depend on (ArchUnit patterns). Replaces the default
    * list ({@code java..}, {@code lombok..}, commons-lang3, commons-collections4, jspecify).
    */
@@ -726,6 +748,7 @@ public final class DcaLayout {
     settings.factorySuffix = factorySuffix;
     settings.specificationSuffix = specificationSuffix;
     settings.timestampTypes = timestampTypes;
+    settings.reconstitutingFactories = reconstitutingFactories;
     settings.thirdPartyPackagesAllowedInDomain = thirdPartyPackagesAllowedInDomain;
     settings.excludedPackages = excludedPackages;
     settings.localOutputPorts = localOutputPorts;
@@ -766,6 +789,7 @@ public final class DcaLayout {
     String factorySuffix;
     String specificationSuffix;
     List<String> timestampTypes;
+    List<String> reconstitutingFactories;
     List<String> thirdPartyPackagesAllowedInDomain;
     List<String> excludedPackages = List.of();
     List<String> localOutputPorts = List.of();
@@ -948,6 +972,14 @@ public final class DcaLayout {
   /** Types a domain event may store its occurrence time in, read by {@code DCA-ADV-008}. */
   public List<String> timestampTypes() {
     return timestampTypes;
+  }
+
+  /**
+   * Names of the factory that rebuilds a stored domain object, read by {@code DCA-TAC-025}; {@code
+   * reconstitute} and {@code restore} by default.
+   */
+  public List<String> reconstitutingFactories() {
+    return reconstitutingFactories;
   }
 
   public List<String> thirdPartyPackagesAllowedInDomain() {

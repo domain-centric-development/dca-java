@@ -13,6 +13,15 @@ public class Account extends BaseAggregateRoot<Account, AccountId> {
     this.status = AccountStatus.OPEN;
   }
 
+  /** Rebuilds a stored account; the stored yes/no fact comes back as the boolean it was. */
+  static Account reconstitute(AccountId id, AccountStatus status, Address address, boolean frozen) {
+    Account account = new Account(id);
+    account.status = status;
+    account.address = address;
+    account.frozen = frozen;
+    return account;
+  }
+
   @Override
   public AccountId id() {
     return id;
