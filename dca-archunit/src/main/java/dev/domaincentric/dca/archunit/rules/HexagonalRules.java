@@ -498,7 +498,8 @@ public final class HexagonalRules implements DcaRuleSet {
                 + " class without the marker is not a domain service by this rule. Injecting it,"
                 + " calling it or naming it in a signature all count as a dependency. An empty"
                 + " selection passes.",
-            "move the collaboration into the use case and carry its outcome in the result");
+            "move the collaboration into the use case and carry its outcome in the result;"
+                + " DCA-ADV-021 holds the same for every caller outside the application");
   }
 
   /**

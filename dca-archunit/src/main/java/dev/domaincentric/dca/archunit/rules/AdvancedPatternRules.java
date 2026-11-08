@@ -4,7 +4,10 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaAccess;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaConstructorCall;
+import com.tngtech.archunit.core.domain.JavaConstructorReference;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.lang.ArchCondition;
@@ -61,7 +64,8 @@ public final class AdvancedPatternRules implements DcaRuleSet {
             specificationsResideInDomain(),
             specificationsHaveNoFrameworkAnnotations(),
             modelTypesDoNotUseDomainServices(),
-            domainServiceOperationsTakeAModelObject());
+            domainServiceOperationsTakeAModelObject(),
+            domainServicesAreUsedByTheApplication());
   }
 
   @Override
@@ -294,7 +298,8 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                 + " domain-service role. Holding one as a parameter or a field type is not an"
                 + " access and is not reported. A domain service calling another domain service is"
                 + " outside this selection. An empty selection passes.",
-            "let the use case call the domain service and hand the model the result");
+            "let the use case call the domain service and hand the model the result; DCA-ADV-021"
+                + " holds the same for every caller outside the application");
   }
 
   public DcaRule domainServiceOperationsTakeAModelObject() {
@@ -348,6 +353,79 @@ public final class AdvancedPatternRules implements DcaRuleSet {
                 + " check on their own: a calculation that needs no aggregate is behaviour of the"
                 + " value object or the aggregate, not a domain service. An empty selection passes.",
             "pass the aggregate itself, or move the operation onto the value object it computes on");
+  }
+
+  /**
+   * DCA-ADV-021. The whole of what DCA-ADV-019 and DCA-HEX-012 each hold a part of: a domain
+   * service is the application's collaborator, and another domain service's. The composition root
+   * may build one to hand it to a use case; nothing outside the application calls it.
+   */
+  public DcaRule domainServicesAreUsedByTheApplication() {
+    return DcaRule.check(
+            "DCA-ADV-021",
+            "Domain services are used only by the application and by other domain services",
+            "A domain service holds logic that spans aggregates, and the use case decides when it"
+                + " runs and puts its outcome into the result. A model type, a read model, an"
+                + " adapter or the composition root that calls one takes that decision outside the"
+                + " application - the incoming adapter and the model type are each held by a"
+                + " narrower rule too (DCA-HEX-012, DCA-ADV-019)",
+            arch -> {
+              var domainService = arch.layout().markers().is("domainService");
+              var inApplication = arch.inApplication();
+              var inInfrastructure = arch.inInfrastructure();
+              List<String> violations = new ArrayList<>();
+              for (JavaClass caller : arch.classes()) {
+                JavaClass outermost = outermost(caller);
+                if (inApplication.test(outermost) || domainService.test(outermost)) {
+                  continue;
+                }
+                boolean compositionRoot = inInfrastructure.test(outermost);
+                for (JavaAccess<?> access : caller.getAccessesFromSelf()) {
+                  JavaClass target = access.getTargetOwner();
+                  if (!domainService.test(target)) {
+                    continue;
+                  }
+                  boolean construction =
+                      access instanceof JavaConstructorCall
+                          || access instanceof JavaConstructorReference;
+                  if (compositionRoot && construction) {
+                    continue;
+                  }
+                  violations.add(access.getDescription());
+                }
+              }
+              failIfAny(
+                  violations.stream().distinct().sorted().toList(),
+                  "Domain services are used only by the application and by other domain services."
+                      + " Fix: let the use case call the domain service and carry its outcome in the"
+                      + " result; the composition root constructs the service and hands it to the"
+                      + " use case.");
+            })
+        .experimental()
+        .selecting(
+            "Every class under scan outside the application layer that does not carry the"
+                + " domain-service role, with the classes nested in it - the domain model, the"
+                + " adapters of both directions, the composition root (the infrastructure layer)"
+                + " and classes outside every layer. A class nested in an application class or in"
+                + " a domain service counts as its outer class and is not selected.")
+        .checking(
+            "None of them calls a method of, reads a field of, references a method of or"
+                + " instantiates a type carrying the domain-service role. A class in the"
+                + " infrastructure layer - the composition root - may construct one (a constructor"
+                + " call or a constructor reference) to hand it to a use case; a call there is"
+                + " reported. Naming the type as a parameter, a field or a return type is not an"
+                + " access and is not reported. An empty selection passes.",
+            "let the use case call the domain service and carry its outcome in the result; the"
+                + " composition root only constructs it");
+  }
+
+  /** The top-level class a nested, local or anonymous class is declared in. */
+  private static JavaClass outermost(JavaClass type) {
+    JavaClass current = type;
+    while (current.getEnclosingClass().isPresent()) {
+      current = current.getEnclosingClass().get();
+    }
+    return current;
   }
 
   public DcaRule domainServicesHaveNoFrameworkAnnotations() {

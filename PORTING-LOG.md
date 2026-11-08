@@ -480,3 +480,22 @@ whose name matches `is(User)?InRole|has(Any)?(Role|Authority)`. A first cut also
 (`roles`, `authorities`, `getRoles`, `getAuthorities`) and listed six methods of the Java sample that issue tokens
 or build the principal from an identity's roles — no decision among them — so the accessors went. An annotation's
 expression is a constant, never a call, so a declared gate is never listed. Empty role: the rule returns nothing.
+
+## 2026-11-08 — DCA-TAC-025: the reconstituting factory may take a boolean (WP-194 item 5)
+
+A static method declared by the type, returning that type (raw), whose name is in
+`DcaLayout.reconstitutingFactories()` (`reconstitute`, `restore` by default, compared lower-cased) skips its
+`boolean`/`Boolean` parameters; its other parameters are checked as before. Same change in `dca-dotnet` (static,
+`ReturnType == runtime type`), `dca-rust` (an associated function without a receiver whose return mentions `Self` or
+the type, config key `reconstituting-factories`) and `dca-python` (a `classmethod`/`staticmethod` annotated to return
+the class or `Self`, `[tool.dca] reconstituting-factories`). Recognised by name, not by a marker: the building
+blocks of all four languages carry no reconstitution marker, and a marker would only restate the name.
+
+## 2026-11-08 — DCA-ADV-021: domain services are used by the application only (WP-189)
+
+New rule, same id in `dca-dotnet`, `dca-rust` and `dca-python`, experimental, enforced. Iterates `arch.classes()`;
+a class whose outermost enclosing class is in `inApplication()` or carries the `domainService` role is skipped.
+Every `getAccessesFromSelf()` whose target owner carries the `domainService` role is reported with its ArchUnit
+description, except a `JavaConstructorCall` or `JavaConstructorReference` from a class in `inInfrastructure()` -
+the composition root may build the service for a use case. A type reference (parameter, field, return) is no
+access. `DCA-ADV-019` and `DCA-HEX-012` stay; their remedies name `DCA-ADV-021`.

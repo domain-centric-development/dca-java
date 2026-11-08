@@ -25,8 +25,8 @@ class AdvancedPatternRulesTest {
   void setHasExpectedShape() {
     AdvancedPatternRules set = new AdvancedPatternRules(DcaLayout.forBasePackage(GOOD));
     assertEquals("advanced", set.name());
-    assertEquals(18, set.rules().size());
-    assertEquals(18, set.rules().stream().map(DcaRule::id).distinct().count());
+    assertEquals(19, set.rules().size());
+    assertEquals(19, set.rules().stream().map(DcaRule::id).distinct().count());
     Fixtures.assertIdsAreSequential(set, "ADV");
   }
 
@@ -47,6 +47,36 @@ class AdvancedPatternRulesTest {
     String message = Fixtures.failure(BAD, "DCA-ADV-019").getMessage();
 
     assertTrue(message.contains("SelfPricingOrder"), message);
+  }
+
+  /**
+   * DCA-ADV-021: the aggregate, the outgoing adapter and the composition root's call are reported;
+   * the composition root's construction is not.
+   */
+  @Test
+  @DisplayName("DCA-ADV-021 reports every caller of a domain service outside the application")
+  void onlyTheApplicationCallsADomainService() {
+    String message = Fixtures.failure(BAD, "DCA-ADV-021").getMessage();
+
+    assertTrue(message.contains("SelfPricingOrder.total()"), message);
+    assertTrue(message.contains("OrderTotalExport.line(") && message.contains("withTax"), message);
+    assertTrue(
+        message.contains("infrastructure.OrderWiring.minimumWithTax(")
+            && message.contains("calls method"),
+        message);
+    assertTrue(
+        message
+            .lines()
+            .filter(line -> line.contains("infrastructure.OrderWiring"))
+            .noneMatch(line -> line.contains("calls constructor")),
+        message);
+    assertTrue(
+        message
+            .lines()
+            .filter(line -> line.contains("PlaceOrderUseCase") || line.contains("TaxService"))
+            .findAny()
+            .isEmpty(),
+        message);
   }
 
   /**

@@ -4,6 +4,16 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Added
+
+**`DCA-ADV-021` — domain services are used only by the application and by other domain services (WP-189),
+experimental.** Selects every class outside the application layer that carries no domain-service role — the model,
+both adapter directions, the composition root, classes outside every layer — with the classes nested in it, and
+reports each method call, field access, method reference or construction whose target carries the domain-service
+role. The composition root (the infrastructure layer) may construct one to hand it to a use case; a call there is
+reported. A type named as a parameter, field or return type is no access. `DCA-ADV-019` (model types) and
+`DCA-HEX-012` (incoming adapters) stay — each rule set stands alone — and their remedies now point at `DCA-ADV-021`.
+
 ### Changed
 
 **`DCA-TAC-025` exempts the factory that rebuilds a stored object.** A `boolean` parameter of a static method that
