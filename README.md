@@ -19,8 +19,8 @@ of them is optional except the building blocks:
 ```kotlin
 dependencies {
     implementation("dev.domaincentric:dca-building-blocks:0.4.0")
-    implementation("dev.domaincentric:dca-spring:0.2.0")
-    testImplementation("dev.domaincentric:dca-archunit:0.12.0")
+    implementation("dev.domaincentric:dca-spring:0.3.0")
+    testImplementation("dev.domaincentric:dca-archunit:0.13.0")
     testImplementation("dev.domaincentric:dca-archunit-spring-modulith:0.2.0")   // Spring Modulith projects only
 }
 ```
@@ -85,7 +85,7 @@ dev.domaincentric.dca.buildingblocks
 dependencies {
     implementation("dev.domaincentric:dca-building-blocks:0.4.0")
 
-    testImplementation("dev.domaincentric:dca-archunit:0.12.0")
+    testImplementation("dev.domaincentric:dca-archunit:0.13.0")
     testImplementation(platform("org.junit:junit-bom:6.1.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
@@ -160,7 +160,7 @@ statements, and Spring's after-commit relays (`@TransactionalEventListener`,
 ports; `dca-spring` ships the two implementations every project used to copy:
 
 ```kotlin
-implementation("dev.domaincentric:dca-spring:0.2.0")
+implementation("dev.domaincentric:dca-spring:0.3.0")
 ```
 
 In a Spring Boot **4** application with a transaction manager, nothing else is needed: the

@@ -7,7 +7,7 @@ java { toolchain.languageVersion.set(JavaLanguageVersion.of(21)) }
 // fresh local publication. While the version below is not on Maven Central yet, run this sample with
 // -PwithDcaJava, which substitutes the surrounding checkout.
 val buildingBlocksVersion = providers.gradleProperty("buildingBlocksVersion").getOrElse("0.4.0")
-val archunitVersion = providers.gradleProperty("archunitVersion").getOrElse("0.12.0")
+val archunitVersion = providers.gradleProperty("archunitVersion").getOrElse("0.13.0")
 
 dependencies {
     implementation("dev.domaincentric:dca-building-blocks:$buildingBlocksVersion")
