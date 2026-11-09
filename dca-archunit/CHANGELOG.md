@@ -6,6 +6,11 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ### Added
 
+**`DcaRule.freezable()` and `"freezable"` in `rules.json` (WP-52).** Whether a rule is one ArchUnit rule and can
+run against a frozen baseline, readable without an architecture; `rules.json` carries it per rule so that the .NET
+library, which now has the same dial, can be checked against it id for id. The refusal for a rule without one is
+pinned word for word by a test; the .NET library uses the same sentence.
+
 **`DCA-ONI-004` — the domain layer stays synchronous (WP-53), experimental.** The shared twin of the .NET-only
 `DCA-NET-001`: a type the layout places in the domain layer depends on none of the configured asynchronous types,
 nor on a type nested in one. The list is a layout setting, `withAsynchronousTypes(...)` /

@@ -274,13 +274,24 @@ Both sources combine: the file is the base, `additionalSelection()` is merged on
 entry wins per rule id. Override `additionalSelection()`, not `selection()` — the latter *replaces*
 the file, so a `dca-archunit.properties` added later would be ignored without a word.
 
-**Two limitations.** Freezing needs a single ArchUnit rule to build the baseline from. The rules that
-run several checks internally — the context-map set and those iterating over bounded contexts —
-cannot be frozen; freezing one fails with a message naming it. Lower those to `warning(...)` instead,
-or scope them with `dca.rule.<id>.ignore`, which works for every rule and is the only one of the two
-that `DomainCentric.ArchRules` also offers — it has no baseline dial yet, so a project that keeps one
-configuration file for both stacks should prefer `ignore`.
-And the transaction rules (`DCA-USE-009`, `-012`, `-013`) reason per *entry path*, following the directed
+**A baseline for an existing code base.** `dca.rules.freeze` (in code: `frozen(...)`) records the
+violations a rule finds at its first run as the accepted baseline; from then on only a violation the
+baseline does not hold fails, and a violation fixed since leaves it. `dca.rules.freeze.store` names the
+directory the baseline lives in — commit it with the code; a relative path is resolved against the
+working directory of the test run. A baseline needs a single ArchUnit rule to build on: the rules marked
+`"freezable": true` in `rules.json` have one, and they are the same ids in both libraries. A rule that runs
+several checks internally — the context-map set, for example, or a rule that iterates over the bounded
+contexts — refuses: running it frozen fails with *"Rule \<id> cannot be frozen: it runs several checks
+internally and has no single ArchUnit rule to build a baseline from. Lower it to WARN instead."* For
+those, and for any rule, `dca.rule.<id>.ignore` is the other way in: one regular expression over what is
+already broken. A baseline adds to `ignore`, it does not replace it — the baseline is the quick start
+that shrinks on its own, `ignore` the exception a reviewer can read. **The baseline file is per project
+and per language**, even though the keys are the same: the Java library keeps ArchUnit's text store (a
+directory with one file per rule, by default `archunit_store`), the .NET library a JSON file,
+`FrozenRules.json` (by default in `../../../ArchUnitNET/Storage`, which from a test project's output
+directory is the project directory). A baseline recorded by one does not carry over to the other.
+
+**One limitation.** The transaction rules (`DCA-USE-009`, `-012`, `-013`) reason per *entry path*, following the directed
 calls within the use case class: an entry point (a method callable from outside the class, or one nothing
 in the class calls) may save through one helper and publish through another, and from every entry point no
 route down to a publication may be free of `@Transactional` or `TransactionBoundary.inTransaction(...)` —

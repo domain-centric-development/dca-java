@@ -289,8 +289,23 @@ class DcaRuleExecutionTest {
             IllegalArgumentException.class,
             () -> execute(TACTICAL_BAD, CUSTOM_RULE, DcaRuleSelection.all().frozen(CUSTOM_RULE)));
 
-    assertTrue(failure.getMessage().contains(CUSTOM_RULE), failure.getMessage());
-    assertTrue(failure.getMessage().contains("WARN"), "points at the alternative");
+    assertEquals(
+        "Rule "
+            + CUSTOM_RULE
+            + " cannot be frozen: it runs several checks internally and has no single ArchUnit"
+            + " rule to build a baseline from. Lower it to WARN instead.",
+        failure.getMessage(),
+        "the same sentence as the .NET library");
+  }
+
+  /** A freezable rule hands out its ArchUnit rule, and only a freezable one does. */
+  @Test
+  void exactlyTheFreezableRulesExposeAnArchUnitRule() {
+    DcaArchitecture architecture = arch(GOOD);
+    for (DcaRule rule : DcaRules.all(architecture.layout())) {
+      assertEquals(
+          rule.freezable(), rule.archRule(architecture).isPresent(), rule.id() + " disagrees");
+    }
   }
 
   /**

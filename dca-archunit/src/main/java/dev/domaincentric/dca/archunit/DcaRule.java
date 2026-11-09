@@ -113,6 +113,14 @@ public interface DcaRule {
   }
 
   /**
+   * Whether the rule is one ArchUnit rule — {@link #archRule(DcaArchitecture)} returns it — and so
+   * can run against a frozen baseline ({@link DcaRuleSelection#frozen(String...)}).
+   */
+  default boolean freezable() {
+    return false;
+  }
+
+  /**
    * A rule built from a single ArchUnit rule derived from the architecture. Complete it with {@link
    * Undescribed#selecting(String)} and {@link Selected#checking(String)}.
    */
@@ -344,6 +352,11 @@ public interface DcaRule {
     @Override
     public Optional<ArchRule> archRule(DcaArchitecture architecture) {
       return archRule == null ? Optional.empty() : Optional.of(described(architecture));
+    }
+
+    @Override
+    public boolean freezable() {
+      return archRule != null;
     }
 
     private ArchRule described(DcaArchitecture architecture) {

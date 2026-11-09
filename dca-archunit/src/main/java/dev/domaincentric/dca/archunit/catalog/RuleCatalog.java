@@ -121,8 +121,9 @@ public final class RuleCatalog {
 
   /**
    * The catalog as JSON: {@code [{"set":…,"id":…,"title":…,"rationale":…,"selects":…,"checks":…,
-   * "status":…,"maturity":…}, …]}. {@code status} is the kind ({@code enforced} or {@code
-   * informational}), {@code maturity} is {@code released} or {@code experimental}.
+   * "status":…,"maturity":…,"freezable":…}, …]}. {@code status} is the kind ({@code enforced} or
+   * {@code informational}), {@code maturity} is {@code released} or {@code experimental}, {@code
+   * freezable} whether the rule can run against a frozen baseline ({@link DcaRule#freezable()}).
    */
   public static String json() {
     StringBuilder sb =
@@ -154,6 +155,8 @@ public final class RuleCatalog {
             .append(quote(rule.kind().name().toLowerCase(java.util.Locale.ROOT)))
             .append(", \"maturity\": ")
             .append(quote(rule.maturity().name().toLowerCase(java.util.Locale.ROOT)))
+            .append(", \"freezable\": ")
+            .append(rule.freezable())
             .append('}');
       }
     }

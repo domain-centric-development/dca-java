@@ -550,3 +550,8 @@ is no sequential-id assertion for the layered set. Negative fixtures are their o
 `fixtures/asynchrony/{good,bad}` and `fixtures/persistenceapi/{good,bad}`; the shared hexagonal bad fixture is not
 extended, the two ids are excluded from its `badFixtureFails` with that reason.
 
+## Baseline dial in .NET (WP-52, 2026-11-09)
+
+The .NET library now has `dca.rules.freeze` for the same ids as this one. Nothing changed here in what freezes;
+`DcaRule.freezable()` was added so that `rules.json` can carry the set without an architecture, and the refusal
+sentence is pinned by a test because .NET copies it verbatim.
