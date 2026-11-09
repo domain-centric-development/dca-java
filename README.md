@@ -9,7 +9,7 @@ Hexagonal Architecture and Clean Architecture.
 | Artifact | What it is | Dependencies |
 |----------|------------|--------------|
 | `dev.domaincentric:dca-building-blocks` | The building blocks your code implements: DDD tactical markers (`AggregateRoot`, `Entity`, `Value`, `DomainEvent`, …), the `Owned<OWNER>` marker for an aggregate that belongs to someone, strategic annotations (`@BoundedContext`, `@SharedKernel`, `@Upstream`, `@Partnership`, …) and hexagonal port interfaces (`UseCase`, `Repository`, `Store`, …), the application-layer `TransactionBoundary` and the exception base types (`DomainException`; `PortException` with `InputPortException` → `UseCaseException` and `OutputPortException`), the `Refusal` marker | none |
-| `dev.domaincentric:dca-archunit` | The governance rules: 119 ArchUnit rules pinned to those building blocks, plus an executable context map | `dca-building-blocks`, ArchUnit |
+| `dev.domaincentric:dca-archunit` | The governance rules: the ArchUnit rule catalog pinned to those building blocks, plus an executable context map | `dca-building-blocks`, ArchUnit |
 | `dev.domaincentric:dca-spring` | The runtime adapters the rules demand: `SpringDomainEventPublisher` (over `ApplicationEventPublisher`), `SpringTransactionBoundary` (over `TransactionTemplate`), an `InMemoryTransactionBoundary` for tests, a Spring Boot auto-configuration, and the net that rolls back a `@Transactional` method returning a `Refusal` (`dca.spring.refusal-rollback.enabled`, on by default) | `dca-building-blocks`; Spring `compileOnly` — your Boot BOM pins the version |
 | `dev.domaincentric:dca-archunit-spring-modulith` | Spring Modulith's module verification as a DCA test: `DcaSpringModulithTest` next to `DcaArchitectureTest`, with the test-class exclusion Modulith needs | `dca-archunit`; `spring-modulith-core` `compileOnly` |
 
@@ -53,6 +53,10 @@ import dev.domaincentric.dca.buildingblocks.ddd.tactical.BaseAggregateRoot;
 
 public class ShoppingCart extends BaseAggregateRoot<ShoppingCart, CartId> { … }
 ```
+
+`BaseAggregateRoot` collects the aggregate's domain events: `registerEvent` is `protected`, so only the
+aggregate itself records one, and `domainEvents()` / `clearDomainEvents()` are what the application
+layer reads and clears after saving.
 
 ```java
 // com/acme/shop/cart/package-info.java
@@ -518,11 +522,3 @@ MIT — see [LICENSE](LICENSE).
 
 Contributions are accepted under the MIT licence, and the copyright holder may additionally publish
 them under other licences (for example a documentation licence for prose).
-
-## WP-39 parity update (2026-09-09)
-
-Java building-blocks 0.2.0 makes event registration protected, matching the existing .NET visibility.
-Factories delegate to aggregate creation. Both samples use Price, the six-field product-created v1 notification, ISO
-money bounds/rounding, snapshot checkout and supplied-fact domain services. Role snapshots and invalid default quantities
-are guarded. The independent shared specification has 45 vectors; final gate results are recorded in WP-39.
-The specification stays unpublished and is an opt-in local check of both samples (not part of their builds).
