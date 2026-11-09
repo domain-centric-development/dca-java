@@ -10,7 +10,7 @@ public sealed interface CancelReservationResult
 
   /** Refusals may be grouped below a sealed case of their own. */
   sealed interface Refused extends CancelReservationResult
-      permits Refused.NotFound, Refused.AlreadyStarted {}
+      permits NotFound, AlreadyStarted {}
 
   record NotFound(String reservationId) implements Refused, Refusal {}
 
