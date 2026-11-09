@@ -527,3 +527,26 @@ implementing it are one finding.
 `DCA-TAC-025`: an enum with `getEnumConstants().size() == 2` whose names, lower-cased without underscores, form one
 of the fixed pairs or `prefix + other` for `not`, `no`, `non`, `un` is reported with the type's other findings.
 
+## 2026-11-09 — DCA-ONI-004, DCA-LAY-008 (WP-53)
+
+Two new rules, same ids in `dca-dotnet`, experimental, enforced: the shared twins of `DCA-NET-001` (synchronous
+domain) and `DCA-NET-006` (no persistence or transaction API in the application layer), which stay released in
+`dca-dotnet` until the twins are released and then retire with these ids as replacement. Title, rationale,
+`selects` and `checks` are the same text in both libraries.
+
+Both are plain `noClasses().that(inDomain()/inApplication()).should().dependOnClassesThat(...)` rules, so every
+dependency ArchUnit records counts - signature, field, annotation, method body. The predicates read the layout of
+the architecture under test (`arch.layout()`), not the one the set was built with. `DCA-ONI-004` matches a target's
+base component type by name, equal or nested (`Flow$Publisher`); `DCA-LAY-008` matches by name prefix.
+`DCA-LAY-008` exempts a target equal to, or nested in, an annotation of the `transactional` role
+(`frameworkAnnotations().transactional()`) - the declarative boundary `DCA-LAY-004` accepts in the application
+layer; programmatic APIs under the prefixes stay reported (decision of 2026-11-09, "declarative allowed").
+`java.util.concurrent.Future` and `CompletionStage` are in the default beside the two types WP-53 named: they are the
+interfaces `CompletableFuture` implements, and a domain declaring one is asynchronous the same way. `javax.sql.` is
+in the default beside `java.sql.`: `DataSource` lives there.
+
+`DCA-LAY-006` was assigned during WP-18 and dropped before release, so the new layered rule is `DCA-LAY-008`; there
+is no sequential-id assertion for the layered set. Negative fixtures are their own trees,
+`fixtures/asynchrony/{good,bad}` and `fixtures/persistenceapi/{good,bad}`; the shared hexagonal bad fixture is not
+extended, the two ids are excluded from its `badFixtureFails` with that reason.
+

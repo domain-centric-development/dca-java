@@ -30,7 +30,8 @@ public final class LayeredRules implements DcaRuleSet {
             applicationMustNotUseInfrastructureImplementations(),
             transactionBoundariesBelongToApplicationLayer(),
             outputPortMarkersMustBeInterfaces(),
-            classesSitInALayer());
+            classesSitInALayer(),
+            applicationLayerMustNotUsePersistenceApis());
   }
 
   @Override
@@ -297,5 +298,55 @@ public final class LayeredRules implements DcaRuleSet {
         .checking(
             "Each is an interface. The project's own output ports in application.shared are not"
                 + " selected; when the building-blocks package is not imported, the rule passes.");
+  }
+
+  /**
+   * DCA-LAY-008 (experimental). The application layer names none of the configured persistence and
+   * transaction APIs ({@link DcaLayout#withPersistenceApiPrefixes(String...)}).
+   */
+  public DcaRule applicationLayerMustNotUsePersistenceApis() {
+    return DcaRule.of(
+            "DCA-LAY-008",
+            "Application layer must not use persistence or transaction APIs",
+            "A use case declares its transaction with the configured transactional annotation or"
+                + " draws its boundary through the transaction-boundary port or a decorator around"
+                + " the use case, never through a persistence context, a connection or a"
+                + " transaction scope of its own. A persistence or transaction API"
+                + " in the application layer binds the use cases to one persistence technology and"
+                + " hides where the boundary is; the boundary's implementation is the single place"
+                + " that knows how to open and commit a transaction",
+            arch -> {
+              List<String> prefixes = arch.layout().persistenceApiPrefixes();
+              // Declarative is allowed: the transactional annotation DCA-LAY-004 places in the
+              // application layer, and the types nested in it (its attribute enums), pass.
+              List<String> declarative = arch.layout().frameworkAnnotations().transactional();
+              DescribedPredicate<JavaClass> persistenceApi =
+                  DescribedPredicate.describe(
+                      "a configured persistence or transaction API",
+                      c -> {
+                        String name = c.getBaseComponentType().getName();
+                        return prefixes.stream().anyMatch(name::startsWith)
+                            && declarative.stream()
+                                .noneMatch(a -> name.equals(a) || name.startsWith(a + "$"));
+                      });
+              return noClasses()
+                  .that(arch.inApplication())
+                  .should()
+                  .dependOnClassesThat(persistenceApi)
+                  .allowEmptyShould(true);
+            })
+        .experimental()
+        .selecting("Types the layout places in the application layer of every module root.")
+        .checking(
+            "No dependency on a type whose fully qualified name starts with one of the configured"
+                + " persistence and transaction API prefixes - in a signature, a field, an annotation or"
+                + " a method body. The configured transactional annotation, which DCA-LAY-004 places in"
+                + " the application layer, passes, and so do the types nested in it: a use case may"
+                + " declare its transaction. A transaction drawn programmatically - a transaction scope,"
+                + " a user transaction, a connection - is reported; it goes through the"
+                + " transaction-boundary port. The default names the platform's common persistence,"
+                + " data-access and transaction APIs; another persistence library is not reported unless"
+                + " the layout setting for persistence APIs names it, and the domain and adapter layers"
+                + " are not selected. An empty list checks nothing; an empty selection passes.");
   }
 }

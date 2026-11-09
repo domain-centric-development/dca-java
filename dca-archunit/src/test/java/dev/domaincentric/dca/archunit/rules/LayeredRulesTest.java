@@ -1,8 +1,13 @@
 package dev.domaincentric.dca.archunit.rules;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.tngtech.archunit.core.importer.ClassFileImporter;
+import dev.domaincentric.dca.archunit.DcaArchitecture;
+import dev.domaincentric.dca.archunit.DcaLayout;
+import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.Fixtures;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
@@ -16,6 +21,7 @@ class LayeredRulesTest {
   private static final String FIXTURES = Fixtures.ROOT + ".hexagonal";
   private static final String INFRASTRUCTURE = Fixtures.ROOT + ".infrastructure";
   private static final String TRANSACTIONS = Fixtures.ROOT + ".transactions";
+  private static final String PERSISTENCE_API = Fixtures.ROOT + ".persistenceapi";
 
   @Test
   @DisplayName(
@@ -49,7 +55,62 @@ class LayeredRulesTest {
         // a diagnostic, lists and never fails
         "DCA-LAY-007",
         // the building-blocks markers are library code, not part of the fixture import
-        "DCA-LAY-005");
+        "DCA-LAY-005",
+        // negative fixture in fixtures.persistenceapi, see below
+        "DCA-LAY-008");
+  }
+
+  @Test
+  @DisplayName(
+      "DCA-LAY-008 passes a use case behind its output port and one with the transactional"
+          + " annotation")
+  void aUseCaseBehindItsPortPasses() {
+    Fixtures.passes(PERSISTENCE_API + ".good", "DCA-LAY-008");
+  }
+
+  @Test
+  @DisplayName(
+      "DCA-LAY-008 reports a persistence API and a programmatic transaction in a use case, not the"
+          + " transactional annotation, not an outgoing adapter and not a library outside the list")
+  void persistenceApisInTheApplicationLayerAreReported() {
+    String message = Fixtures.failure(PERSISTENCE_API + ".bad", "DCA-LAY-008").getMessage();
+    assertTrue(message.contains("RecordPostingUseCase"), message);
+    assertTrue(message.contains("java.sql.Connection"), message);
+    assertFalse(message.contains("ConnectionPostings"), "outgoing adapter: " + message);
+    assertFalse(message.contains("ClosePeriodUseCase"), "unlisted library: " + message);
+    assertTrue(message.contains("jakarta.transaction.UserTransaction"), "programmatic: " + message);
+    assertFalse(
+        message.contains("jakarta.transaction.Transactional"), "declarative passes: " + message);
+  }
+
+  @Test
+  @DisplayName("DCA-LAY-008 exempts the annotation of the transactional role, and only that")
+  void theDeclarativeExemptionFollowsTheTransactionalRole() {
+    String pkg = PERSISTENCE_API + ".good";
+    DcaLayout withoutRole = DcaLayout.forBasePackage(pkg).withFrameworkPreset("none");
+    String message = assertThrows(AssertionError.class, () -> check(withoutRole, pkg)).getMessage();
+    assertTrue(message.contains("CloseDayUseCase"), message);
+    assertTrue(message.contains("jakarta.transaction.Transactional"), message);
+  }
+
+  @Test
+  @DisplayName("DCA-LAY-008 follows the configured persistence API prefixes")
+  void thePersistenceApiPrefixesAreConfigurable() {
+    String pkg = PERSISTENCE_API + ".bad";
+    DcaLayout own = DcaLayout.forBasePackage(pkg).withPersistenceApiPrefixes(pkg + ".vendor.");
+    String message = assertThrows(AssertionError.class, () -> check(own, pkg)).getMessage();
+    assertTrue(message.contains("ClosePeriodUseCase"), message);
+    assertFalse(
+        message.contains("RecordPostingUseCase"), "the default list is replaced: " + message);
+
+    check(DcaLayout.forBasePackage(pkg).withPersistenceApiPrefixes(), pkg);
+  }
+
+  private static void check(DcaLayout layout, String pkg) {
+    DcaRule rule =
+        new LayeredRules(layout)
+            .rules().stream().filter(r -> r.id().equals("DCA-LAY-008")).findFirst().orElseThrow();
+    rule.check(DcaArchitecture.of(layout, new ClassFileImporter().importPackages(pkg)));
   }
 
   /**

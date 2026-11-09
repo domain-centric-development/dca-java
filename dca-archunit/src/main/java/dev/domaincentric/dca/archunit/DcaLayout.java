@@ -60,6 +60,22 @@ public final class DcaLayout {
   private static final List<String> DEFAULT_RECONSTITUTING_FACTORIES =
       List.of("reconstitute", "restore");
 
+  private static final List<String> DEFAULT_ASYNCHRONOUS_TYPES =
+      List.of(
+          "java.util.concurrent.CompletableFuture",
+          "java.util.concurrent.CompletionStage",
+          "java.util.concurrent.Future",
+          "java.util.concurrent.Flow");
+
+  private static final List<String> DEFAULT_PERSISTENCE_API_PREFIXES =
+      List.of(
+          "jakarta.persistence.",
+          "javax.persistence.",
+          "java.sql.",
+          "javax.sql.",
+          "jakarta.transaction.",
+          "javax.transaction.");
+
   private static final List<String> DEFAULT_THIRD_PARTY_ALLOWED_IN_DOMAIN =
       List.of(
           "java..",
@@ -94,6 +110,8 @@ public final class DcaLayout {
   private final String specificationSuffix;
   private final List<String> timestampTypes;
   private final List<String> reconstitutingFactories;
+  private final List<String> asynchronousTypes;
+  private final List<String> persistenceApiPrefixes;
   private final List<String> thirdPartyPackagesAllowedInDomain;
   private final List<String> excludedPackages;
   private final List<String> localOutputPorts;
@@ -184,6 +202,9 @@ public final class DcaLayout {
     this.timestampTypes = requireTypeNames(settings.timestampTypes, "timestampTypes");
     this.reconstitutingFactories =
         requireNames(settings.reconstitutingFactories, "reconstitutingFactories");
+    this.asynchronousTypes = requireNames(settings.asynchronousTypes, "asynchronousTypes");
+    this.persistenceApiPrefixes =
+        requireNames(settings.persistenceApiPrefixes, "persistenceApiPrefixes");
     this.thirdPartyPackagesAllowedInDomain =
         List.copyOf(
             Objects.requireNonNull(
@@ -250,6 +271,8 @@ public final class DcaLayout {
     defaults.specificationSuffix = "Specification";
     defaults.timestampTypes = DEFAULT_TIMESTAMP_TYPES;
     defaults.reconstitutingFactories = DEFAULT_RECONSTITUTING_FACTORIES;
+    defaults.asynchronousTypes = DEFAULT_ASYNCHRONOUS_TYPES;
+    defaults.persistenceApiPrefixes = DEFAULT_PERSISTENCE_API_PREFIXES;
     defaults.thirdPartyPackagesAllowedInDomain = DEFAULT_THIRD_PARTY_ALLOWED_IN_DOMAIN;
     defaults.markers = DcaMarkers.dca();
     FrameworkAnnotations.Detection detection = FrameworkAnnotations.detect();
@@ -620,6 +643,28 @@ public final class DcaLayout {
   }
 
   /**
+   * Types the domain layer may not depend on because they make it asynchronous, by fully qualified
+   * name; a type nested in one of them counts as well. Replaces the default list ({@code
+   * java.util.concurrent.CompletableFuture}, {@code CompletionStage}, {@code Future} and {@code
+   * Flow} with its publisher and subscriber types), read by {@code DCA-ONI-004}. A project that
+   * uses a reactive library names that library's types here. An empty list checks nothing.
+   */
+  public DcaLayout withAsynchronousTypes(String... typeNames) {
+    return copy(settings -> settings.asynchronousTypes = List.of(typeNames));
+  }
+
+  /**
+   * Name prefixes of the persistence and transaction APIs the application layer may not depend on -
+   * a type whose fully qualified name starts with one of them is reported by {@code DCA-LAY-008}.
+   * Replaces the default list ({@code jakarta.persistence.}, {@code javax.persistence.}, {@code
+   * java.sql.}, {@code javax.sql.}, {@code jakarta.transaction.}, {@code javax.transaction.}). A
+   * project on another persistence library names its packages here. An empty list checks nothing.
+   */
+  public DcaLayout withPersistenceApiPrefixes(String... prefixes) {
+    return copy(settings -> settings.persistenceApiPrefixes = List.of(prefixes));
+  }
+
+  /**
    * Third-party packages the domain layer may depend on (ArchUnit patterns). Replaces the default
    * list ({@code java..}, {@code lombok..}, commons-lang3, commons-collections4, jspecify).
    */
@@ -749,6 +794,8 @@ public final class DcaLayout {
     settings.specificationSuffix = specificationSuffix;
     settings.timestampTypes = timestampTypes;
     settings.reconstitutingFactories = reconstitutingFactories;
+    settings.asynchronousTypes = asynchronousTypes;
+    settings.persistenceApiPrefixes = persistenceApiPrefixes;
     settings.thirdPartyPackagesAllowedInDomain = thirdPartyPackagesAllowedInDomain;
     settings.excludedPackages = excludedPackages;
     settings.localOutputPorts = localOutputPorts;
@@ -790,6 +837,8 @@ public final class DcaLayout {
     String specificationSuffix;
     List<String> timestampTypes;
     List<String> reconstitutingFactories;
+    List<String> asynchronousTypes;
+    List<String> persistenceApiPrefixes;
     List<String> thirdPartyPackagesAllowedInDomain;
     List<String> excludedPackages = List.of();
     List<String> localOutputPorts = List.of();
@@ -980,6 +1029,16 @@ public final class DcaLayout {
    */
   public List<String> reconstitutingFactories() {
     return reconstitutingFactories;
+  }
+
+  /** Types that make the domain layer asynchronous, read by {@code DCA-ONI-004}. */
+  public List<String> asynchronousTypes() {
+    return asynchronousTypes;
+  }
+
+  /** Name prefixes of the persistence and transaction APIs, read by {@code DCA-LAY-008}. */
+  public List<String> persistenceApiPrefixes() {
+    return persistenceApiPrefixes;
   }
 
   public List<String> thirdPartyPackagesAllowedInDomain() {

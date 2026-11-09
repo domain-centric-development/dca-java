@@ -344,7 +344,12 @@ controller, REST-controller, aggregate-root, repository, store, factory and spec
 the segments of the package layout, the types a domain event may store its occurrence time in
 (`withTimestampTypes`) and the names of the factory that rebuilds a stored object (`withReconstitutingFactories`,
 `reconstitute` and `restore` by default) — `DcaLayout` has a `with…` for it. Configure the name; do not switch the
-rule off.
+rule off. The same holds for the types the domain may not use because they make it asynchronous
+(`withAsynchronousTypes`, read by `DCA-ONI-004`; `CompletableFuture`, `CompletionStage`, `Future` and `Flow` by
+default) and the name prefixes of the persistence and transaction APIs the application layer may not use
+(`withPersistenceApiPrefixes`, read by `DCA-LAY-008`; `jakarta.persistence.`, `javax.persistence.`, `java.sql.`,
+`javax.sql.`, `jakarta.transaction.`, `javax.transaction.` by default) — a project on a reactive or another
+persistence library names its own.
 
 **Your own layers and annotations.** A layer is its package by default. A project that keeps a layer under
 another package name, or already marks its layers with annotations — its own or a library's — names that per

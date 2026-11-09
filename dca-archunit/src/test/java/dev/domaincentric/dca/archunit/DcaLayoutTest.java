@@ -172,4 +172,37 @@ class DcaLayoutTest {
     assertThrows(IllegalArgumentException.class, DEFAULTS::withTimestampTypes);
     assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withTimestampTypes(" "));
   }
+
+  @Test
+  void theAsynchronousTypesAndPersistenceApiPrefixesAreConfigurable() {
+    assertEquals(
+        java.util.List.of(
+            "java.util.concurrent.CompletableFuture",
+            "java.util.concurrent.CompletionStage",
+            "java.util.concurrent.Future",
+            "java.util.concurrent.Flow"),
+        DEFAULTS.asynchronousTypes());
+    assertEquals(
+        java.util.List.of(
+            "jakarta.persistence.",
+            "javax.persistence.",
+            "java.sql.",
+            "javax.sql.",
+            "jakarta.transaction.",
+            "javax.transaction."),
+        DEFAULTS.persistenceApiPrefixes());
+
+    DcaLayout own =
+        DEFAULTS
+            .withAsynchronousTypes("com.acme.reactive.Mono")
+            .withPersistenceApiPrefixes("com.acme.store.");
+    assertEquals(java.util.List.of("com.acme.reactive.Mono"), own.asynchronousTypes());
+    assertEquals(java.util.List.of("com.acme.store."), own.persistenceApiPrefixes());
+    assertEquals("com.acme.shop", own.basePackage(), "the rest is unchanged");
+
+    // An empty list checks nothing; a blank entry is a mistake.
+    assertEquals(java.util.List.of(), DEFAULTS.withAsynchronousTypes().asynchronousTypes());
+    assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withAsynchronousTypes(" "));
+    assertThrows(IllegalArgumentException.class, () -> DEFAULTS.withPersistenceApiPrefixes(""));
+  }
 }

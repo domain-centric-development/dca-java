@@ -6,6 +6,23 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ### Added
 
+**`DCA-ONI-004` — the domain layer stays synchronous (WP-53), experimental.** The shared twin of the .NET-only
+`DCA-NET-001`: a type the layout places in the domain layer depends on none of the configured asynchronous types,
+nor on a type nested in one. The list is a layout setting, `withAsynchronousTypes(...)` /
+`asynchronousTypes()`; the Java default is `java.util.concurrent.CompletableFuture`, `CompletionStage`, `Future` and
+`Flow` (with its publisher and subscriber types). Other awaitables and a library's own reactive types are not
+checked unless the setting names them; an empty list checks nothing.
+
+**`DCA-LAY-008` — the application layer uses no persistence or transaction API (WP-53), experimental.** The shared
+twin of the .NET-only `DCA-NET-006`: a type the layout places in the application layer depends on no type whose
+name starts with one of the configured prefixes. The list is a layout setting, `withPersistenceApiPrefixes(...)` /
+`persistenceApiPrefixes()`; the Java default is `jakarta.persistence.`, `javax.persistence.`, `java.sql.`,
+`javax.sql.`, `jakarta.transaction.`, `javax.transaction.`. Declarative is allowed: the annotations of the
+`transactional` role, which `DCA-LAY-004` places in the application layer, and the types nested in them pass; a
+transaction drawn programmatically (`UserTransaction`, `EntityManager`, `Connection`, `DataSource`) is reported and
+goes through the transaction-boundary port. `DCA-LAY-006` stays unused: it was assigned during development once and
+dropped before release, and an id is never reused.
+
 **`DCA-ADV-021` — domain services are used only by the application and by other domain services (WP-189),
 experimental.** Selects every class outside the application layer that carries no domain-service role — the model,
 both adapter directions, the composition root, classes outside every layer — with the classes nested in it, and

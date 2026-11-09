@@ -26,7 +26,8 @@ public final class OnionRules implements DcaRuleSet {
         List.of(
             domainMustNotAccessApplication(),
             domainMustBeFrameworkIndependent(),
-            domainModelsMustNotHaveFrameworkAnnotations());
+            domainModelsMustNotHaveFrameworkAnnotations(),
+            domainLayerMustStaySynchronous());
   }
 
   @Override
@@ -123,5 +124,49 @@ public final class OnionRules implements DcaRuleSet {
             "Non-interface domain models in domain packages. Metadata ownership is exclusive: events, services, factories, specifications, then domain.model types.")
         .checking(
             "Direct or meta-annotations: types prohibit injectable, persistenceEntity and transactional roles; fields prohibit injectionSite and persistenceMapping; methods prohibit transactional and eventListener, plus injectionSite except on events; constructors prohibit injectionSite. Unclassified annotations are allowed by this check. Empty configured roles select no metadata; wiring is not established.");
+  }
+
+  /**
+   * DCA-ONI-004 (experimental). The domain layer names none of the configured asynchronous types
+   * ({@link DcaLayout#withAsynchronousTypes(String...)}).
+   */
+  public DcaRule domainLayerMustStaySynchronous() {
+    return DcaRule.of(
+            "DCA-ONI-004",
+            "Domain layer must stay synchronous",
+            "Asynchrony is an I/O concern of ports and adapters; a synchronous domain model stays"
+                + " testable, deterministic and free of sync-over-async hazards",
+            arch -> {
+              List<String> asynchronous = arch.layout().asynchronousTypes();
+              DescribedPredicate<JavaClass> asynchronousType =
+                  DescribedPredicate.describe(
+                      "a configured asynchronous type",
+                      c -> isOrIsNestedIn(c.getBaseComponentType().getName(), asynchronous));
+              return noClasses()
+                  .that(arch.inDomain())
+                  .should()
+                  .dependOnClassesThat(asynchronousType)
+                  .allowEmptyShould(true);
+            })
+        .experimental()
+        .selecting("Types the layout places in the domain layer of every module root.")
+        .checking(
+            "No dependency on one of the configured asynchronous types, on a type nested in one or"
+                + " on a generic form of one - in a signature, a field, an annotation or a method"
+                + " body. The default names the platform's standard asynchronous types; other"
+                + " awaitables, asynchronous sequences and a library's own reactive types are not"
+                + " checked unless the layout setting for asynchronous types names them. The"
+                + " application and adapter layers are not selected. An empty list checks nothing;"
+                + " an empty selection passes.");
+  }
+
+  /** The type itself, a generic form of it or a type nested in it. */
+  private static boolean isOrIsNestedIn(String name, List<String> types) {
+    for (String type : types) {
+      if (name.equals(type) || name.startsWith(type + "$")) {
+        return true;
+      }
+    }
+    return false;
   }
 }
