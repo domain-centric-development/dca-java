@@ -317,4 +317,28 @@ class HexagonalRulesTest {
 
     assertTrue(rule.observe(arch).isEmpty());
   }
+
+  /**
+   * DCA-HEX-021: the outgoing adapter's call of a void method of the aggregate root is reported;
+   * its queries are not.
+   */
+  @Test
+  @DisplayName("DCA-HEX-021 reports an outgoing adapter that changes an aggregate")
+  void outgoingAdaptersDoNotChangeAggregates() {
+    String message = Fixtures.failure(FIXTURES + ".bad", "DCA-HEX-021").getMessage();
+
+    assertTrue(
+        message.contains("OrderArchiveExport.export(") && message.contains("Order.archive()"),
+        message);
+    assertTrue(message.lines().noneMatch(line -> line.contains("isArchived")), message);
+    assertTrue(message.lines().noneMatch(line -> line.contains("Order.total()")), message);
+    assertTrue(message.lines().noneMatch(line -> line.contains("Order.id()")), message);
+    assertTrue(message.lines().noneMatch(line -> line.contains("clearDomainEvents")), message);
+  }
+
+  /** An outgoing adapter that only reads the aggregate passes. */
+  @Test
+  void anOutgoingAdapterThatOnlyReadsPasses() {
+    Fixtures.passes(FIXTURES + ".good", "DCA-HEX-021");
+  }
 }

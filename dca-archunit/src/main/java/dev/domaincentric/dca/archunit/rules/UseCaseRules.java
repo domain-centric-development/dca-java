@@ -62,7 +62,9 @@ public final class UseCaseRules implements DcaRuleSet {
             useCasesExposeOnlyInputPort(layout),
             incomingAdaptersServeOneFeature(layout),
             queriesHaveNoSideEffect(layout),
-            useCasesParseNoRawIds(layout));
+            useCasesParseNoRawIds(layout),
+            useCasesAreStateless(layout),
+            useCaseResultsAreNoBarePrimitives(layout));
   }
 
   public static DcaRule useCasesMustNotInvokeOtherUseCases(DcaLayout layout) {
@@ -1132,5 +1134,149 @@ public final class UseCaseRules implements DcaRuleSet {
                 + " id's value type called from the use case, is not reported. An empty selection"
                 + " passes.",
             "take the id's value type in the command and parse the text in the adapter");
+  }
+
+  /**
+   * DCA-USE-021. The twin of DCA-ADV-012 for use cases: one instance serves every caller, so what
+   * it holds is set once, by its constructor.
+   */
+  public static DcaRule useCasesAreStateless(DcaLayout layout) {
+    return DcaRule.of(
+            "DCA-USE-021",
+            "Use cases should be stateless (only final fields for dependencies)",
+            "One instance of a use case serves every caller. A field it writes while it runs is"
+                + " shared by the next call and by concurrent ones, and one call's outcome depends"
+                + " on the call before. What a use case holds is set once, by its constructor: the"
+                + " ports and services it is wired with",
+            arch ->
+                classes()
+                    .that(useCases(arch, layout))
+                    .should(haveOnlyFinalInstanceFields())
+                    .allowEmptyShould(true))
+        .experimental()
+        .selecting(
+            "Non-interface classes in <module>.application.. that implement InputPort or whose"
+                + " simple name ends with the configured use-case suffix.")
+        .checking(
+            "Every instance field - declared or inherited from a superclass - is final. Static"
+                + " fields are not an instance's state and are not inspected; field types are not"
+                + " inspected either, so a final field holding mutable state passes. An empty"
+                + " selection passes.",
+            "pass what a call needs through the command or keep it in a local; the constructor"
+                + " sets only the collaborators");
+  }
+
+  private static ArchCondition<JavaClass> haveOnlyFinalInstanceFields() {
+    return new ArchCondition<>("have only final instance fields, inherited ones included") {
+      @Override
+      public void check(JavaClass item, ConditionEvents events) {
+        for (JavaField field : TypeInspection.instanceFields(item)) {
+          if (field.getModifiers().contains(JavaModifier.FINAL)
+              || field.getModifiers().contains(JavaModifier.SYNTHETIC)) {
+            continue;
+          }
+          events.add(
+              SimpleConditionEvent.violated(
+                  item,
+                  item.getName()
+                      + " has the non-final field '"
+                      + field.getName()
+                      + "'"
+                      + (field.getOwner().equals(item)
+                          ? ""
+                          : " inherited from " + field.getOwner().getSimpleName())));
+        }
+      }
+    };
+  }
+
+  /** What a use case may not answer with: text, a flag, a number or a character, bare. */
+  private static final java.util.Set<String> BARE_RESULTS =
+      java.util.Set.of(
+          "java.lang.String",
+          "java.lang.Boolean",
+          "java.lang.Byte",
+          "java.lang.Short",
+          "java.lang.Integer",
+          "java.lang.Long",
+          "java.lang.Float",
+          "java.lang.Double",
+          "java.lang.Character");
+
+  /**
+   * DCA-USE-022. The output type argument of the generic input-port contract, resolved through the
+   * interfaces and superclasses in between. Reported where it is bound, not again on every type
+   * that inherits the binding.
+   */
+  public static DcaRule useCaseResultsAreNoBarePrimitives(DcaLayout layout) {
+    return DcaRule.check(
+            "DCA-USE-022",
+            "Use case results must not be bare primitives or strings",
+            "A use case answers in the application's language: a result type of its own, a"
+                + " value, or a case of a closed result. A bare number, text or flag carries no"
+                + " meaning of its own - an exit code, a status word or a count whose meaning lives"
+                + " in the caller - and it cannot gain a case without changing every caller",
+            arch -> {
+              String contract = arch.layout().markers().useCase();
+              List<String> violations = new ArrayList<>();
+              for (JavaClass type : arch.classes()) {
+                if (type.getName().equals(contract) || !type.isAssignableTo(contract)) {
+                  continue;
+                }
+                String bare = bareOutput(type, contract);
+                if (bare == null || inheritsBareOutput(type, contract)) {
+                  continue;
+                }
+                violations.add(
+                    type.getName()
+                        + " answers with a bare "
+                        + bare.substring(bare.lastIndexOf('.') + 1)
+                        + " as the output of "
+                        + contract.substring(contract.lastIndexOf('.') + 1));
+              }
+              if (!violations.isEmpty()) {
+                throw new DcaRuleViolation(
+                    "Use case results must not be bare primitives or strings. Fix: answer with a"
+                        + " result type of its own, a value object, or a closed result whose cases"
+                        + " name the outcomes.",
+                    violations.stream().sorted().toList());
+              }
+            })
+        .experimental()
+        .selecting(
+            "Interfaces and classes under scan that implement or extend the input-port role's"
+                + " generic contract UseCase<INPUT, OUTPUT> - the type the useCase role names -"
+                + " with its output type argument resolved through the interfaces and superclasses"
+                + " in between. A type that only inherits a binding made by one of its supertypes is"
+                + " reported at that supertype, not again.")
+        .checking(
+            "The output type argument is none of String, Boolean, Byte, Short, Integer, Long,"
+                + " Float, Double or Character. Void passes - a command with nothing to answer; an"
+                + " unresolved type argument passes; a container such as List<String> is no bare"
+                + " primitive and passes. An empty selection passes.",
+            "answer with a result type of its own, a value object, or a closed result whose cases"
+                + " name the outcomes");
+  }
+
+  /** The bare output a type binds on the contract, by class name, or {@code null}. */
+  private static String bareOutput(JavaClass type, String contract) {
+    java.util.Optional<com.tngtech.archunit.core.domain.JavaType> output =
+        TypeInspection.typeArgument(type, contract, 1);
+    if (output.isEmpty()
+        || !(output.get() instanceof JavaClass resolved)
+        || !BARE_RESULTS.contains(resolved.getName())) {
+      return null;
+    }
+    return resolved.getName();
+  }
+
+  /** Whether a direct supertype already binds the bare output this type inherits. */
+  private static boolean inheritsBareOutput(JavaClass type, String contract) {
+    List<JavaClass> supertypes = new ArrayList<>(type.getRawInterfaces());
+    type.getRawSuperclass().ifPresent(supertypes::add);
+    return supertypes.stream()
+        .filter(supertype -> !supertype.getName().equals(contract))
+        .filter(supertype -> supertype.isAssignableTo(contract))
+        .anyMatch(supertype -> bareOutput(supertype, contract) != null);
   }
 }

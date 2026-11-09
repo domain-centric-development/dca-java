@@ -6,7 +6,10 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaCodeUnit;
+import com.tngtech.archunit.core.domain.JavaFieldAccess;
+import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
+import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
@@ -15,6 +18,7 @@ import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaMarkers;
 import dev.domaincentric.dca.archunit.DcaRule;
 import dev.domaincentric.dca.archunit.DcaRuleSet;
+import dev.domaincentric.dca.archunit.DcaRuleViolation;
 import dev.domaincentric.dca.archunit.FrameworkAnnotations;
 import dev.domaincentric.dca.buildingblocks.hexagonal.port.in.InputPort;
 import java.util.ArrayList;
@@ -54,7 +58,8 @@ public final class HexagonalRules implements DcaRuleSet {
             listenersThatDriveAnInputPortRunAfterTheCommit(),
             controllersResideInIncomingAdapters(),
             outputPortImplementationsResideInOutgoingAdapters(),
-            claimsOnlyAuthorizationIsDeclaredOnTheRoute());
+            claimsOnlyAuthorizationIsDeclaredOnTheRoute(),
+            outgoingAdaptersDoNotChangeAggregates());
   }
 
   /**
@@ -873,5 +878,113 @@ public final class HexagonalRules implements DcaRuleSet {
                 + " its type from the call - so it is not visible and is not listed, nor is a"
                 + " serializer that writes the name on its own; whether the value leaves the"
                 + " process is not established either.");
+  }
+
+  /**
+   * DCA-HEX-021. An outgoing adapter stores and loads what an aggregate holds; it does not change
+   * it. A state change is recognised on the called method: a non-static method that returns void,
+   * or one that sets a field of its own class. A write past the aggregate, straight to storage, is
+   * not a call and is not seen.
+   */
+  public DcaRule outgoingAdaptersDoNotChangeAggregates() {
+    return DcaRule.check(
+            "DCA-HEX-021",
+            "Outgoing adapters must not call state-changing methods of aggregate roots",
+            "An aggregate's state changes through its own methods, each with its guard and its"
+                + " event, and the application decides when one runs. An outgoing adapter that"
+                + " calls one changes the aggregate on a path no use case owns, outside the"
+                + " transaction the use case draws and without the events it publishes. The"
+                + " adapter stores and loads what the aggregate holds",
+            arch -> {
+              DescribedPredicate<JavaClass> aggregateRoot =
+                  arch.layout().markers().is("aggregateRoot");
+              if (arch.classes().stream().noneMatch(aggregateRoot)) {
+                return;
+              }
+              String marker = arch.layout().markers().aggregateRoot();
+              String vocabulary =
+                  marker.contains(".") ? marker.substring(0, marker.lastIndexOf('.')) : "";
+              DescribedPredicate<JavaClass> outgoing = arch.inOutgoingAdapter();
+              java.util.Set<String> violations = new java.util.TreeSet<>();
+              for (JavaClass adapter : arch.classes()) {
+                if (!outgoing.test(adapter)) {
+                  continue;
+                }
+                for (JavaMethodCall call : adapter.getMethodCallsFromSelf()) {
+                  if (call.getOrigin().getName().equals("$deserializeLambda$")
+                      || !aggregateRoot.test(call.getTargetOwner())) {
+                    continue;
+                  }
+                  String change = stateChangeOf(call, vocabulary);
+                  if (change != null) {
+                    violations.add(
+                        call.getOrigin().getFullName()
+                            + " calls "
+                            + call.getTargetOwner().getSimpleName()
+                            + "."
+                            + call.getName()
+                            + "(), which "
+                            + change);
+                  }
+                }
+              }
+              if (!violations.isEmpty()) {
+                throw new DcaRuleViolation(
+                    "Outgoing adapters must not call state-changing methods of aggregate roots."
+                        + " Fix: let a use case load the aggregate, call the method and save it;"
+                        + " the adapter only stores what the aggregate holds.",
+                    new ArrayList<>(violations));
+              }
+            })
+        .experimental()
+        .selecting(
+            "Every class in <module>.adapter.outgoing.. of every module root, with the classes"
+                + " nested in it, and the method calls they make on a type carrying the"
+                + " aggregate-root role. A project without a type carrying the aggregate-root role"
+                + " selects nothing.")
+        .checking(
+            "No code unit calls a method of a type carrying the aggregate-root role that changes"
+                + " its state - a non-static method that returns void, or one that sets a field of"
+                + " its own class; the called method is read where it is declared, methods"
+                + " inherited from the root's superclasses included. Static methods - factories,"
+                + " reconstitution - and methods that return a value without setting a field are"
+                + " queries and pass. A method declared by a type in the package of the"
+                + " aggregate-root role's own marker - the vocabulary's base, such as its"
+                + " domain-event bookkeeping that a publisher clears after publishing - is not the"
+                + " aggregate's behaviour and passes. A change made by writing to storage directly, past the"
+                + " aggregate, is not a call and is not seen. An empty selection passes.",
+            "let a use case load the aggregate, call the method and save it; the adapter only"
+                + " stores what the aggregate holds");
+  }
+
+  /**
+   * How the called method changes the aggregate, worded for the violation, or {@code null} for a
+   * query. A method of the vocabulary's own base - declared in the package of the aggregate-root
+   * role's marker, such as the domain-event bookkeeping - is none. A method that cannot be resolved
+   * is judged by its return type alone.
+   */
+  private static String stateChangeOf(JavaMethodCall call, String vocabulary) {
+    java.util.Optional<JavaMethod> resolved = call.getTarget().resolveMember();
+    if (resolved.isPresent()) {
+      JavaMethod method = resolved.get();
+      if (method.getModifiers().contains(JavaModifier.STATIC)
+          || method.getOwner().getPackageName().equals(vocabulary)) {
+        return null;
+      }
+      if (method.getRawReturnType().getName().equals("void")) {
+        return "returns void and changes its state";
+      }
+      JavaClass root = call.getTargetOwner();
+      for (JavaFieldAccess access : method.getFieldAccesses()) {
+        if (access.getAccessType() == JavaFieldAccess.AccessType.SET
+            && root.isAssignableTo(access.getTargetOwner().getName())) {
+          return "sets the field " + access.getName();
+        }
+      }
+      return null;
+    }
+    return call.getTarget().getRawReturnType().getName().equals("void")
+        ? "returns void and changes its state"
+        : null;
   }
 }

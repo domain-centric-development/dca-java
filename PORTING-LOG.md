@@ -499,3 +499,31 @@ Every `getAccessesFromSelf()` whose target owner carries the `domainService` rol
 description, except a `JavaConstructorCall` or `JavaConstructorReference` from a class in `inInfrastructure()` -
 the composition root may build the service for a use case. A type reference (parameter, field, return) is no
 access. `DCA-ADV-019` and `DCA-HEX-012` stay; their remedies name `DCA-ADV-021`.
+
+## 2026-11-09 — DCA-HEX-021, DCA-USE-021, DCA-USE-022, DCA-TAC-025 negation enums (WP-193)
+
+Three new rules, same ids in `dca-dotnet` and `dca-python`, experimental, enforced.
+
+`DCA-HEX-021` iterates `arch.classes()` in `inOutgoingAdapter()` (nested classes share the package) and their
+`getMethodCallsFromSelf()` whose target owner carries the `aggregateRoot` role; no aggregate root under scan, no
+check. The target is resolved with `resolveMember()`: static passes, a `void` return is a change, otherwise a
+`JavaFieldAccess` of type `SET` in the resolved method whose owner the root is assignable to is a change. An
+unresolvable target is judged by its raw return type alone. `$deserializeLambda$` is skipped as in `DCA-HEX-016`. A resolved method whose owner's package equals the package
+of `markers().aggregateRoot()` - the vocabulary's base, `BaseAggregateRoot.clearDomainEvents()` by default - passes;
+agreed with the .NET twin (`ClearDomainEvents`). Setters are not recognised by name: a `setX` returning `void` is a
+change by its return type, a fluent one by the field it sets.
+
+`DCA-USE-021` reuses the `useCases(arch, layout)` selection of `DCA-USE-019` and `TypeInspection.instanceFields`
+(inherited fields included, static and synthetic fields left out) - `DCA-ADV-012` checks static fields too, this
+one does not, as the shared text says "every instance field".
+
+`DCA-USE-022` selects every class under scan assignable to the `useCase` role's type except the type itself and
+reads type argument 1 through `TypeInspection.typeArgument` - moved there from `TacticalPatternRules`, where
+`DCA-TAC-026` and its repository lookup use it unchanged. A resolved `JavaClass` among the eight boxes and `String`
+is bare; a `JavaParameterizedType` (`List<String>`), a type variable and `Void` pass. A type is reported only when
+no direct supertype assignable to the contract binds the bare output already, so a port and the use case
+implementing it are one finding.
+
+`DCA-TAC-025`: an enum with `getEnumConstants().size() == 2` whose names, lower-cased without underscores, form one
+of the fixed pairs or `prefix + other` for `not`, `no`, `non`, `un` is reported with the type's other findings.
+

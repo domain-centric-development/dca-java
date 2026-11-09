@@ -1026,6 +1026,10 @@ public final class TacticalPatternRules implements DcaRuleSet {
                   continue;
                 }
                 List<String> bare = new ArrayList<>();
+                String negation = booleanInDisguise(type);
+                if (negation != null) {
+                  bare.add(negation);
+                }
                 Set<String> exemptAccessors = new java.util.HashSet<>();
                 for (JavaMethod method : type.getMethods()) {
                   if (implementsBuildingBlock(type, method, buildingBlocks)) {
@@ -1138,7 +1142,12 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 + " like any other type: each component is a value object itself. A record's"
                 + " accessor is not reported again beside its field. A reported type with exactly one"
                 + " instance field that is no value or id is told to carry the value or id role to"
-                + " count as a wrapper. An empty selection passes.",
+                + " count as a wrapper. A domain enum with exactly two constants that name one fact"
+                + " and its negation is a boolean in disguise and is reported where it is declared:"
+                + " the pairs YES/NO, TRUE/FALSE, ON/OFF, PRESENT/ABSENT, ENABLED/DISABLED, and any"
+                + " X with NOT_X, NO_X, NON_X or UN_X / UNX (compared case-insensitively, underscores"
+                + " ignored). A two-constant enum whose constants have names of their own (for"
+                + " example OPEN/CLOSED) passes. An empty selection passes.",
             "wrap the primitive in a value object that carries its rules; a value of one"
                 + " component may hold it; a boolean parameter becomes a method that names the"
                 + " behaviour - complete() instead of setCompleted(true)");
@@ -1170,7 +1179,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
               List<String> violations = new ArrayList<>();
               List<JavaClass> repositories = repositoryInterfaces(arch);
               for (JavaClass aggregate : ownedAggregateRoots(arch)) {
-                Optional<JavaType> owner = typeArgument(aggregate, markers.owned(), 0);
+                Optional<JavaType> owner =
+                    TypeInspection.typeArgument(aggregate, markers.owned(), 0);
                 if (owner.isEmpty() || owner.get() instanceof JavaTypeVariable) {
                   violations.add(
                       aggregate.getName()
@@ -1277,7 +1287,7 @@ public final class TacticalPatternRules implements DcaRuleSet {
    */
   private static Optional<JavaClass> aggregateIdOf(
       JavaClass aggregate, JavaClass repository, DcaMarkers markers) {
-    Optional<JavaType> bound = typeArgument(repository, markers.repository(), 1);
+    Optional<JavaType> bound = TypeInspection.typeArgument(repository, markers.repository(), 1);
     if (bound.isPresent() && !(bound.get() instanceof JavaTypeVariable)) {
       return Optional.of(bound.get().toErasure());
     }
@@ -1308,46 +1318,6 @@ public final class TacticalPatternRules implements DcaRuleSet {
   }
 
   /**
-   * The type argument at {@code index} that a type binds on the given marker, through its
-   * interfaces, the interfaces they extend and its superclasses; a type variable of an intermediate
-   * type is substituted by the argument the type binds for it. Empty where the marker is used raw
-   * or not at all.
-   */
-  private static Optional<JavaType> typeArgument(JavaClass type, String markerName, int index) {
-    List<JavaType> candidates = new ArrayList<>(type.getInterfaces());
-    type.getSuperclass().ifPresent(candidates::add);
-    for (JavaType candidate : candidates) {
-      JavaClass erasure = candidate.toErasure();
-      if (erasure.getName().equals(markerName)) {
-        if (candidate instanceof JavaParameterizedType parameterized
-            && parameterized.getActualTypeArguments().size() > index) {
-          return Optional.of(parameterized.getActualTypeArguments().get(index));
-        }
-        return Optional.empty();
-      }
-      if (!erasure.isAssignableTo(markerName)) {
-        continue;
-      }
-      Optional<JavaType> inherited = typeArgument(erasure, markerName, index);
-      if (inherited.isPresent()
-          && inherited.get() instanceof JavaTypeVariable<?> variable
-          && candidate instanceof JavaParameterizedType parameterized) {
-        List<? extends JavaTypeVariable<?>> parameters = erasure.getTypeParameters();
-        for (int i = 0; i < parameters.size(); i++) {
-          if (parameters.get(i).getName().equals(variable.getName())
-              && parameterized.getActualTypeArguments().size() > i) {
-            return Optional.of(parameterized.getActualTypeArguments().get(i));
-          }
-        }
-      }
-      if (inherited.isPresent()) {
-        return inherited;
-      }
-    }
-    return Optional.empty();
-  }
-
-  /**
    * The factory that rebuilds a stored object: static, returning the type that declares it, named
    * as the layout configures ({@code reconstitute}, {@code restore} by default), case ignored.
    */
@@ -1356,6 +1326,52 @@ public final class TacticalPatternRules implements DcaRuleSet {
     return method.getModifiers().contains(JavaModifier.STATIC)
         && method.getRawReturnType().equals(type)
         && names.contains(method.getName().toLowerCase(java.util.Locale.ROOT));
+  }
+
+  /** The pairs of constant names that say yes and no, normalised: lower case, no underscores. */
+  private static final List<Set<String>> NEGATION_PAIRS =
+      List.of(
+          Set.of("yes", "no"),
+          Set.of("true", "false"),
+          Set.of("on", "off"),
+          Set.of("present", "absent"),
+          Set.of("enabled", "disabled"));
+
+  /** The prefixes that negate a constant's name: NOT_X, NO_X, NON_X, UN_X and UNX. */
+  private static final List<String> NEGATING_PREFIXES = List.of("not", "no", "non", "un");
+
+  /**
+   * The finding for an enum of exactly two constants that name one fact and its negation - a
+   * boolean in disguise - or {@code null}.
+   */
+  private static String booleanInDisguise(JavaClass type) {
+    if (!type.isEnum() || type.getEnumConstants().size() != 2) {
+      return null;
+    }
+    List<String> names =
+        type.getEnumConstants().stream().map(constant -> constant.name()).sorted().toList();
+    String first = normalisedConstant(names.get(0));
+    String second = normalisedConstant(names.get(1));
+    boolean pair =
+        NEGATION_PAIRS.contains(Set.of(first, second))
+            || negates(first, second)
+            || negates(second, first);
+    return pair
+        ? "enum with the constants "
+            + names.get(0)
+            + " and "
+            + names.get(1)
+            + " names one fact and its negation - a boolean in disguise"
+        : null;
+  }
+
+  private static String normalisedConstant(String name) {
+    return name.replace("_", "").toLowerCase(java.util.Locale.ROOT);
+  }
+
+  private static boolean negates(String negated, String fact) {
+    return !fact.isEmpty()
+        && NEGATING_PREFIXES.stream().anyMatch(prefix -> negated.equals(prefix + fact));
   }
 
   /** A boolean or its box: a yes/no fact as a field, a predicate as a return type. */

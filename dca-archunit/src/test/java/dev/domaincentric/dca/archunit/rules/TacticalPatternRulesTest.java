@@ -275,6 +275,10 @@ class TacticalPatternRulesTest {
     assertFalse(message.contains("PostalCode"), message);
     assertFalse(message.contains("AccountId"), message);
     assertFalse(message.contains("toString"), message);
+    assertTrue(
+        message.contains(
+            "Presence: enum with the constants ABSENT and PRESENT names one fact and its negation"),
+        message);
   }
 
   /**
@@ -283,6 +287,7 @@ class TacticalPatternRulesTest {
    */
   @Test
   void aDomainOfValueObjectsPasses() {
+    // AccountStatus { OPEN, CLOSED } - two constants with names of their own - is no boolean
     Fixtures.passes(Fixtures.ROOT + ".tactical.primitives.good", "DCA-TAC-025");
   }
 

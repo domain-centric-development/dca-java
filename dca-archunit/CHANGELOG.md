@@ -14,7 +14,32 @@ role. The composition root (the infrastructure layer) may construct one to hand 
 reported. A type named as a parameter, field or return type is no access. `DCA-ADV-019` (model types) and
 `DCA-HEX-012` (incoming adapters) stay — each rule set stands alone — and their remedies now point at `DCA-ADV-021`.
 
+**`DCA-HEX-021` — outgoing adapters must not call state-changing methods of aggregate roots (WP-193),
+experimental.** Selects every class in the outgoing adapter layer, nested classes included, and reports each call
+of a method of a type carrying the aggregate-root role that changes its state: a non-static method returning
+`void`, or one that sets a field of its own class (read where the method is declared, inherited methods included).
+Static factories and reconstitution, and methods that return a value without setting a field, are queries and
+pass, and so does a method declared in the package of the aggregate-root role's own marker — the vocabulary's base,
+such as the domain-event bookkeeping (`clearDomainEvents()`) a publisher calls after publishing. A write straight to storage, past the aggregate, is not seen. A project without an aggregate root selects
+nothing.
+
+**`DCA-USE-021` — use cases should be stateless (only final fields for dependencies) (WP-193), experimental.** The
+twin of `DCA-ADV-012` for use cases: every instance field of a use case — selected as `DCA-USE-019` selects them,
+inherited fields included — is final. Static fields are not inspected.
+
+**`DCA-USE-022` — use case results must not be bare primitives or strings (WP-193), experimental.** The output type
+argument of the generic contract `UseCase<INPUT, OUTPUT>` (the `useCase` role), resolved through the interfaces and
+superclasses in between, is none of `String`, `Boolean`, `Byte`, `Short`, `Integer`, `Long`, `Float`, `Double`,
+`Character`. `Void`, an unresolved type argument and a container such as `List<String>` pass. A bare output is
+reported where it is bound, not again on the types that inherit the binding.
+
 ### Changed
+
+**`DCA-TAC-025` reports an enum that is a boolean in disguise (WP-193).** A domain enum with exactly two constants
+that name one fact and its negation is reported where it is declared: the pairs `YES`/`NO`, `TRUE`/`FALSE`,
+`ON`/`OFF`, `PRESENT`/`ABSENT`, `ENABLED`/`DISABLED`, and any `X` with `NOT_X`, `NO_X`, `NON_X` or `UN_X` / `UNX`
+(compared case-insensitively, underscores ignored). A two-constant enum whose constants have names of their own
+(`OPEN`/`CLOSED`) passes.
 
 **`DCA-TAC-025` exempts the factory that rebuilds a stored object.** A `boolean` parameter of a static method that
 returns its own type and is named as the layout configures — `reconstitute` and `restore` by default, case ignored —

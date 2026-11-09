@@ -18,6 +18,7 @@ public class Order extends BaseAggregateRoot<Order, OrderId> {
   private final OrderId id;
   private final Money total;
   private final InMemoryOrderRepository repository = new InMemoryOrderRepository();
+  private boolean archived;
 
   public Order(OrderId id, Money total) {
     this.id = id;
@@ -41,5 +42,13 @@ public class Order extends BaseAggregateRoot<Order, OrderId> {
 
   public Money total() {
     return total;
+  }
+
+  public void archive() {
+    archived = true;
+  }
+
+  public boolean isArchived() {
+    return archived;
   }
 }

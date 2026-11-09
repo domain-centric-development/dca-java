@@ -417,4 +417,37 @@ class UseCaseRulesTest {
       Fixtures.passes(FIXTURES + ".rawids.good", "DCA-USE-020");
     }
   }
+
+  @Nested
+  @DisplayName("DCA-USE-021 — use cases are stateless")
+  class UseCasesAreStateless {
+
+    @Test
+    void aFieldWrittenWhileTheUseCaseRunsIsReported() {
+      String message = Fixtures.failure(FIXTURES + ".bad", "DCA-USE-021").getMessage();
+
+      assertTrue(
+          message.contains("CountOrdersUseCase has the non-final field 'lastCount'"), message);
+      assertFalse(message.contains("PlaceOrderUseCase"), message);
+    }
+  }
+
+  @Nested
+  @DisplayName("DCA-USE-022 — use case results are no bare primitives")
+  class UseCaseResultsAreNoBarePrimitives {
+
+    @Test
+    void aBareOutputIsReportedWhereItIsBound() {
+      String message = Fixtures.failure(FIXTURES + ".bad", "DCA-USE-022").getMessage();
+
+      assertTrue(message.contains("CountOrdersInputPort answers with a bare Long"), message);
+      assertTrue(message.contains("ExportOrdersUseCase answers with a bare String"), message);
+      assertTrue(message.contains("TallyOrdersInputPort answers with a bare Integer"), message);
+      assertFalse(message.contains("CountOrdersUseCase"), message);
+      assertFalse(message.contains("ListOrderRegionsInputPort"), message);
+      assertFalse(message.contains("ForgetOrdersInputPort"), message);
+      assertFalse(message.contains("Answering"), message);
+      assertFalse(message.contains("PlaceOrder"), message);
+    }
+  }
 }
