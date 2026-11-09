@@ -4,6 +4,8 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-09
+
 ### Added
 
 **`DcaRule.freezable()` and `"freezable"` in `rules.json` (WP-52).** Whether a rule is one ArchUnit rule and can
