@@ -3,11 +3,14 @@ package dev.domaincentric.dca.archunit.rules;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 
 import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaAccess;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaCodeUnit;
 import com.tngtech.archunit.core.domain.JavaCodeUnitAccess;
 import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.domain.PackageMatcher;
+import com.tngtech.archunit.core.domain.TryCatchBlock;
 import dev.domaincentric.dca.archunit.DcaArchitecture;
 import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaMarkers;
@@ -57,7 +60,8 @@ public final class ErrorHandlingRules implements DcaRuleSet {
             adaptersWithoutTranslation(),
             failuresCarryIdsAndFigures(),
             closedResultsRefuse(),
-            domainExceptionsConstructedInTheDomain());
+            domainExceptionsConstructedInTheDomain(),
+            portCallsCatchNamedFailures());
   }
 
   @Override
@@ -581,6 +585,108 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                 + " for a failure the use case finds itself - nothing found, not owned - return a"
                 + " refusal case of the result or throw a use-case exception declared beside the"
                 + " use case");
+  }
+
+  /**
+   * The platform's catch-all types: catching one catches every failure, the unexpected included.
+   */
+  private static final Set<String> CATCH_ALL =
+      Set.of(Exception.class.getName(), RuntimeException.class.getName());
+
+  public DcaRule portCallsCatchNamedFailures() {
+    return DcaRule.check(
+            "DCA-ERR-010",
+            "A port call is never wrapped in a catch of every failure",
+            "A failure has a type, and the code that answers it names that type. A catch of the"
+                + " platform's catch-all or of the port failures' common base around a port call"
+                + " answers every failure alike: a broken rule, an output port's refusal and a"
+                + " defect end in the same branch, and a failure nobody expected is swallowed"
+                + " instead of reaching the one handler that reports it",
+            arch -> {
+              DcaMarkers markers = arch.layout().markers();
+              DescribedPredicate<JavaClass> port =
+                  DescribedPredicate.or(markers.is("inputPort"), markers.is("outputPort"));
+              DescribedPredicate<JavaClass> commonBase =
+                  DescribedPredicate.or(
+                      markers.is("portException"), markers.is("inputPortException"));
+              DescribedPredicate<JavaClass> selected =
+                  DescribedPredicate.or(arch.inIncomingAdapter(), arch.inApplication());
+              DescribedPredicate<JavaClass> outputPortFailure = markers.is("outputPortException");
+              DescribedPredicate<JavaClass> useCaseFailure = markers.is("useCaseException");
+              CollectedViolations collected =
+                  CollectedViolations.withHeader(
+                      "A port call is wrapped in a catch of every failure");
+              Set<String> seen = new LinkedHashSet<>();
+              for (JavaClass origin : arch.classes()) {
+                if (!selected.test(origin)) {
+                  continue;
+                }
+                for (JavaCodeUnit unit : origin.getCodeUnits()) {
+                  for (TryCatchBlock block : unit.getTryCatchBlocks()) {
+                    JavaAccess<?> call = portCall(block, port);
+                    if (call == null) {
+                      continue;
+                    }
+                    for (JavaClass caught : block.getCaughtThrowables()) {
+                      boolean catchAll = CATCH_ALL.contains(caught.getName());
+                      boolean base =
+                          commonBase.test(caught)
+                              && !outputPortFailure.test(caught)
+                              && !useCaseFailure.test(caught);
+                      if (!catchAll && !base) {
+                        continue;
+                      }
+                      String finding =
+                          unit.getFullName()
+                              + " catches "
+                              + caught.getName()
+                              + " around "
+                              + call.getTarget().getFullName()
+                              + " "
+                              + block.getSourceCodeLocation()
+                              + " - catch the failure the port declares by its own type";
+                      if (seen.add(finding)) {
+                        collected.add(finding);
+                      }
+                    }
+                  }
+                }
+              }
+              collected.throwIfAny();
+            })
+        .experimental()
+        .selecting(
+            "Every try block in a class of <module>.adapter.incoming.. or <module>.application.."
+                + " of every module root whose try part calls a method of an interface assignable to the"
+                + " configured input-port or output-port role, lambdas and nested classes"
+                + " included.")
+        .checking(
+            "No catch clause of such a try block names the platform's catch-all exception or"
+                + " its unchecked root (Exception, RuntimeException), nor the configured"
+                + " port-exception or input-port-exception role itself; a subtype - a use case's"
+                + " own failure, an output port's failure, a named domain failure - passes. The"
+                + " compiler's own catch of every throwable for try-with-resources and finally is"
+                + " not a catch clause of the source and is not reported, so a catch of Throwable"
+                + " is not seen either. A clause that cleans up and rethrows the caught failure"
+                + " unchanged is reported as well: the import model carries no throw site, so it"
+                + " cannot tell a rethrow from a swallow - catch the named failure, or move the"
+                + " clean-up into a finally block. A try block without a port call - a call of the class's"
+                + " own method that reaches a port included, which is not followed -, a handler"
+                + " method that receives the failure as a parameter, and a catch outside the"
+                + " selected layers pass. An empty selection passes.",
+            "catch the failure the port declares by its own type - the use case's own exception,"
+                + " the output port's exception, the domain exception of the rule - and let every"
+                + " other failure reach the one handler of the context");
+  }
+
+  private static JavaAccess<?> portCall(TryCatchBlock block, DescribedPredicate<JavaClass> port) {
+    for (JavaAccess<?> access : block.getAccessesContainedInTryBlock()) {
+      JavaClass owner = access.getTargetOwner();
+      if (access instanceof JavaCodeUnitAccess<?> && owner.isInterface() && port.test(owner)) {
+        return access;
+      }
+    }
+    return null;
   }
 
   /** A subclass constructor's call to its parent's constructor, or a {@code this(...)} call. */

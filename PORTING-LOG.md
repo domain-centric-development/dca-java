@@ -429,6 +429,13 @@ The decision behind the set, the naming and the limits is `docs/adr/adr-002-exce
   assignable to the `domainException` role fails, except a constructor of a subtype chaining to its parent
   (`super(...)`/`this(...)`) and origins in the role's own package. Exact for bytecode constructions; reflection and
   generic factories are not seen.
+- **ERR-010 — a port call is never wrapped in a catch of every failure (WP-143, 2026-11-20), experimental,
+  enforced.** New rule, same id in `dca-dotnet`. Reads `getTryCatchBlocks()` of every code unit of a class in the
+  incoming adapters or the application layer: a block whose try part calls a method of an interface assignable to
+  the `inputPort` or `outputPort` role fails when a catch clause names `Exception`, `RuntimeException`, or the
+  `portException` / `inputPortException` role itself. `Throwable` is left out — javac's own try-with-resources
+  clause catches it. The import model has no throw site, so a clause that rethrows the caught failure is reported
+  too; .NET reads `rethrow` from the IL and passes it.
 - **The base types are excluded from every selection** by their package (`dev.domaincentric.dca.buildingblocks`):
   they are library code, and ERR-002 would otherwise report them as residing outside the project's layers.
 

@@ -73,7 +73,8 @@ class ExperimentalRulesTest {
             "DCA-NAM-013",
             "DCA-ERR-007",
             "DCA-ERR-008",
-            "DCA-ERR-009"),
+            "DCA-ERR-009",
+            "DCA-ERR-010"),
         experimental);
   }
 

@@ -394,4 +394,29 @@ class ErrorHandlingRulesTest {
   void theDomainLayerConstructsItsOwnFailures() {
     Fixtures.passes(FIXTURES + ".good", "DCA-ERR-009");
   }
+
+  @Test
+  @DisplayName("DCA-ERR-010 reports a catch of every failure around an input or output port call")
+  void aCatchAllAroundAPortCallIsReported() {
+    String message = Fixtures.violation(FIXTURES + ".catchall.bad", "DCA-ERR-010").getMessage();
+
+    assertTrue(
+        message.contains("InvoiceController.pay(java.lang.String) catches java.lang.Exception"),
+        message);
+    assertTrue(
+        message.contains(
+            "catches dev.domaincentric.dca.buildingblocks.application.InputPortException"),
+        message);
+    assertTrue(
+        message.contains("PayInvoiceUseCase.execute(")
+            && message.contains("catches java.lang.RuntimeException"),
+        message);
+    assertFalse(message.contains("parse("), "a catch-all around no port call is not this rule's");
+  }
+
+  @Test
+  @DisplayName("DCA-ERR-010 holds for catches of the port's own failure and for try-with-resources")
+  void namedFailuresAroundPortCallsPass() {
+    Fixtures.passes(FIXTURES + ".catchall.good", "DCA-ERR-010");
+  }
 }

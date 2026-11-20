@@ -9,8 +9,7 @@ public sealed interface CancelReservationResult
   record Cancelled(String reservationId) implements CancelReservationResult {}
 
   /** Refusals may be grouped below a sealed case of their own. */
-  sealed interface Refused extends CancelReservationResult
-      permits NotFound, AlreadyStarted {}
+  sealed interface Refused extends CancelReservationResult permits NotFound, AlreadyStarted {}
 
   record NotFound(String reservationId) implements Refused, Refusal {}
 
