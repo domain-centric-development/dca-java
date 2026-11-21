@@ -6,9 +6,9 @@ package dev.domaincentric.dca.buildingblocks.application;
  * <p>A use case may answer an expected refusal - the addressed thing does not exist, the caller may
  * not act on it, the model refused the input - in one of two styles, chosen per bounded context: it
  * throws a named failure, or it returns the refusal as a case of a closed result (a sealed type
- * whose cases its caller switches over). Both are equally valid; within one context the style is
- * uniform. This marker belongs to the second style: every case of a closed result that refuses the
- * request implements it, and a case that reports success never does.
+ * whose cases its caller switches over). Returning is preferred, throwing is allowed; within one
+ * context the style is uniform. This marker belongs to the second style: every case of a closed
+ * result that refuses the request implements it, and a case that reports success never does.
  *
  * <p><b>A refusal rolls back like a thrown failure.</b> A use case that wrote something before it
  * found out it has to refuse must not commit that write. A thrown failure rolls the transaction

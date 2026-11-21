@@ -20,8 +20,8 @@ import java.io.Serial;
  * <p><b>Thrown or returned - per bounded context.</b> A use case answers its expected refusals (not
  * found, not owned, a precondition) in one of two styles, chosen per bounded context and uniform
  * within it: it throws them as subtypes of this class, or it returns them as cases of a closed
- * result, each marked {@link Refusal}. Both styles are equally valid. In a context that returns
- * results, not-found and not-owned are cases of the result, not exceptions.
+ * result, each marked {@link Refusal}. Returning is preferred, throwing is allowed. In a context
+ * that returns results, not-found and not-owned are cases of the result, not exceptions.
  *
  * <p><b>What is not a use-case failure.</b> A broken rule of the model is a {@link
  * dev.domaincentric.dca.buildingblocks.ddd.tactical.DomainException} and stays in the domain layer;
