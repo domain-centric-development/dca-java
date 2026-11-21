@@ -37,4 +37,51 @@ public final class InvoiceController {
       return 0;
     }
   }
+
+  /** Cleans up and wraps the failure: reported. */
+  public String payOrWrap(String invoiceId) {
+    try {
+      return payInvoice.execute(new PayInvoiceCommand(invoiceId)).invoiceId();
+    } catch (RuntimeException failure) {
+      undo(invoiceId);
+      throw new IllegalStateException(failure);
+    }
+  }
+
+  /** Cleans up and throws something else: reported. */
+  public String payOrThrowOther(String invoiceId) {
+    try {
+      return payInvoice.execute(new PayInvoiceCommand(invoiceId)).invoiceId();
+    } catch (RuntimeException failure) {
+      undo(invoiceId);
+      throw new IllegalArgumentException(invoiceId);
+    }
+  }
+
+  /** Rethrows on one path only, returns on the other: reported. */
+  public String payOrSometimesReturn(String invoiceId) {
+    try {
+      return payInvoice.execute(new PayInvoiceCommand(invoiceId)).invoiceId();
+    } catch (RuntimeException failure) {
+      if (invoiceId.isEmpty()) {
+        return "400";
+      }
+      throw failure;
+    }
+  }
+
+  /** Cleans up and runs on after the try statement: reported. */
+  public String payOrCarryOn(String invoiceId) {
+    String answer = "";
+    try {
+      answer = payInvoice.execute(new PayInvoiceCommand(invoiceId)).invoiceId();
+    } catch (RuntimeException failure) {
+      undo(invoiceId);
+    }
+    return answer;
+  }
+
+  private void undo(String invoiceId) {
+    invoiceId.length();
+  }
 }

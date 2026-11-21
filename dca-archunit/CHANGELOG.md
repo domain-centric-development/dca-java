@@ -15,6 +15,16 @@ The gateway is the new `DcaMarkers` role `domainGateway` (default `ddd.tactical.
 `withDomainGateway(...)`). The role sits after `specification`; the former canonical
 constructor stays as a compatibility constructor that fills it with the library's type.
 
+### Changed
+
+**`DCA-ERR-010` — a catch-all that cleans up and rethrows the caught exception unchanged passes.** Such a handler
+does not answer the failure. The rule now reads the handler from the method's byte code: it passes when every path
+from the handler, following jumps and switches, ends in a throw of the very object it caught (kept on the stack or
+held in a local variable) and no path reaches a return or runs on after the try statement. A handler that returns,
+swallows, wraps (`throw new X(e)`) or throws anything else is still reported, as is a rethrow through a field, an
+array or a method call, and every handler of a class file that cannot be read. Only the constant pool, the exception
+table, the line numbers and the instructions of the method are read; no dependency is added.
+
 ## [0.13.0] - 2026-11-09
 
 ### Added

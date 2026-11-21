@@ -14,6 +14,7 @@ import dev.domaincentric.dca.archunit.Fixtures;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
 import javax.tools.JavaCompiler;
@@ -412,10 +413,17 @@ class ErrorHandlingRulesTest {
             && message.contains("catches java.lang.RuntimeException"),
         message);
     assertFalse(message.contains("parse("), "a catch-all around no port call is not this rule's");
+    for (String method :
+        List.of("payOrWrap", "payOrThrowOther", "payOrSometimesReturn", "payOrCarryOn")) {
+      assertTrue(
+          message.contains("InvoiceController." + method + "(java.lang.String) catches"),
+          method + " answers the failure and is reported: " + message);
+    }
   }
 
   @Test
-  @DisplayName("DCA-ERR-010 holds for catches of the port's own failure and for try-with-resources")
+  @DisplayName(
+      "DCA-ERR-010 holds for the port's own failure, try-with-resources and an unchanged rethrow")
   void namedFailuresAroundPortCallsPass() {
     Fixtures.passes(FIXTURES + ".catchall.good", "DCA-ERR-010");
   }

@@ -617,6 +617,7 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                   CollectedViolations.withHeader(
                       "A port call is wrapped in a catch of every failure");
               Set<String> seen = new LinkedHashSet<>();
+              RethrowingHandlers handlers = new RethrowingHandlers();
               for (JavaClass origin : arch.classes()) {
                 if (!selected.test(origin)) {
                   continue;
@@ -633,7 +634,7 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                           commonBase.test(caught)
                               && !outputPortFailure.test(caught)
                               && !useCaseFailure.test(caught);
-                      if (!catchAll && !base) {
+                      if ((!catchAll && !base) || handlers.rethrowsUnchanged(unit, call, caught)) {
                         continue;
                       }
                       String finding =
@@ -667,10 +668,16 @@ public final class ErrorHandlingRules implements DcaRuleSet {
                 + " own failure, an output port's failure, a named domain failure - passes. The"
                 + " compiler's own catch of every throwable for try-with-resources and finally is"
                 + " not a catch clause of the source and is not reported, so a catch of Throwable"
-                + " is not seen either. A clause that cleans up and rethrows the caught failure"
-                + " unchanged is reported as well: the import model carries no throw site, so it"
-                + " cannot tell a rethrow from a swallow - catch the named failure, or move the"
-                + " clean-up into a finally block. A try block without a port call - a call of the class's"
+                + " is not seen either. A handler that rethrows the caught exception unchanged, after"
+                + " cleaning up, passes: it does not answer the failure. Read from the method's"
+                + " byte code, that is a handler whose every path, following jumps and switches,"
+                + " ends in a throw of the very object it caught - kept on the stack or held in a"
+                + " local variable - and none reaches a return or runs on after the try statement;"
+                + " the paths a failure of the clean-up itself would take are not followed. A"
+                + " handler that returns, swallows, wraps (throw new X(e)) or throws anything"
+                + " else is reported, and so is a rethrow whose object passes through a field, an"
+                + " array or a method call, and every handler of a class file that cannot be read."
+                + " A try block without a port call - a call of the class's"
                 + " own method that reaches a port included, which is not followed -, a handler"
                 + " method that receives the failure as a parameter, and a catch outside the"
                 + " selected layers pass. An empty selection passes.",
