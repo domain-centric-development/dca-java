@@ -85,6 +85,10 @@ import java.util.Objects;
  * @param factory the marker of a factory
  * @param specification the marker of a specification — a predicate over a domain object, selected
  *     by {@code DCA-ADV-017} and {@code DCA-ADV-018} alongside the name suffix
+ * @param domainGateway the marker of a domain gateway — a domain-owned interface that supplies a
+ *     fact or a technology-bound computation, called by a domain service or the application; read
+ *     by {@code DCA-TAC-027}, which keeps it out of aggregates, entities, values, factories and
+ *     specifications
  * @param domainException the base type of a domain failure
  * @param useCaseException the base type of a use-case failure
  * @param portException the base type of every failure a port's contract declares - read by {@code
@@ -134,6 +138,7 @@ public record DcaMarkers(
     String domainService,
     String factory,
     String specification,
+    String domainGateway,
     String domainException,
     String useCaseException,
     String portException,
@@ -163,6 +168,70 @@ public record DcaMarkers(
 
   private static final List<String> DECLARATION_ROLES =
       List.of("boundedContext", "sharedKernel", "integrationEventType");
+
+  /** The vocabulary before the domainGateway role existed: it keeps the library's own type. */
+  public DcaMarkers(
+      String name,
+      String aggregateRoot,
+      String owned,
+      String entity,
+      String value,
+      String id,
+      String domainEvent,
+      String integrationEvent,
+      String domainService,
+      String factory,
+      String specification,
+      String domainException,
+      String useCaseException,
+      String portException,
+      String inputPortException,
+      String outputPortException,
+      String transactionBoundary,
+      String refusal,
+      String inputPort,
+      String useCase,
+      String outputPort,
+      String repository,
+      String store,
+      String domainEventPublisher,
+      String integrationEventPublisher,
+      String boundedContext,
+      String sharedKernel,
+      String integrationEventType,
+      Map<String, DcaMarker> recognisedBy) {
+    this(
+        name,
+        aggregateRoot,
+        owned,
+        entity,
+        value,
+        id,
+        domainEvent,
+        integrationEvent,
+        domainService,
+        factory,
+        specification,
+        DCA_BUILDING_BLOCKS + ".ddd.tactical.DomainGateway",
+        domainException,
+        useCaseException,
+        portException,
+        inputPortException,
+        outputPortException,
+        transactionBoundary,
+        refusal,
+        inputPort,
+        useCase,
+        outputPort,
+        repository,
+        store,
+        domainEventPublisher,
+        integrationEventPublisher,
+        boundedContext,
+        sharedKernel,
+        integrationEventType,
+        recognisedBy);
+  }
 
   /** The vocabulary before the roles refusal existed: it keeps the library's own type. */
   public DcaMarkers(
@@ -349,6 +418,7 @@ public record DcaMarkers(
     domainService = type(domainService, "domainService");
     factory = type(factory, "factory");
     specification = type(specification, "specification");
+    domainGateway = type(domainGateway, "domainGateway");
     domainException = type(domainException, "domainException");
     useCaseException = type(useCaseException, "useCaseException");
     portException = type(portException, "portException");
@@ -398,6 +468,7 @@ public record DcaMarkers(
         DCA_BUILDING_BLOCKS + ".ddd.tactical.DomainService",
         DCA_BUILDING_BLOCKS + ".ddd.tactical.Factory",
         DCA_BUILDING_BLOCKS + ".ddd.tactical.Specification",
+        DCA_BUILDING_BLOCKS + ".ddd.tactical.DomainGateway",
         DCA_BUILDING_BLOCKS + ".ddd.tactical.DomainException",
         DCA_BUILDING_BLOCKS + ".application.UseCaseException",
         DCA_BUILDING_BLOCKS + ".application.PortException",
@@ -584,6 +655,7 @@ public record DcaMarkers(
         roles.get("domainService"),
         roles.get("factory"),
         roles.get("specification"),
+        roles.get("domainGateway"),
         roles.get("domainException"),
         roles.get("useCaseException"),
         roles.get("portException"),
@@ -642,6 +714,10 @@ public record DcaMarkers(
 
   public DcaMarkers withSpecification(String fqn) {
     return withRole("specification", fqn);
+  }
+
+  public DcaMarkers withDomainGateway(String fqn) {
+    return withRole("domainGateway", fqn);
   }
 
   public DcaMarkers withDomainException(String fqn) {
@@ -765,6 +841,10 @@ public record DcaMarkers(
     return withRole("specification", marker);
   }
 
+  public DcaMarkers withDomainGateway(DcaMarker marker) {
+    return withRole("domainGateway", marker);
+  }
+
   public DcaMarkers withDomainException(DcaMarker marker) {
     return withRole("domainException", marker);
   }
@@ -864,6 +944,7 @@ public record DcaMarkers(
           "domainService",
           "factory",
           "specification",
+          "domainGateway",
           "domainException",
           "outputPort",
           "repository",
@@ -924,6 +1005,7 @@ public record DcaMarkers(
     roles.put("domainService", domainService);
     roles.put("factory", factory);
     roles.put("specification", specification);
+    roles.put("domainGateway", domainGateway);
     roles.put("domainException", domainException);
     roles.put("useCaseException", useCaseException);
     roles.put("portException", portException);

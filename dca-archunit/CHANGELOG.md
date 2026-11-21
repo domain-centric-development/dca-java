@@ -4,6 +4,17 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+### Added
+
+**`DCA-TAC-027` — aggregates, entities, values, factories and specifications receive a domain gateway only as a
+parameter, experimental.** Selects every non-interface class assignable to the aggregate-root, entity, value, factory
+or specification role and reports a gateway it holds (a declared field, static included, through arrays and generic
+arguments), returns from a declared method, obtains from another type (a call whose raw return type is a gateway, a
+read of another type's gateway field) or constructs. A gateway taken as a parameter and the calls made on it pass.
+The gateway is the new `DcaMarkers` role `domainGateway` (default `ddd.tactical.DomainGateway`,
+`withDomainGateway(...)`). The role sits after `specification`; the former canonical
+constructor stays as a compatibility constructor that fills it with the library's type.
+
 ## [0.13.0] - 2026-11-09
 
 ### Added

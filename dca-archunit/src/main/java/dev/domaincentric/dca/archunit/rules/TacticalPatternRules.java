@@ -72,7 +72,8 @@ public final class TacticalPatternRules implements DcaRuleSet {
             aggregateRootsHaveNoPublicConstructors(),
             valueObjectsHaveOneFactoryPerOrigin(),
             domainHoldsNoBarePrimitives(),
-            ownedAggregatesAreLoadedThroughTheirOwner());
+            ownedAggregatesAreLoadedThroughTheirOwner(),
+            modelTypesReceiveADomainGatewayOnlyAsAParameter());
   }
 
   @Override
@@ -1244,6 +1245,123 @@ public final class TacticalPatternRules implements DcaRuleSet {
                 + " not seen through. An empty selection passes.",
             "add a lookup such as findByIdForOwner(id, ownerId) to the aggregate's repository and"
                 + " load the aggregate through it wherever a caller is known");
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Domain gateway
+  // ---------------------------------------------------------------------------------------------
+
+  /** The roles of the model types that receive a gateway only as a parameter. */
+  private static final List<String> GATEWAY_FREE_ROLES =
+      List.of("aggregateRoot", "entity", "value", "factory", "specification");
+
+  /**
+   * DCA-TAC-027. An aggregate, entity, value, factory or specification receives a domain gateway
+   * only as a method parameter: it never holds one, never looks one up and never builds one.
+   */
+  public static DcaRule modelTypesReceiveADomainGatewayOnlyAsAParameter() {
+    return DcaRule.check(
+            "DCA-TAC-027",
+            "Aggregates, entities, values, factories and specifications receive a domain gateway"
+                + " only as a parameter",
+            "A domain gateway only reads: it supplies a fact the model does not hold or a"
+                + " computation bound to a technology. A model method that needs it takes it as a"
+                + " parameter, so the dependency stands in the signature and the caller - a domain"
+                + " service or the use case - decides which implementation answers. A gateway held"
+                + " in a field makes the model stateful towards the outside and survives into every"
+                + " later call; a gateway looked up from a registry or built in place is a hidden"
+                + " dependency no signature shows. The service-locator form - a static registry the"
+                + " model asks for its services - is the one this rule rejects",
+            arch -> {
+              DcaMarkers markers = arch.layout().markers();
+              DescribedPredicate<JavaClass> gateway = markers.is("domainGateway");
+              Predicate<JavaClass> isGateway = c -> gateway.test(c.getBaseComponentType());
+              List<String> violations = new ArrayList<>();
+              for (JavaClass type :
+                  classesMatching(
+                      arch,
+                      c ->
+                          !c.isInterface()
+                              && !gateway.test(c)
+                              && GATEWAY_FREE_ROLES.stream()
+                                  .anyMatch(role -> markers.is(role).test(c)))) {
+                for (JavaField field : type.getFields()) {
+                  TypeInspection.involvedTypes(field, type).stream()
+                      .filter(isGateway)
+                      .findFirst()
+                      .ifPresent(
+                          involved ->
+                              violations.add(
+                                  fieldDescription(type, field, involved)
+                                      + " - a held domain gateway"));
+                }
+                for (JavaMethod method : type.getMethods()) {
+                  if (TypeInspection.involvedTypes(method.getReturnType()).stream()
+                      .anyMatch(isGateway)) {
+                    violations.add(
+                        type.getName()
+                            + "."
+                            + method.getName()
+                            + "() returns a domain gateway - a locator for its callers");
+                  }
+                }
+                type.getMethodCallsFromSelf().stream()
+                    .filter(call -> !isGateway.test(call.getTargetOwner()))
+                    .filter(call -> isGateway.test(call.getTarget().getRawReturnType()))
+                    .map(
+                        call ->
+                            call.getOrigin().getFullName()
+                                + " obtains a domain gateway from "
+                                + call.getTargetOwner().getName()
+                                + "."
+                                + call.getName()
+                                + "()")
+                    .forEach(violations::add);
+                type.getFieldAccessesFromSelf().stream()
+                    .filter(access -> !access.getTargetOwner().equals(type))
+                    .filter(access -> isGateway.test(access.getTarget().getRawType()))
+                    .map(
+                        access ->
+                            access.getOrigin().getFullName()
+                                + " obtains a domain gateway from the field "
+                                + access.getTargetOwner().getName()
+                                + "."
+                                + access.getName())
+                    .forEach(violations::add);
+                type.getConstructorCallsFromSelf().stream()
+                    .filter(call -> gateway.test(call.getTargetOwner()))
+                    .map(
+                        call ->
+                            call.getOrigin().getFullName()
+                                + " constructs the domain gateway "
+                                + call.getTargetOwner().getName())
+                    .forEach(violations::add);
+              }
+              fail(
+                  "Aggregates, entities, values, factories and specifications must receive a"
+                      + " domain gateway only as a method parameter - never hold it, look it up or"
+                      + " build it.",
+                  violations.stream().distinct().sorted().toList());
+            })
+        .experimental()
+        .selecting(
+            "Non-interface classes anywhere under scan assignable to the aggregate-root, entity,"
+                + " value, factory or specification role, abstract ones included; a class that is"
+                + " itself assignable to the domain-gateway role is not selected.")
+        .checking(
+            "A type assignable to the domain-gateway role (by default DomainGateway of the"
+                + " building blocks) appears in none of these places: a field the class declares,"
+                + " static ones included, through its type, arrays or generic arguments; the"
+                + " return type of a method the class declares, generic arguments included; a"
+                + " method the class calls on another type whose raw return type is a gateway - a"
+                + " registry or locator lookup; a field of another type the class reads whose raw"
+                + " type is a gateway; a constructor of a gateway implementation the class calls. A"
+                + " gateway taken as a constructor or method parameter and the calls made on it"
+                + " pass - a constructor that keeps it in a field is reported for the field."
+                + " Inherited fields are reported on the class that declares them. A domain service"
+                + " and the application may use the gateway freely. An empty selection passes.",
+            "take the gateway as a parameter of the method that needs it, and let the domain"
+                + " service or the use case pass it in");
   }
 
   private static List<JavaClass> ownedAggregateRoots(DcaArchitecture arch) {

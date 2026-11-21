@@ -557,6 +557,21 @@ is no sequential-id assertion for the layered set. Negative fixtures are their o
 `fixtures/asynchrony/{good,bad}` and `fixtures/persistenceapi/{good,bad}`; the shared hexagonal bad fixture is not
 extended, the two ids are excluded from its `badFixtureFails` with that reason.
 
+## 2026-11-20 — DCA-TAC-027: the model receives a domain gateway only as a parameter
+
+New rule, same id in `dca-dotnet`, experimental, enforced. New
+`DcaMarkers` role `domainGateway` (inserted after `specification`; the former canonical constructor stays as a
+compatibility constructor and fills it with the library's type). Selects non-interface classes, abstract ones
+included, assignable to `aggregateRoot`, `entity`, `value`, `factory` or `specification` and not themselves to
+`domainGateway`. Reports, by base component type and through `TypeInspection.involvedTypes`: a declared field
+(`getFields()`, static included) involving a gateway; a declared method whose generic return type involves one; a
+`getMethodCallsFromSelf()` call on a non-gateway owner whose raw return type is a gateway (the locator); a
+`getFieldAccessesFromSelf()` read of another type's field whose raw type is a gateway; a
+`getConstructorCallsFromSelf()` call on a gateway implementation. A parameter and the calls on it pass; a constructor
+that stores the parameter is reported for the field. A nested or anonymous class is a class of its own. A model method takes the gateway in its signature, as both shops do with the password hasher. Fixtures: `tactical.gateways.bad` (a field, a `List` field, a static field read from a
+registry's field, a registry call, a method returning a gateway that constructs an implementation) and
+`tactical.gateways.good` (an aggregate and a value taking it as a parameter, a domain service, a use case).
+
 ## Baseline dial in .NET (WP-52, 2026-11-09)
 
 The .NET library now has `dca.rules.freeze` for the same ids as this one. Nothing changed here in what freezes;

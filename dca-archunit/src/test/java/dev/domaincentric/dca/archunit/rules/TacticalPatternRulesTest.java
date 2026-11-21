@@ -28,7 +28,7 @@ class TacticalPatternRulesTest {
   void ruleSetHasStableShape() {
     TacticalPatternRules set = new TacticalPatternRules(DcaLayout.forBasePackage(GOOD));
     assertEquals("tactical", set.name());
-    assertEquals(25, set.rules().size());
+    assertEquals(26, set.rules().size());
     Fixtures.assertIdsAreSequential(set, "TAC");
   }
 
@@ -54,7 +54,9 @@ class TacticalPatternRulesTest {
         // negative fixture in .tactical.primitives
         "DCA-TAC-025",
         // negative fixture in .tactical.ownership
-        "DCA-TAC-026");
+        "DCA-TAC-026",
+        // negative fixture in .tactical.gateways
+        "DCA-TAC-027");
   }
 
   @Test
@@ -335,5 +337,39 @@ class TacticalPatternRulesTest {
   @Test
   void anOwnedAggregateWithAScopedLookupPasses() {
     Fixtures.passes(Fixtures.ROOT + ".tactical.ownership.good", "DCA-TAC-026");
+  }
+
+  /**
+   * DCA-TAC-027: an aggregate and an entity that hold a domain gateway (the entity in a type
+   * argument), a value that holds one in a static field read from a registry, a factory that looks
+   * one up, a specification that builds an implementation and returns it.
+   */
+  @Test
+  void aModelTypeThatHoldsOrObtainsADomainGatewayIsReported() {
+    String message =
+        Fixtures.violation(Fixtures.ROOT + ".tactical.gateways.bad", "DCA-TAC-027").getMessage();
+
+    for (String offender :
+        List.of(
+            "Policy has field 'rates' of type",
+            "Cover has field 'sources' containing",
+            "Premium has field 'RATES' of type",
+            "obtains a domain gateway from the field",
+            "obtains a domain gateway from",
+            "GatewayRegistry.riskRates()",
+            "constructs the domain gateway",
+            "InsurableRegion.rates() returns a domain gateway")) {
+      assertTrue(message.contains(offender), offender + " in " + message);
+    }
+    assertFalse(message.contains("Policy.open"), "a parameter passes: " + message);
+  }
+
+  /**
+   * An aggregate and a value that take the gateway as a parameter and call it, a domain service and
+   * a use case that call it.
+   */
+  @Test
+  void aGatewayReceivedAsAParameterPasses() {
+    Fixtures.passes(Fixtures.ROOT + ".tactical.gateways.good", "DCA-TAC-027");
   }
 }

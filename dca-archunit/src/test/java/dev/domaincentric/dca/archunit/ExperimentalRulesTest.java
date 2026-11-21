@@ -62,6 +62,7 @@ class ExperimentalRulesTest {
             "DCA-TAC-024",
             "DCA-TAC-025",
             "DCA-TAC-026",
+            "DCA-TAC-027",
             "DCA-MAP-014",
             "DCA-ADV-021",
             "DCA-USE-018",
