@@ -384,9 +384,10 @@ public final class StrategicPatternRules implements DcaRuleSet {
             "DCA-STR-012",
             "At least one module owns a DCA layer",
             "Without a discovered module root every rule that selects over the layers matches"
-                + " nothing and reports success over an empty model",
+                + " nothing and reports success over an empty model; a project without production"
+                + " code has no model to be empty, so it passes",
             arch -> {
-              if (!arch.moduleRoots().isEmpty()) {
+              if (!arch.moduleRoots().isEmpty() || arch.classes().isEmpty()) {
                 return;
               }
               List<String> segments = new ArrayList<>(arch.layerSegments());
@@ -427,7 +428,11 @@ public final class StrategicPatternRules implements DcaRuleSet {
             "At least one module root was discovered. The rule says nothing about how many"
                 + " modules there should be or how they are cut; it only establishes that the"
                 + " layer-selecting rules have something to look at. It is the third guard of the"
-                + " same kind as an empty import and an undeclared bounded context.");
+                + " same kind as an empty import and an undeclared bounded context. A project that"
+                + " holds no production code yet - no class imported below the base package - passes:"
+                + " there is no module to own a layer. Once one production class is imported, the"
+                + " rule fails until a module root is discovered, so a layout that misses the"
+                + " existing code still fails.");
   }
 
   /** DCA-STR-011. */
@@ -436,9 +441,10 @@ public final class StrategicPatternRules implements DcaRuleSet {
             "DCA-STR-011",
             "At least one bounded context is declared",
             "Without a declared context the context-map and isolation rules select nothing and"
-                + " report success over an empty model",
+                + " report success over an empty model; a project without production code has no"
+                + " model to be empty, so it passes",
             arch -> {
-              if (arch.boundedContexts().isEmpty()) {
+              if (arch.boundedContexts().isEmpty() && !arch.classes().isEmpty()) {
                 throw new DcaRuleViolation(
                     "No package below the base package '"
                         + arch.layout().basePackage()
@@ -463,7 +469,11 @@ public final class StrategicPatternRules implements DcaRuleSet {
             "At least one such package exists. The rule says nothing about how many contexts there"
                 + " should be, about their boundaries, or about modules that own a layer without"
                 + " declaring a context — those are governed structurally and are not a substitute"
-                + " for the declaration.");
+                + " for the declaration. A project that holds no production code yet - no class"
+                + " imported below the base package - passes: there is nothing to declare a context"
+                + " for. Once one production class is imported, the rule fails until a context is"
+                + " declared, so a base package or a layout that misses the declarations still"
+                + " fails.");
   }
 
   /**

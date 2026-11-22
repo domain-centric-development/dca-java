@@ -17,6 +17,13 @@ constructor stays as a compatibility constructor that fills it with the library'
 
 ### Changed
 
+**`DCA-STR-011` and `DCA-STR-012` pass on a project without production code.** Both guard against success over
+an empty model: a layout that selects nothing. A project that holds no production code yet - no class imported
+below the base package - has no model to be empty, so neither rule fails there any more. As soon as one production
+class is imported, both fail as before until a context is declared and a module root is discovered.
+`DcaArchitecture.load` still refuses an import that holds no class at all; the rules pass on such an import when it
+is handed to `DcaArchitecture.of`.
+
 **`DCA-ERR-010` — a catch-all that cleans up and rethrows the caught exception unchanged passes.** Such a handler
 does not answer the failure. The rule now reads the handler from the method's byte code: it passes when every path
 from the handler, following jumps and switches, ends in a throw of the very object it caught (kept on the stack or

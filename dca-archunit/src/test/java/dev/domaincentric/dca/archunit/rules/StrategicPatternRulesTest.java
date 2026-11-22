@@ -15,6 +15,9 @@ class StrategicPatternRulesTest {
   private static final String BAD = Fixtures.ROOT + ".strategic.bad";
   private static final String UNDECLARED = Fixtures.ROOT + ".strategic.undeclared";
 
+  /** No class exists below this package: a project that holds no production code yet. */
+  private static final String NO_PRODUCTION_CODE = Fixtures.ROOT + ".noproductioncode";
+
   /** A declared context whose layers carry names the layout does not know. */
   private static final String NO_MODULE_ROOT = Fixtures.ROOT + ".nomoduleroot";
 
@@ -57,6 +60,18 @@ class StrategicPatternRulesTest {
     assertTrue(message.contains("no module root was discovered"), message);
     assertTrue(message.contains("withDomainSubpackage"), message);
     assertTrue(message.contains("passes without having looked at anything"), message);
+  }
+
+  /**
+   * A project without production code has nothing to declare and no module to own a layer: both
+   * guards pass, so the suite is green on an empty project. The two fixtures above keep them red
+   * once code exists.
+   */
+  @Test
+  void aProjectWithoutProductionCodePassesBothGuards() {
+    assertTrue(Fixtures.arch(NO_PRODUCTION_CODE).classes().isEmpty());
+    Fixtures.passes(NO_PRODUCTION_CODE, "DCA-STR-011");
+    Fixtures.passes(NO_PRODUCTION_CODE, "DCA-STR-012");
   }
 
   /** And a normal tree does not trip it. */
