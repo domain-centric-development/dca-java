@@ -7,10 +7,12 @@ import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.core.importer.Location;
+import com.tngtech.archunit.core.importer.Locations;
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.BoundedContext;
 import dev.domaincentric.dca.buildingblocks.ddd.strategic.relationships.SharedKernel;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -19,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -33,6 +36,7 @@ public final class DcaArchitecture {
 
   private final DcaLayout layout;
   private final JavaClasses classes;
+  private final Optional<String> noProductionCodeNotice;
   private Map<String, BoundedContext> boundedContexts;
   private Optional<String> sharedKernelPackage;
 
@@ -69,8 +73,14 @@ public final class DcaArchitecture {
   }
 
   private DcaArchitecture(DcaLayout layout, JavaClasses classes) {
+    this(layout, classes, Optional.empty());
+  }
+
+  private DcaArchitecture(
+      DcaLayout layout, JavaClasses classes, Optional<String> noProductionCodeNotice) {
     this.layout = Objects.requireNonNull(layout);
     this.classes = withoutExcludedPackages(layout, Objects.requireNonNull(classes));
+    this.noProductionCodeNotice = noProductionCodeNotice;
   }
 
   private static JavaClasses withoutExcludedPackages(DcaLayout layout, JavaClasses classes) {
@@ -108,23 +118,113 @@ public final class DcaArchitecture {
    * the sibling modules of a multi-module build).
    */
   public static DcaArchitecture load(DcaLayout layout, ImportOption... importOptions) {
+    return load(layout, Locations.inClassPath(), importOptions);
+  }
+
+  /**
+   * {@link #load(DcaLayout, ImportOption...)} with the class path given as locations — for tests
+   * that need a class path of a given shape.
+   *
+   * <p>An import that found no class below the base package is either a project without production
+   * code yet or a misconfiguration: a misspelt base package, uncompiled classes, a test module that
+   * depends on no production module. The two are told apart by the project's own output — the
+   * directories on the class path, test output and the DCA libraries left out. A production class
+   * there, outside the base package, means the base package misses the code: the import is refused.
+   * No production class there means there is no code to govern yet: every rule passes and {@link
+   * #noProductionCodeNotice()} says so. Production code that reaches the class path only as a jar —
+   * a sibling module of a multi-module build — cannot be told from a third-party library, so a
+   * misspelt base package in a test module without code of its own passes with that notice too.
+   */
+  static DcaArchitecture load(
+      DcaLayout layout, Set<Location> classPath, ImportOption... importOptions) {
     ClassFileImporter importer = new ClassFileImporter();
     for (ImportOption option : importOptions) {
       importer = importer.withImportOption(option);
     }
     JavaClasses imported = importer.importPackages(layout.basePackage());
-    if (!imported.iterator().hasNext()) {
+    if (imported.iterator().hasNext()) {
+      return new DcaArchitecture(layout, imported);
+    }
+    Optional<JavaClass> outside = productionClassInProjectOutput(classPath, importOptions);
+    if (outside.isPresent()) {
       throw new IllegalStateException(
           "No class was imported below the base package '"
               + layout.basePackage()
-              + "', so every rule would pass without having looked at anything. Check that the"
-              + " base package is spelled as the production code declares it, that the production"
-              + " classes are compiled, and — in a multi-module build — that the module running"
-              + " the architecture test depends on every module that holds production code. Pass"
-              + " already imported classes to DcaArchitecture.of(layout, classes) to import them"
-              + " yourself.");
+              + "', but the project's own output holds production classes outside it - "
+              + outside.get().getName()
+              + " among them - so every rule would pass without having looked at anything. Check"
+              + " that the base package is spelled as the production code declares it, and — in a"
+              + " multi-module build — that the module running the architecture test depends on"
+              + " every module that holds production code. Pass already imported classes to"
+              + " DcaArchitecture.of(layout, classes) to import them yourself.");
     }
-    return new DcaArchitecture(layout, imported);
+    return new DcaArchitecture(
+        layout,
+        imported,
+        Optional.of(
+            "no production class below the base package '"
+                + layout.basePackage()
+                + "' and none in the project's own output: a project without production code yet,"
+                + " so every rule passes. Production code that reaches this test only as a jar - a"
+                + " sibling module - is not seen here; once code exists, a misspelt base package"
+                + " fails the import."));
+  }
+
+  /**
+   * The first production class in the project's own output: the class-path directories, archives
+   * (jars, the JDK) left out, test output left out, the DCA libraries' own classes left out.
+   */
+  private static Optional<JavaClass> productionClassInProjectOutput(
+      Set<Location> classPath, ImportOption... importOptions) {
+    Set<URI> libraries = libraryLocations();
+    List<Location> directories =
+        classPath.stream()
+            .filter(l -> !l.isArchive() && "file".equals(l.asURI().getScheme()))
+            .filter(l -> !libraries.contains(l.asURI()))
+            .toList();
+    if (directories.isEmpty()) {
+      return Optional.empty();
+    }
+    ClassFileImporter importer =
+        new ClassFileImporter()
+            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+            .withImportOption(new DoNotIncludeArchitectureTests());
+    for (ImportOption option : importOptions) {
+      importer = importer.withImportOption(option);
+    }
+    for (JavaClass javaClass : importer.importLocations(directories)) {
+      if (!inPackageTree(javaClass.getPackageName(), LIBRARY_PACKAGE)) {
+        return Optional.of(javaClass);
+      }
+    }
+    return Optional.empty();
+  }
+
+  /** The root package of every DCA library: their classes are never the project's code. */
+  private static final String LIBRARY_PACKAGE = "dev.domaincentric.dca";
+
+  private static Set<URI> libraryLocations() {
+    Set<URI> found = new java.util.HashSet<>();
+    for (Class<?> type : List.of(DcaArchitecture.class, BoundedContext.class)) {
+      try {
+        java.security.CodeSource source = type.getProtectionDomain().getCodeSource();
+        if (source != null && source.getLocation() != null) {
+          found.add(Location.of(source.getLocation()).asURI());
+        }
+      } catch (SecurityException | IllegalArgumentException ignored) {
+        // the package filter still leaves the library's classes out
+      }
+    }
+    return found;
+  }
+
+  /**
+   * Set when {@link #load} found no production code at all — nothing below the base package and
+   * nothing in the project's own output: a project that holds no production code yet. Every rule
+   * passes on it; the notice says why the suite is green.
+   */
+  public Optional<String> noProductionCodeNotice() {
+    return noProductionCodeNotice;
   }
 
   /** Wraps already imported classes — for tests and custom importers. */

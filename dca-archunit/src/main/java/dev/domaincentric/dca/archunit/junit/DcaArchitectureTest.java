@@ -225,6 +225,17 @@ public abstract class DcaArchitectureTest {
                 // diagnostic only - what the architecture under test leaves out
               }));
     }
+    arch.noProductionCodeNotice()
+        .ifPresent(
+            notice -> {
+              System.out.println("DCA: " + notice);
+              notices.add(
+                  DynamicTest.dynamicTest(
+                      "production code: " + notice,
+                      () -> {
+                        // diagnostic only - nothing to govern yet, every rule passes
+                      }));
+            });
     arch.baseModuleRootNotice()
         .ifPresent(
             notice -> {

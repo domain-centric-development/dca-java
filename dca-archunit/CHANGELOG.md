@@ -21,8 +21,15 @@ constructor stays as a compatibility constructor that fills it with the library'
 an empty model: a layout that selects nothing. A project that holds no production code yet - no class imported
 below the base package - has no model to be empty, so neither rule fails there any more. As soon as one production
 class is imported, both fail as before until a context is declared and a module root is discovered.
-`DcaArchitecture.load` still refuses an import that holds no class at all; the rules pass on such an import when it
-is handed to `DcaArchitecture.of`.
+
+**`DcaArchitecture.load` accepts a project without production code.** An import that found no class below the base
+package used to be refused. It is now refused only when the project's own output - the directories on the class
+path, test output and the DCA libraries left out - holds a production class outside the base package: a misspelt
+base package over existing code still fails, and the message names one such class. With no production class there,
+the import passes, `DcaArchitecture.noProductionCodeNotice()` says why, and `DcaArchitectureTest` lists it as a
+diagnostic, so the whole catalog is green on an empty project. Production code that reaches the test only as a jar -
+a sibling module of a multi-module build - cannot be told from a third-party library; a misspelt base package in a
+test module without code of its own passes with the notice.
 
 **`DCA-ERR-010` — a catch-all that cleans up and rethrows the caught exception unchanged passes.** Such a handler
 does not answer the failure. The rule now reads the handler from the method's byte code: it passes when every path
