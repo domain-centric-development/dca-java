@@ -22,6 +22,14 @@ an empty model: a layout that selects nothing. A project that holds no productio
 below the base package - has no model to be empty, so neither rule fails there any more. As soon as one production
 class is imported, both fail as before until a context is declared and a module root is discovered.
 
+**A class that only starts the program is no production code.** A freshly generated application starts green:
+`DcaArchitecture.isEntryPoint` recognises a top-level class that extends and implements nothing, declares no field
+and no nested type, takes no constructor parameter and whose only declared method is `public static void
+main(String[])` - annotations allowed, synthetic methods of a lambda inside `main` part of `main`. A project whose
+classes are only such entry points holds no production code (`holdsProductionCode()`): `DCA-STR-011` and
+`DCA-STR-012` pass, and `load` passes with the notice. The shape decides, not a framework annotation. One more class
+of any other shape and both guards fail as before; a misspelt base package over it still fails the import.
+
 **`DcaArchitecture.load` accepts a project without production code.** An import that found no class below the base
 package used to be refused. It is now refused only when the project's own output - the directories on the class
 path, test output and the DCA libraries left out - holds a production class outside the base package: a misspelt

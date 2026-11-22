@@ -4,6 +4,8 @@ import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaAnnotation;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaMethod;
+import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.core.importer.Location;
@@ -125,15 +127,18 @@ public final class DcaArchitecture {
    * {@link #load(DcaLayout, ImportOption...)} with the class path given as locations — for tests
    * that need a class path of a given shape.
    *
-   * <p>An import that found no class below the base package is either a project without production
-   * code yet or a misconfiguration: a misspelt base package, uncompiled classes, a test module that
-   * depends on no production module. The two are told apart by the project's own output — the
-   * directories on the class path, test output and the DCA libraries left out. A production class
-   * there, outside the base package, means the base package misses the code: the import is refused.
-   * No production class there means there is no code to govern yet: every rule passes and {@link
-   * #noProductionCodeNotice()} says so. Production code that reaches the class path only as a jar —
-   * a sibling module of a multi-module build — cannot be told from a third-party library, so a
-   * misspelt base package in a test module without code of its own passes with that notice too.
+   * <p>A project holds production code once it has a class that is not a program entry point (see
+   * {@link #isEntryPoint(JavaClass, JavaClasses)}): a freshly generated application whose only
+   * class starts the program holds none yet. An import that found no production class below the
+   * base package is either such a project or a misconfiguration: a misspelt base package,
+   * uncompiled classes, a test module that depends on no production module. The two are told apart
+   * by the project's own output — the directories on the class path, test output and the DCA
+   * libraries left out. A production class there, outside the base package, means the base package
+   * misses the code: the import is refused. None there means there is no code to govern yet: every
+   * rule passes and {@link #noProductionCodeNotice()} says so. Production code that reaches the
+   * class path only as a jar — a sibling module of a multi-module build — cannot be told from a
+   * third-party library, so a misspelt base package in a test module without code of its own passes
+   * with that notice too.
    */
   static DcaArchitecture load(
       DcaLayout layout, Set<Location> classPath, ImportOption... importOptions) {
@@ -142,13 +147,13 @@ public final class DcaArchitecture {
       importer = importer.withImportOption(option);
     }
     JavaClasses imported = importer.importPackages(layout.basePackage());
-    if (imported.iterator().hasNext()) {
+    if (productionClass(imported, false).isPresent()) {
       return new DcaArchitecture(layout, imported);
     }
     Optional<JavaClass> outside = productionClassInProjectOutput(classPath, importOptions);
     if (outside.isPresent()) {
       throw new IllegalStateException(
-          "No class was imported below the base package '"
+          "No production class was imported below the base package '"
               + layout.basePackage()
               + "', but the project's own output holds production classes outside it - "
               + outside.get().getName()
@@ -164,15 +169,90 @@ public final class DcaArchitecture {
         Optional.of(
             "no production class below the base package '"
                 + layout.basePackage()
-                + "' and none in the project's own output: a project without production code yet,"
-                + " so every rule passes. Production code that reaches this test only as a jar - a"
-                + " sibling module - is not seen here; once code exists, a misspelt base package"
-                + " fails the import."));
+                + "' and none in the project's own output - at most a class that only starts the"
+                + " program: a project without production code yet, so every rule passes."
+                + " Production code that reaches this test only as a jar - a sibling module - is"
+                + " not seen here; once code exists, a misspelt base package fails the import."));
   }
 
   /**
+   * The first class of the import that is production code: one that is not a program entry point.
+   */
+  private static Optional<JavaClass> productionClass(JavaClasses classes, boolean skipLibraries) {
+    for (JavaClass javaClass : classes) {
+      if (!(skipLibraries && inPackageTree(javaClass.getPackageName(), LIBRARY_PACKAGE))
+          && !isEntryPoint(javaClass, classes)) {
+        return Optional.of(javaClass);
+      }
+    }
+    return Optional.empty();
+  }
+
+  /**
+   * Whether the class only starts the program — the shape an application generator writes before
+   * any production code exists. Such a class is a top-level class that extends nothing, implements
+   * nothing and declares no field and no nested type; its only declared method is {@code public
+   * static void main(String[])}, its constructors take no parameter (the implicit default one, or a
+   * private one), and it may carry annotations. Synthetic methods the compiler writes for a lambda
+   * inside {@code main} are part of {@code main}. Every other class is production code.
+   */
+  public static boolean isEntryPoint(JavaClass javaClass, JavaClasses classes) {
+    if (javaClass.isInterface()
+        || javaClass.isEnum()
+        || javaClass.isRecord()
+        || javaClass.isAnnotation()
+        || javaClass.isNestedClass()
+        || javaClass.getSimpleName().equals("package-info")
+        || !javaClass.getRawSuperclass().map(s -> s.isEquivalentTo(Object.class)).orElse(false)
+        || !javaClass.getRawInterfaces().isEmpty()
+        || !javaClass.getFields().isEmpty()) {
+      return false;
+    }
+    if (javaClass.getConstructors().stream().anyMatch(c -> !c.getRawParameterTypes().isEmpty())) {
+      return false;
+    }
+    boolean main = false;
+    for (JavaMethod method : javaClass.getMethods()) {
+      if (isMain(method)) {
+        main = true;
+      } else if (!method.getModifiers().contains(JavaModifier.SYNTHETIC)) {
+        return false;
+      }
+    }
+    for (JavaClass other : classes) {
+      if (other.getEnclosingClass().map(javaClass::equals).orElse(false)) {
+        return false;
+      }
+    }
+    return main;
+  }
+
+  private static boolean isMain(JavaMethod method) {
+    return method.getName().equals("main")
+        && method.getModifiers().contains(JavaModifier.PUBLIC)
+        && method.getModifiers().contains(JavaModifier.STATIC)
+        && method.getRawReturnType().isEquivalentTo(void.class)
+        && method.getRawParameterTypes().size() == 1
+        && method.getRawParameterTypes().get(0).isEquivalentTo(String[].class);
+  }
+
+  /**
+   * Whether the imported classes hold production code: a class that is not a program entry point. A
+   * project whose only class starts the program holds none yet.
+   */
+  public boolean holdsProductionCode() {
+    if (holdsProductionCode == null) {
+      holdsProductionCode = productionClass(classes, false).isPresent();
+    }
+    return holdsProductionCode;
+  }
+
+  private Boolean holdsProductionCode;
+
+  /**
    * The first production class in the project's own output: the class-path directories, archives
-   * (jars, the JDK) left out, test output left out, the DCA libraries' own classes left out.
+   * (jars, the JDK) left out, test output left out, the DCA libraries' own classes and program
+   * entry points left out.
    */
   private static Optional<JavaClass> productionClassInProjectOutput(
       Set<Location> classPath, ImportOption... importOptions) {
@@ -192,12 +272,7 @@ public final class DcaArchitecture {
     for (ImportOption option : importOptions) {
       importer = importer.withImportOption(option);
     }
-    for (JavaClass javaClass : importer.importLocations(directories)) {
-      if (!inPackageTree(javaClass.getPackageName(), LIBRARY_PACKAGE)) {
-        return Optional.of(javaClass);
-      }
-    }
-    return Optional.empty();
+    return productionClass(importer.importLocations(directories), true);
   }
 
   /** The root package of every DCA library: their classes are never the project's code. */
@@ -220,8 +295,9 @@ public final class DcaArchitecture {
 
   /**
    * Set when {@link #load} found no production code at all — nothing below the base package and
-   * nothing in the project's own output: a project that holds no production code yet. Every rule
-   * passes on it; the notice says why the suite is green.
+   * nothing in the project's own output but, at most, classes that only start the program: a
+   * project that holds no production code yet. Every rule passes on it; the notice says why the
+   * suite is green.
    */
   public Optional<String> noProductionCodeNotice() {
     return noProductionCodeNotice;

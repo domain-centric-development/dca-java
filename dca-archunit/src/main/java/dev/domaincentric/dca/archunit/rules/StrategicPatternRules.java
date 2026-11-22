@@ -387,7 +387,7 @@ public final class StrategicPatternRules implements DcaRuleSet {
                 + " nothing and reports success over an empty model; a project without production"
                 + " code has no model to be empty, so it passes",
             arch -> {
-              if (!arch.moduleRoots().isEmpty() || arch.classes().isEmpty()) {
+              if (!arch.moduleRoots().isEmpty() || !arch.holdsProductionCode()) {
                 return;
               }
               List<String> segments = new ArrayList<>(arch.layerSegments());
@@ -429,8 +429,12 @@ public final class StrategicPatternRules implements DcaRuleSet {
                 + " modules there should be or how they are cut; it only establishes that the"
                 + " layer-selecting rules have something to look at. It is the third guard of the"
                 + " same kind as an empty import and an undeclared bounded context. A project that"
-                + " holds no production code yet - no class imported below the base package - passes:"
-                + " there is no module to own a layer. Once one production class is imported, the"
+                + " holds no production code yet passes: there is no module to own a layer. A project"
+                + " holds none while every class imported below the base package is a program entry"
+                + " point - a top-level class that extends and implements nothing, declares no field"
+                + " and no nested type, takes no constructor parameter and whose only declared method"
+                + " is public static void main(String[]), annotations allowed. Once one production"
+                + " class is imported, the"
                 + " rule fails until a module root is discovered, so a layout that misses the"
                 + " existing code still fails.");
   }
@@ -444,7 +448,7 @@ public final class StrategicPatternRules implements DcaRuleSet {
                 + " report success over an empty model; a project without production code has no"
                 + " model to be empty, so it passes",
             arch -> {
-              if (arch.boundedContexts().isEmpty() && !arch.classes().isEmpty()) {
+              if (arch.boundedContexts().isEmpty() && arch.holdsProductionCode()) {
                 throw new DcaRuleViolation(
                     "No package below the base package '"
                         + arch.layout().basePackage()
@@ -469,9 +473,13 @@ public final class StrategicPatternRules implements DcaRuleSet {
             "At least one such package exists. The rule says nothing about how many contexts there"
                 + " should be, about their boundaries, or about modules that own a layer without"
                 + " declaring a context — those are governed structurally and are not a substitute"
-                + " for the declaration. A project that holds no production code yet - no class"
-                + " imported below the base package - passes: there is nothing to declare a context"
-                + " for. Once one production class is imported, the rule fails until a context is"
+                + " for the declaration. A project that holds no production code yet passes: there is"
+                + " nothing to declare a context for. A project holds none while every class imported"
+                + " below the base package is a program entry point - a top-level class that extends"
+                + " and implements nothing, declares no field and no nested type, takes no constructor"
+                + " parameter and whose only declared method is public static void main(String[]),"
+                + " annotations allowed. Once one production class is imported, the rule fails until"
+                + " a context is"
                 + " declared, so a base package or a layout that misses the declarations still"
                 + " fails.");
   }

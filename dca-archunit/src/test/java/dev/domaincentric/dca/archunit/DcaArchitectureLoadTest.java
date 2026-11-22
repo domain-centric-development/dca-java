@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -93,6 +94,25 @@ class DcaArchitectureLoadTest {
                 .importPackages("com.example.absent"));
 
     assertEquals(0, architecture.classes().size());
+  }
+
+  /** The shapes of an entry point: only main, annotations and a lambda inside main allowed. */
+  @Test
+  void anEntryPointOnlyStartsTheProgram() {
+    String shapes = Fixtures.ROOT + ".entrypoint.shapes";
+    com.tngtech.archunit.core.domain.JavaClasses classes =
+        new com.tngtech.archunit.core.importer.ClassFileImporter()
+            .importPackages(Fixtures.ROOT + ".entrypoint");
+    java.util.function.Predicate<String> entryPoint =
+        name -> DcaArchitecture.isEntryPoint(classes.get(name), classes);
+
+    assertTrue(entryPoint.test(Fixtures.ROOT + ".entrypoint.only.Application"));
+    assertTrue(entryPoint.test(shapes + ".WithLambda"));
+    for (String production :
+        List.of("WithField", "WithSecondMethod", "WithNestedType", "WithoutMain")) {
+      assertTrue(!entryPoint.test(shapes + "." + production), production);
+    }
+    assertTrue(!entryPoint.test(Fixtures.ROOT + ".entrypoint.plus.Thing"));
   }
 
   /** A class outside every DCA package, standing in for the project's own production code. */

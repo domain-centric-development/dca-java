@@ -18,6 +18,12 @@ class StrategicPatternRulesTest {
   /** No class exists below this package: a project that holds no production code yet. */
   private static final String NO_PRODUCTION_CODE = Fixtures.ROOT + ".noproductioncode";
 
+  /** Only the class a generator writes to start the program. */
+  private static final String ENTRY_POINT_ONLY = Fixtures.ROOT + ".entrypoint.only";
+
+  /** The same entry point and one record beside it. */
+  private static final String ENTRY_POINT_PLUS = Fixtures.ROOT + ".entrypoint.plus";
+
   /** A declared context whose layers carry names the layout does not know. */
   private static final String NO_MODULE_ROOT = Fixtures.ROOT + ".nomoduleroot";
 
@@ -72,6 +78,18 @@ class StrategicPatternRulesTest {
     assertTrue(Fixtures.arch(NO_PRODUCTION_CODE).classes().isEmpty());
     Fixtures.passes(NO_PRODUCTION_CODE, "DCA-STR-011");
     Fixtures.passes(NO_PRODUCTION_CODE, "DCA-STR-012");
+  }
+
+  /**
+   * A freshly generated application: its only class starts the program. It holds no production code
+   * yet, so both guards pass; one more real type and both fail.
+   */
+  @Test
+  void aProjectWhoseOnlyClassStartsTheProgramPassesBothGuards() {
+    Fixtures.passes(ENTRY_POINT_ONLY, "DCA-STR-011");
+    Fixtures.passes(ENTRY_POINT_ONLY, "DCA-STR-012");
+    Fixtures.violation(ENTRY_POINT_PLUS, "DCA-STR-011");
+    Fixtures.violation(ENTRY_POINT_PLUS, "DCA-STR-012");
   }
 
   /** And a normal tree does not trip it. */
