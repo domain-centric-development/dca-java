@@ -6,6 +6,14 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ### Added
 
+**`DCA-USE-023` — an output port declared in a use case's package is used by that use case only, experimental.**
+A port used by one use case stays with it; a port used by several belongs in the shared application package. The rule
+selects every interface assignable to the output-port role that is declared in a use case package - the package of an
+operation (the input-port role or the use-case suffix, as `DCA-USE-016` selects it) and everything below it, the
+deepest one winning - and reports it when a class of another use case package depends on it, naming the port, its use
+case and the others. Ports in the shared package, a feature package or the application package itself are not
+selected; adapters do not count.
+
 **`DCA-TAC-027` — aggregates, entities, values, factories and specifications receive a domain gateway only as a
 parameter, experimental.** Selects every non-interface class assignable to the aggregate-root, entity, value, factory
 or specification role and reports a gateway it holds (a declared field, static included, through arrays and generic

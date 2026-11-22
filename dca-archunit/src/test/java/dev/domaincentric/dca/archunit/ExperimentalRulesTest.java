@@ -70,6 +70,7 @@ class ExperimentalRulesTest {
             "DCA-USE-020",
             "DCA-USE-021",
             "DCA-USE-022",
+            "DCA-USE-023",
             "DCA-NAM-012",
             "DCA-NAM-013",
             "DCA-ERR-007",

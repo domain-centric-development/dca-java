@@ -8,6 +8,7 @@ import dev.domaincentric.dca.archunit.DcaLayout;
 import dev.domaincentric.dca.archunit.DcaRuleExecution;
 import dev.domaincentric.dca.archunit.DcaRuleOutcome;
 import dev.domaincentric.dca.archunit.DcaRuleSelection;
+import dev.domaincentric.dca.archunit.DcaRuleViolation;
 import dev.domaincentric.dca.archunit.Fixtures;
 import java.util.List;
 import java.util.stream.Stream;
@@ -43,7 +44,55 @@ class UseCaseRulesTest {
         // negative fixture in .usecase.readonly
         "DCA-USE-019",
         // negative fixture in .usecase.rawids
-        "DCA-USE-020");
+        "DCA-USE-020",
+        // negative fixture in .usecase.sharedport
+        "DCA-USE-023");
+  }
+
+  @Nested
+  @DisplayName("DCA-USE-023 — a port of several use cases is shared")
+  class PortsOfSeveralUseCases {
+    private static final String SHARED_PORT = FIXTURES + ".sharedport";
+
+    @Test
+    void aPortOfOneUseCaseUsedByAnotherFails() {
+      DcaRuleViolation violation = Fixtures.violation(SHARED_PORT + ".bad", "DCA-USE-023");
+      assertTrue(
+          violation
+              .getMessage()
+              .contains(
+                  SHARED_PORT
+                      + ".bad.alpha.application.install.Source is declared in the use case package "
+                      + SHARED_PORT
+                      + ".bad.alpha.application.install and used by "
+                      + SHARED_PORT
+                      + ".bad.alpha.application.check"),
+          violation.getMessage());
+    }
+
+    @Test
+    void aSharedPortAndAPortOfItsOwnUseCasePass() {
+      Fixtures.passes(SHARED_PORT + ".good", "DCA-USE-023");
+    }
+
+    @Test
+    void itIsExperimentalAndRunsOnlyWhenSwitchedOn() {
+      DcaLayout layout = DcaLayout.forBasePackage(SHARED_PORT + ".bad");
+      assertFalse(
+          dev.domaincentric.dca.archunit.DcaRules.selectFlat(layout, DcaRuleSelection.all())
+              .stream()
+              .anyMatch(r -> r.id().equals("DCA-USE-023")));
+      assertTrue(
+          dev.domaincentric.dca.archunit.DcaRules.selectFlat(
+                  layout, DcaRuleSelection.all().withExperimental())
+              .stream()
+              .anyMatch(r -> r.id().equals("DCA-USE-023")));
+    }
+
+    @Test
+    void anEmptyProjectPasses() {
+      Fixtures.passes(Fixtures.ROOT + ".noproductioncode", "DCA-USE-023");
+    }
   }
 
   @Nested

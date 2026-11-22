@@ -64,7 +64,8 @@ public final class UseCaseRules implements DcaRuleSet {
             queriesHaveNoSideEffect(layout),
             useCasesParseNoRawIds(layout),
             useCasesAreStateless(layout),
-            useCaseResultsAreNoBarePrimitives(layout));
+            useCaseResultsAreNoBarePrimitives(layout),
+            portsOfSeveralUseCasesAreShared(layout));
   }
 
   public static DcaRule useCasesMustNotInvokeOtherUseCases(DcaLayout layout) {
@@ -1278,5 +1279,108 @@ public final class UseCaseRules implements DcaRuleSet {
         .filter(supertype -> !supertype.getName().equals(contract))
         .filter(supertype -> supertype.isAssignableTo(contract))
         .anyMatch(supertype -> bareOutput(supertype, contract) != null);
+  }
+
+  /**
+   * DCA-USE-023. A use case package is the package of an operation (the input-port role or the
+   * use-case suffix, as DCA-USE-016 selects it) and everything below it; a class belongs to the
+   * deepest such package that contains it. The shared package and the application package itself
+   * are no use case package.
+   */
+  public static DcaRule portsOfSeveralUseCasesAreShared(DcaLayout layout) {
+    return DcaRule.check(
+            "DCA-USE-023",
+            "An output port declared in a use case's package is used by that use case only",
+            "A port used by one use case stays with that use case; a port used by several belongs"
+                + " in the shared application package. A port declared in one use case's package and"
+                + " used by another ties the second to the first: it changes with a use case it does"
+                + " not belong to, grows methods only the other one calls, and hides that the port"
+                + " is shared",
+            arch -> checkPortsOfSeveralUseCases(arch, layout))
+        .experimental()
+        .selecting(
+            "Interfaces assignable to the output-port role (the role type itself excluded) that are"
+                + " declared in a use case package: the package of a non-interface, non-abstract,"
+                + " non-nested application class with the input-port role or the configured"
+                + " use-case suffix, and everything below it - a class belongs to the deepest such"
+                + " package. Ports in application.shared, in a feature package or directly in the"
+                + " application package are not selected.")
+        .checking(
+            "No class of another use case package depends on the port - a field, a parameter, a"
+                + " call or any other direct dependency, read from the byte code. Adapters, the"
+                + " shared package and classes outside a use case package are not counted. An empty"
+                + " selection passes.",
+            "move the port into application.shared once a second use case needs it");
+  }
+
+  private static void checkPortsOfSeveralUseCases(DcaArchitecture arch, DcaLayout layout) {
+    DescribedPredicate<JavaClass> outputPort = arch.layout().markers().is("outputPort");
+    String marker = arch.layout().markers().outputPort();
+    TreeSet<String> roots = new TreeSet<>();
+    for (JavaClass type : arch.classes()) {
+      if (OperationPolicy.operation(type, arch)) {
+        roots.add(type.getPackageName());
+      }
+    }
+    Map<String, TreeSet<String>> foreignUsers = new TreeMap<>();
+    Map<String, String> homes = new TreeMap<>();
+    for (JavaClass user : arch.classes()) {
+      String userRoot = useCasePackageOf(user.getPackageName(), roots, arch, layout);
+      if (userRoot == null) {
+        continue;
+      }
+      for (var dependency : user.getDirectDependenciesFromSelf()) {
+        JavaClass target = dependency.getTargetClass().getBaseComponentType();
+        if (!target.isInterface() || target.getName().equals(marker) || !outputPort.test(target)) {
+          continue;
+        }
+        String home = useCasePackageOf(target.getPackageName(), roots, arch, layout);
+        if (home == null || home.equals(userRoot)) {
+          continue;
+        }
+        homes.put(target.getName(), home);
+        foreignUsers.computeIfAbsent(target.getName(), k -> new TreeSet<>()).add(userRoot);
+      }
+    }
+    if (foreignUsers.isEmpty()) {
+      return;
+    }
+    List<String> violations = new ArrayList<>();
+    foreignUsers.forEach(
+        (port, users) ->
+            violations.add(
+                port
+                    + " is declared in the use case package "
+                    + homes.get(port)
+                    + " and used by "
+                    + String.join(", ", users)));
+    throw new DcaRuleViolation(
+        "An output port used by several use cases is declared in one of them. Fix: move it into"
+            + " the shared application package.",
+        violations);
+  }
+
+  /** The deepest use case package containing the package, or {@code null}. */
+  private static String useCasePackageOf(
+      String pkg, TreeSet<String> roots, DcaArchitecture arch, DcaLayout layout) {
+    String module = arch.moduleRootOf(pkg);
+    if (module == null) {
+      return null;
+    }
+    String application = module + "." + layout.applicationSubpackage();
+    String shared = application + "." + layout.sharedSubpackage();
+    if (pkg.equals(shared) || pkg.startsWith(shared + ".")) {
+      return null;
+    }
+    String found = null;
+    for (String root : roots) {
+      if (!root.equals(application)
+          && root.startsWith(application + ".")
+          && (pkg.equals(root) || pkg.startsWith(root + "."))
+          && (found == null || root.length() > found.length())) {
+        found = root;
+      }
+    }
+    return found;
   }
 }
