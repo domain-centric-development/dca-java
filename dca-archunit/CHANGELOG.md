@@ -4,6 +4,8 @@ All notable changes to this artifact. Format: [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-26
+
 ### Added
 
 **`DCA-USE-023` — an output port declared in a use case's package is used by that use case only, experimental.**
@@ -22,6 +24,13 @@ read of another type's gateway field) or constructs. A gateway taken as a parame
 The gateway is the new `DcaMarkers` role `domainGateway` (default `ddd.tactical.DomainGateway`,
 `withDomainGateway(...)`). The role sits after `specification`; the former canonical
 constructor stays as a compatibility constructor that fills it with the library's type.
+
+**`DCA-ERR-010` — a port call is never wrapped in a catch of every failure, experimental.** Selects every try
+block in a class of `<module>.adapter.incoming..` or `<module>.application..` whose try part calls a method of an
+interface assignable to the input-port or output-port role, lambdas and nested classes included, and reports a catch
+clause that names `Exception`, `RuntimeException` or the port-exception or input-port-exception role itself. A
+subtype - a use case's own failure, an output port's failure, a named domain failure - passes, and so does a handler
+that rethrows the caught exception unchanged (see below).
 
 ### Changed
 
